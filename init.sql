@@ -1,0 +1,9 @@
+CREATE TABLE IF NOT EXISTS users(
+    login TEXT PRIMARY KEY,
+    passhash BYTEA NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS sessions(
+    id TEXT NOT NULL,
+    username TEXT NOT NULL REFERENCES users(login) ON DELETE CASCADE
+);
