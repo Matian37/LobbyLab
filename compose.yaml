@@ -5,6 +5,12 @@ services:
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "${POSTGRES_USER}", "-d", "${POSTGRES_DB}"]
+      interval: 5s
+      retries: 10
+      timeout: 2s
+      start_period: 10s
     volumes:
       - ./data/db:/var/lib/postgresql
       - ./init.sql:/docker-entrypoint-initdb.d/init.sql
@@ -17,6 +23,11 @@ services:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER}
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS}
       RABBITMQ_NODENAME: rabbit@rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 5s
+      retries: 10
+      timeout: 2s
     volumes:
       - ./data/rabbitmq:/var/lib/rabbitmq
     networks:
@@ -36,8 +47,10 @@ services:
       - db-net
       - rabbitmq-net
     depends_on:
-      - db
-      - rabbitmq
+      db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
 
   server-manager:
     image: golang:1.26-alpine
@@ -51,8 +64,10 @@ services:
       - db-net
       - rabbitmq-net
     depends_on:
-      - db
-      - rabbitmq
+      db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
 
   game-server:
     build:
@@ -63,7 +78,8 @@ services:
     networks:
       - rabbitmq-net
     depends_on:
-      - rabbitmq
+      rabbitmq:
+        condition: service_healthy
 
 networks:
   db-net:
