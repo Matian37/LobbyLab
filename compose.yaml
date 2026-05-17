@@ -11,6 +11,17 @@ services:
     networks:
       - db-net
 
+  rabbitmq:
+    image: rabbitmq:4.3-alpine
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS}
+      RABBITMQ_NODENAME: rabbit@rabbitmq
+    volumes:
+      - ./data/rabbitmq:/var/lib/rabbitmq
+    networks:
+      - rabbitmq-net
+
   api:
     image: node:26-alpine
     environment:
@@ -52,21 +63,7 @@ services:
     networks:
       - rabbitmq-net
     depends_on:
-      - server-manager
-
-  rabbitmq:
-    image: rabbitmq:4.3-alpine
-    environment:
-      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER}
-      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS}
-      RABBITMQ_NODENAME: rabbit@rabbitmq
-    ports:
-      - "127.0.0.1:15672:15672"
-      - "5672:5672"
-    volumes:
-      - ./data/rabbitmq:/var/lib/rabbitmq
-    networks:
-      - rabbitmq-net
+      - rabbitmq
 
 networks:
   db-net:
