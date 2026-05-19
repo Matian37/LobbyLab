@@ -39,17 +39,12 @@ services:
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER}
-      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS}
     ports:
       - "3000:3000"
     networks:
       - db-net
-      - rabbitmq-net
     depends_on:
       db:
-        condition: service_healthy
-      rabbitmq:
         condition: service_healthy
 
   server-manager:
