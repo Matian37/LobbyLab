@@ -3,7 +3,7 @@ using System.Net.Sockets;
 using System.Text;
 using UnityEngine;
 
-public class SimpleClient : MonoBehaviour
+public class Client : MonoBehaviour
 {
     UdpClient client;
     IPEndPoint serverEP;
@@ -17,6 +17,7 @@ public class SimpleClient : MonoBehaviour
         client = new UdpClient();
         // Adres serwera (na razie localhost) i port
         serverEP = new IPEndPoint(IPAddress.Parse("127.0.0.1"), 7777);
+        Time.timeScale = 0;
     }
 
     void Update()
@@ -37,14 +38,16 @@ public class SimpleClient : MonoBehaviour
             IPEndPoint senderEP = new IPEndPoint(IPAddress.Any, 0);
             byte[] receivedData = client.Receive(ref senderEP);
             string message = Encoding.ASCII.GetString(receivedData);
-
-            string[] floats = message.Split(',');
+            if (message == "0" || message == "" || message == null)
+                return;
+            if (Time.timeScale == 0) Time.timeScale = 1;
+            string[] floats = message.Split('.');
             float pos1 = float.Parse(floats[0]);
             float pos2 = float.Parse(floats[1]);
             float hearts1 = float.Parse(floats[2]);
             float hearts2 = float.Parse(floats[3]);
             float win = float.Parse(floats[4]);
-            
+            Debug.Log(pos2 + " " + message);
             player1.position = new Vector3(pos1, player1.position.y, player1.position.z);
             player2.position = new Vector3(pos2, player2.position.y, player2.position.z);
             int before = 0;
@@ -70,4 +73,5 @@ public class SimpleClient : MonoBehaviour
     }
 }
 
-//position1,position2,hearts1,hearts2,win(0->trwa, 1->youWin, 2->youLose)
+//ODBIÓR: position1,position2,hearts1,hearts2,win(0->trwa, 1->youWin, 2->youLose)
+//wysy³ka: A/N/D

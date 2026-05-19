@@ -15,7 +15,7 @@ public class LevelInfo
 public class Info : MonoBehaviour
 {
     public GameObject[] modes;
-    public GameObject[] turnOnRivalry;
+    public GameObject[] turnOnRivalry, turnOnMultiplayer;
 
     public PlayerController altLeft, altRight;
 
@@ -25,12 +25,18 @@ public class Info : MonoBehaviour
         LevelInfo info = JsonUtility.FromJson<LevelInfo>(s);
 
         if (info.mode == 0) modes[0].SetActive(true);
-        else modes[1].SetActive(true);
+        else if(info.mode < 3) modes[1].SetActive(true);
+        else modes[2].SetActive(true);
 
-        if(info.rival || info.mode == 3)
+        if(info.rival)
             foreach (GameObject g in turnOnRivalry)
                 g.SetActive(true);
-        if(info.mode == 1)
+        if (info.mode == 3)
+        {
+            foreach (GameObject g in turnOnMultiplayer)
+                g.SetActive(true);
+        }
+        if (info.mode == 1)
         {
             altRight.livesManager = altLeft.livesManager;
         }

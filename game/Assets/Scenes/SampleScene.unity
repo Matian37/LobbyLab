@@ -3217,10 +3217,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 0cd44c1031e13a943bb63640046fad76, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  m_UiScaleMode: 0
+  m_UiScaleMode: 1
   m_ReferencePixelsPerUnit: 100
   m_ScaleFactor: 1
-  m_ReferenceResolution: {x: 800, y: 600}
+  m_ReferenceResolution: {x: 1920, y: 1080}
   m_ScreenMatchMode: 0
   m_MatchWidthOrHeight: 0
   m_PhysicalUnit: 3
@@ -5275,8 +5275,11 @@ MonoBehaviour:
   modes:
   - {fileID: 26620226}
   - {fileID: 1694445002}
+  - {fileID: 788851369}
   turnOnRivalry:
   - {fileID: 100360365}
+  - {fileID: 453997860}
+  turnOnMultiplayer:
   - {fileID: 453997860}
   altLeft: {fileID: 868768172}
   altRight: {fileID: 151248637}
@@ -6197,9 +6200,9 @@ MonoBehaviour:
   player: {fileID: 78545749}
   obs: {fileID: 772251362936771863, guid: e786d520051bd5a4c944f0510d857e61, type: 3}
   leftWall: {x: 72.5, y: 54.5, z: 0}
-  leftTor: {x: -995.6, y: 35.7, z: 0}
-  rightTor: {x: -1039.3, y: 35.7, z: 0}
-  rightWall: {x: -1072.9, y: 54.5, z: 0}
+  leftTor: {x: -1623.6, y: 35.7, z: 0}
+  rightTor: {x: -1666.6, y: 35.7, z: 0}
+  rightWall: {x: -1700.6, y: 54.5, z: 0}
   text: {fileID: 1332621140}
   loseText: {fileID: 255106495}
   winInfo: {fileID: 1781422164}
@@ -8057,9 +8060,9 @@ MonoBehaviour:
   speed: 90
   player: {fileID: 1400080637}
   obs: {fileID: 772251362936771863, guid: e786d520051bd5a4c944f0510d857e61, type: 3}
-  leftWall: {x: -892.4, y: 54.5, z: 0}
-  leftTor: {x: -925.26, y: 35.7, z: 0}
-  rightTor: {x: -964.2, y: 35.7, z: 0}
+  leftWall: {x: -1520.4, y: 54.5, z: 0}
+  leftTor: {x: -1553.26, y: 35.7, z: 0}
+  rightTor: {x: -1592.2, y: 35.7, z: 0}
   rightWall: {x: -66, y: 54.5, z: 0}
   text: {fileID: 1332621140}
   loseText: {fileID: 255106495}

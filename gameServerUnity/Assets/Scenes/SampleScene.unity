@@ -133,7 +133,9 @@ GameObject:
   m_Component:
   - component: {fileID: 78545749}
   - component: {fileID: 78545754}
+  - component: {fileID: 78545756}
   - component: {fileID: 78545753}
+  - component: {fileID: 78545755}
   - component: {fileID: 78545752}
   - component: {fileID: 78545750}
   m_Layer: 0
@@ -258,6 +260,44 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 78545748}
   m_Mesh: {fileID: 10208, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!114 &78545755
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 78545748}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d4e2f031bfe236c4391025924531d694, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  speed: 15
+  altLeft: 0
+  altRight: 1
+  leftWall: {x: 0, y: 0, z: 0}
+  leftTor: {x: -1623.6, y: 45.7, z: 81.7}
+  rightTor: {x: -1666.6, y: 45.7, z: 81.7}
+  rightWall: {x: -1700.6, y: 45.7, z: 81.7}
+  gen: {fileID: 1529507987}
+  touchedWall: 0
+  livesManager: {fileID: 78545756}
+--- !u!114 &78545756
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 78545748}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9dfe5e108724bd0419440222827d441c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  lives: 3
+  ser: {fileID: 788851371}
+  isLeft: 0
+  timeToRegen: 20
 --- !u!1 &119457474
 GameObject:
   m_ObjectHideFlags: 0
@@ -499,6 +539,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 788851370}
+  - component: {fileID: 788851371}
   m_Layer: 0
   m_Name: Tryb3
   m_TagString: Untagged
@@ -530,6 +571,25 @@ Transform:
   - {fileID: 78545749}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &788851371
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 788851369}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 258f1b4243bc8e24aa2c85f61194cc3f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  song: 0
+  leftGen: {fileID: 1925350277}
+  rightGen: {fileID: 1529507987}
+  leftPlayer: {fileID: 1400080643}
+  rightPlayer: {fileID: 78545755}
+  livesLeft: {fileID: 1400080644}
+  livesRight: {fileID: 78545756}
 --- !u!1 &899649654
 GameObject:
   m_ObjectHideFlags: 0
@@ -610,17 +670,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 474bcb49853aa07438625e644c072ee6, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  m_Version: 3
-  m_UsePipelineSettings: 1
-  m_AdditionalLightsShadowResolutionTier: 2
-  m_LightLayerMask: 1
-  m_RenderingLayers: 1
-  m_CustomShadowLayers: 0
-  m_ShadowLayerMask: 1
-  m_ShadowRenderingLayers: 1
-  m_LightCookieSize: {x: 1, y: 1}
-  m_LightCookieOffset: {x: 0, y: 0}
-  m_SoftShadowQuality: 1
 --- !u!108 &1318264048
 Light:
   m_ObjectHideFlags: 0
@@ -708,7 +757,9 @@ GameObject:
   m_Component:
   - component: {fileID: 1400080637}
   - component: {fileID: 1400080642}
+  - component: {fileID: 1400080644}
   - component: {fileID: 1400080641}
+  - component: {fileID: 1400080643}
   - component: {fileID: 1400080640}
   - component: {fileID: 1400080638}
   m_Layer: 0
@@ -833,6 +884,44 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1400080636}
   m_Mesh: {fileID: 10208, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!114 &1400080643
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1400080636}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d4e2f031bfe236c4391025924531d694, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  speed: 15
+  altLeft: 1
+  altRight: 0
+  leftWall: {x: -1520.4, y: 45.7, z: 81.7}
+  leftTor: {x: -1553.26, y: 45.7, z: 81.7}
+  rightTor: {x: -1592.2, y: 45.7, z: 81.7}
+  rightWall: {x: 0, y: 0, z: 0}
+  gen: {fileID: 1925350277}
+  touchedWall: 0
+  livesManager: {fileID: 1400080644}
+--- !u!114 &1400080644
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1400080636}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9dfe5e108724bd0419440222827d441c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  lives: 3
+  ser: {fileID: 788851371}
+  isLeft: 1
+  timeToRegen: 20
 --- !u!1 &1529507986
 GameObject:
   m_ObjectHideFlags: 0
@@ -876,23 +965,14 @@ MonoBehaviour:
   speeds: []
   altLeft: 0
   altRight: 1
-  rival: 1
   timeBeforeMusic: 3
   speed: 90
   player: {fileID: 78545749}
   obs: {fileID: 772251362936771863, guid: e786d520051bd5a4c944f0510d857e61, type: 3}
   leftWall: {x: 72.5, y: 54.5, z: 0}
-  leftTor: {x: -995.6, y: 35.7, z: 0}
-  rightTor: {x: -1039.3, y: 35.7, z: 0}
-  rightWall: {x: -1072.9, y: 54.5, z: 0}
-  text: {fileID: 0}
-  loseText: {fileID: 0}
-  winInfo: {fileID: 0}
-  loseInfo: {fileID: 0}
-  leftWinText: "Lewy wygra\u0142"
-  rightWinText: "Prawy wygra\u0142"
-  startGenerationCount: 0
-  wyprzedzenie: 5
+  leftTor: {x: -1623.6, y: 35.7, z: 0}
+  rightTor: {x: -1666.6, y: 35.7, z: 0}
+  rightWall: {x: -1700.6, y: 54.5, z: 0}
 --- !u!4 &1529507988
 Transform:
   m_ObjectHideFlags: 0
@@ -951,23 +1031,14 @@ MonoBehaviour:
   speeds: []
   altLeft: 1
   altRight: 0
-  rival: 1
   timeBeforeMusic: 3
   speed: 90
   player: {fileID: 1400080637}
   obs: {fileID: 772251362936771863, guid: e786d520051bd5a4c944f0510d857e61, type: 3}
-  leftWall: {x: -892.4, y: 54.5, z: 0}
-  leftTor: {x: -925.26, y: 35.7, z: 0}
-  rightTor: {x: -964.2, y: 35.7, z: 0}
+  leftWall: {x: -1520.4, y: 54.5, z: 0}
+  leftTor: {x: -1553.26, y: 35.7, z: 0}
+  rightTor: {x: -1592.2, y: 35.7, z: 0}
   rightWall: {x: -66, y: 54.5, z: 0}
-  text: {fileID: 0}
-  loseText: {fileID: 0}
-  winInfo: {fileID: 0}
-  loseInfo: {fileID: 0}
-  leftWinText: "Lewy wygra\u0142"
-  rightWinText: "Prawy wygra\u0142"
-  startGenerationCount: 0
-  wyprzedzenie: 5
 --- !u!4 &1925350278
 Transform:
   m_ObjectHideFlags: 0
