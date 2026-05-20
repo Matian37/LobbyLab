@@ -11,6 +11,21 @@ public class Tim
     public List<float> t;
 }
 
+public class Input
+{
+    public List<string> nicks;
+    public int song;
+}
+
+public class Output
+{
+    public float result;
+    public Output(float _result)
+    {
+        result = _result;
+    }
+}
+
 public class Server : MonoBehaviour
 {
     UdpClient udpServer;
@@ -18,15 +33,27 @@ public class Server : MonoBehaviour
 
     //things we need as input
     public int song = 0;
-    public string[] nicks;
+    public List<string> nicks;
 
     public ObstaclesGen leftGen, rightGen;
     public PlayerController leftPlayer, rightPlayer;
     public LivesManager livesLeft, livesRight;
     public Transform obstacleParent;
 
+    string inputPath, outputPath;
+
     void Start()
     {
+        string[] args = Environment.GetCommandLineArgs();
+        for(int i = 1; i < args.Length; i++)
+        {
+            if (args[i] == "match-config") inputPath = args[i + 1];
+            else if (args[i] == "match-result") outputPath = args[i + 1];
+        }
+        Input inp = JsonUtility.FromJson<Input>(File.ReadAllText(inputPath));
+        song = inp.song;
+        nicks = inp.nicks;
+
         udpServer = new UdpClient(7777); // Nas³uchujemy na porcie 7777
         remoteEP = new IPEndPoint(IPAddress.Any, 0);
         Debug.Log("Serwer wystartowa³");
@@ -54,6 +81,8 @@ public class Server : MonoBehaviour
         if (isLeft) win = 2;
         else win = 1;
         //return who won to python
+        Output outp = new Output(win);
+        File.WriteAllText(outputPath, JsonUtility.ToJson(outp, true));
     }
 
     bool isCountdown = false;
