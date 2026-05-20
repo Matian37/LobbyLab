@@ -5,7 +5,7 @@ using UnityEngine;
 public class LivesManager : MonoBehaviour
 {
     public int lives = 3;
-    public ObstaclesGen gen;
+    public GameManager gen;
     public bool isLeft;
     public GameObject[] livesImg;
     public float timeToRegen = 20;

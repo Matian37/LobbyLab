@@ -16,6 +16,7 @@ public class ObstaclesGen : MonoBehaviour
     public Transform player;
     public GameObject obs;
     public Vector3 leftWall, leftTor, rightTor, rightWall;
+    public Transform parent;
     void Do()
     {
         for (int i = 0; i < times.Count; i++)
@@ -109,9 +110,10 @@ public class ObstaclesGen : MonoBehaviour
         }
         pos.z = z;
         Obstacle o = Instantiate(obs, pos, rot).GetComponent<Obstacle>();
-        o.GetComponent<ElementControl>().SetIndx(j, this);
         if (altLeft) o.isLeft = true;
         else o.isLeft = false;
         if (x > 2) o.isWall = true;
+
+        o.transform.SetParent(parent, true);
     }
 }

@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
+using TMPro;
 using UnityEngine;
 
 public class Client : MonoBehaviour
@@ -10,19 +11,22 @@ public class Client : MonoBehaviour
 
     public Transform player1, player2;
     public GameObject[] lives1, lives2;
-    public ObstaclesGen man;
+    public GameManager man;
+    public TextMeshProUGUI[] nicksText;
+    public TextMeshProUGUI countdownText;
+    public GameObject waitingArea;
+    public Transform obstacleParent;
+    public ObstaclesGen leftObstacleGen, rightObstacleGen;
 
     void Start()
     {
         client = new UdpClient();
         // Adres serwera (na razie localhost) i port
         serverEP = new IPEndPoint(IPAddress.Parse("127.0.0.1"), 7777);
-        Time.timeScale = 0;
     }
 
     void Update()
     {
-        // 1. Wysy³anie inputu (np. po klikniêciu spacji)
         byte[] data;
         if (Input.GetKeyDown(KeyCode.A))
             data = Encoding.ASCII.GetBytes("A");
@@ -30,24 +34,29 @@ public class Client : MonoBehaviour
             data = Encoding.ASCII.GetBytes("D");
         else
             data = Encoding.ASCII.GetBytes("N");
-        client.Send(data, data.Length, serverEP);
+        client.Send(data, data.Length, serverEP); //wysylam input klienta (lewo, prawo lub nic)
 
-        // 2. Odbieranie pozycji od serwera
         if (client.Available > 0)
         {
             IPEndPoint senderEP = new IPEndPoint(IPAddress.Any, 0);
             byte[] receivedData = client.Receive(ref senderEP);
             string message = Encoding.ASCII.GetString(receivedData);
-            if (message == "0" || message == "" || message == null)
+            if (message == "0" || message == "" || message == null) //gdy nic nie odpowiada serwer to znaczy ze nie ma drugiego gracza
                 return;
-            if (Time.timeScale == 0) Time.timeScale = 1;
+            waitingArea.SetActive(false);
+            //odiberam wszystkie potrzebne dane
             string[] floats = message.Split('.');
             float pos1 = float.Parse(floats[0]);
             float pos2 = float.Parse(floats[1]);
             float hearts1 = float.Parse(floats[2]);
             float hearts2 = float.Parse(floats[3]);
             float win = float.Parse(floats[4]);
-            Debug.Log(pos2 + " " + message);
+            string nick1 = floats[5];
+            string nick2 = floats[6];
+            float countdownTime = float.Parse(floats[7]);
+            float obstaclePos = float.Parse(floats[8]);
+
+            //ustawiam swoje obiekty na otrzymane
             player1.position = new Vector3(pos1, player1.position.y, player1.position.z);
             player2.position = new Vector3(pos2, player2.position.y, player2.position.z);
             int before = 0;
@@ -66,12 +75,25 @@ public class Client : MonoBehaviour
             if(hearts1 < before)
                 SkyBoxManager.Instance.ChangeSky(SkyBoxManager.Instance.red, true, 4, true, false);
             if (win == 1)
-                man.MultEndGame("Wygra³eœ!");
+                man.MultEndGame($"Wygra³ {nick1}!");
             else if (win == 2)
-                man.MultEndGame("Przegra³eœ!");
+                man.MultEndGame($"Wygra³ {nick2}!");
+            nicksText[0].text = nick1;
+            nicksText[1].text = nick2;
+            obstacleParent.position = new Vector3(0, 0, obstaclePos);
+
+            if (countdownTime == -1 && !man.didGameStart) //gdy skonczylo sie odliczanie to generuje wszystko lokalnie
+            {
+                countdownText.gameObject.SetActive(false);
+                leftObstacleGen.Do();
+                rightObstacleGen.Do();
+                man.didGameStart = true;
+            }
+            else
+                countdownText.text = Mathf.Round(countdownTime).ToString();
         }
     }
 }
 
-//ODBIÓR: position1,position2,hearts1,hearts2,win(0->trwa, 1->youWin, 2->youLose)
+//ODBIÓR: position1.position2.hearts1.hearts2.win(0->trwa, 1->leftWon, 2->rightWon).nickLeft.nickRight.time(-1->gdy po countdown).obsPos
 //wysy³ka: A/N/D

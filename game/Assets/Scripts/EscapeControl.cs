@@ -42,7 +42,7 @@ public class EscapeControl : MonoBehaviour
     public void MenuButton()
     {
         SoundManager.Instance.Sfx(SoundManager.Instance.click);
-        foreach (ObstaclesGen gen in FindObjectsOfType<ObstaclesGen>())
+        foreach (var gen in FindObjectsOfType<GameManager>())
         {
             if(gen.gameObject.activeInHierarchy)
             {

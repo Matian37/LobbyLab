@@ -9,42 +9,27 @@ public class ObstaclesGen : MonoBehaviour
 {
     public List<float> times = new List<float>();
     public List<float> speeds = new List<float>();
-    int indx;
+    int indx, mode;
     public bool altLeft, altRight;
 
     public bool rival;
     public float timeBeforeMusic = 5;
     public float speed = 0.1f;
-    float time = 0;
     public Transform player;
     public GameObject obs;
     public Vector3 leftWall, leftTor, rightTor, rightWall;
-    public TextMeshProUGUI text, loseText;
-    public GameObject winInfo, loseInfo;
-    public string leftWinText, rightWinText;
-    public int startGenerationCount;
-    bool didMusicStart = false;
-    public float wyprzedzenie = 5;
-    int mode;
-    bool win = false;
-    string startHour = "";
+    public GameManager gm;
 
-    private void Awake()
-    {
-        Time.timeScale = 1;
-    }
+    public Transform parent;
+    public bool multiplayer;
 
-    private void Start()
+    public void Do()
     {
-        
-    }
-
-    void Do()
-    {
-        startHour = DateTime.Now.Hour + ":" + DateTime.Now.Minute;
+        if(!altLeft)
+            gm.GameStart(rival, mode, indx, times[times.Count - 1] + timeBeforeMusic);
         for (int i = 0; i < times.Count; i++)
         {
-            if (times[i] < times[times.Count - 1] / 3) speeds.Add(speed);
+            if (times[i] < times[times.Count - 1] / 3 || multiplayer) speeds.Add(speed);
             else if (times[i] < 2 * times[times.Count - 1] / 3) speeds.Add(speed * 1.35f);
             else speeds.Add(speed * 1.7f);
         }
@@ -52,7 +37,6 @@ public class ObstaclesGen : MonoBehaviour
         for (int i = 0; i < times.Count; i++)
         {
             times[i] += timeBeforeMusic;
-            //if (i == 0) Debug.Log(times[i]);
             generate(times[i], speeds[i], i);
         }
     }
@@ -64,100 +48,8 @@ public class ObstaclesGen : MonoBehaviour
         rival = _rival;
         indx = musicIndx;
         mode = _mode;
-
-        Do();
-    }
-
-    public void Lose(bool lewyWin)
-    {
-        Save();
-        SoundManager.Instance.StopMusic();
-        if (rival)
-        {
-            loseInfo.SetActive(true);
-            if (lewyWin) loseText.text = leftWinText;
-            else loseText.text = rightWinText;
-            Time.timeScale = 0;
-        }
-        else
-            SceneManager.LoadScene("SampleScene");
-    }
-
-    public void MultEndGame(string message)
-    {
-        loseInfo.SetActive(true);
-        loseText.text = message;
-        Time.timeScale = 0;
-    }
-
-    void ShowWin()
-    {
-        if (altLeft) return;
-        win = true;
-        if (mode == 0 && !SceneTransport.Instance.done[indx])
-        {
-            SceneTransport.Instance.odb++;
-            SceneTransport.Instance.xp += 100;
-            SceneTransport.Instance.done[indx] = true;
-        }
-        else if(mode == 1 && !rival && !SceneTransport.Instance.doneHard[indx])
-        {
-            SceneTransport.Instance.odb++;
-            SceneTransport.Instance.xp += 100;
-            SceneTransport.Instance.doneHard[indx] = true;
-        }
-        Save();
-        Time.timeScale = 0;
-        winInfo.SetActive(true);
-    }
-
-    private void Update()
-    {
-        time += Time.deltaTime;
-        if (altLeft) return;
-
-        if (time >= timeBeforeMusic && !didMusicStart)
-            startMusic();
-        if (time >= timeBeforeMusic && time - timeBeforeMusic >= times[times.Count - 1] + 2)
-            ShowWin();
-        if(time >= timeBeforeMusic)
-            text.text = Mathf.RoundToInt((time - timeBeforeMusic) / (times[times.Count - 1] + 2) * 100).ToString() + "%";
-    }
-
-    void QuestInfo()
-    {
-        int perc = Mathf.RoundToInt((time - timeBeforeMusic) / (times[times.Count - 1] + 2) * 100);
-        bool rekord = false;
-
-        if (mode == 0 && SceneTransport.Instance.percents[indx] < perc)
-            rekord = true;
-        else if (mode == 1 && SceneTransport.Instance.percents1[indx] < perc)
-            rekord = true;
-
-        bool muted = SceneTransport.Instance.volume == 0 && win;
-        bool bindy = SceneTransport.Instance.binds[0] == KeyCode.D && SceneTransport.Instance.binds[1] == KeyCode.A && mode == 0 && win;
-        Quests.Instance.GetInfo(perc, time, rekord, rival && win, false, indx, startHour, false, muted, bindy);
-    }
-
-    public void Save()
-    {
-        if (altLeft) return;
-        QuestInfo();
-        if (rival) return;
-
-        int perc = Mathf.RoundToInt((time - timeBeforeMusic) / (times[times.Count - 1] + 2) * 100);
-
-        if (mode == 0 && SceneTransport.Instance.percents[indx] < perc)
-            SceneTransport.Instance.percents[indx] = perc;
-        else if (mode == 1 && SceneTransport.Instance.percents1[indx] < perc)
-            SceneTransport.Instance.percents1[indx] = perc;
-
-        SceneTransport.Instance.Save();
-    }
-
-    private void OnApplicationQuit()
-    {
-        Save();
+        if(!multiplayer)
+            Do();
     }
 
     int lastGenerated = 0;
@@ -255,17 +147,14 @@ public class ObstaclesGen : MonoBehaviour
         }
         pos.z = z;
         Obstacle o = Instantiate(obs, pos, rot).GetComponent<Obstacle>();
-        o.GetComponent<ElementControl>().SetIndx(j, this);
+        if(!multiplayer)
+            o.GetComponent<ElementControl>().SetIndx(j, this);
         if (altLeft) o.isLeft = true;
         else o.isLeft = false;
         if (x > 2) o.isWall = true;
         if (x == 3) o.left = true;
         else o.left = false;
-    }
-
-    void startMusic()
-    {
-        didMusicStart = true;
-        SoundManager.Instance.PlaySong(indx);
+        if(multiplayer)
+            o.transform.SetParent(parent, true);
     }
 }

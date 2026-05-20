@@ -17,12 +17,13 @@ public class Obstacle : MonoBehaviour
     public float downForce = 100, downForce2 = 100, sideForce = 1000, forwardForce = 1000, forwardForce2 = 10000;
     Vector3 color1, color2, col, playerPosition;
     public Color skyColor;
+
+    public bool isMultiplayer;
     private void Start()
     {
-        player = FindObjectOfType<PlayerController>().transform;
-        foreach (PlayerController x in FindObjectsOfType<PlayerController>())
+        foreach (var x in GameObject.FindGameObjectsWithTag("Player"))
         {
-            if(x.gameObject.activeInHierarchy)
+            if(x.activeInHierarchy)
             {
                 player = x.transform;
                 break;
@@ -82,7 +83,8 @@ public class Obstacle : MonoBehaviour
 
     void Lose()
     {
-        foreach (ObstaclesGen obj in FindObjectsOfType<ObstaclesGen>())
+        if (isMultiplayer) return;
+        foreach (var obj in FindObjectsOfType<GameManager>())
         {
             if(obj.gameObject.activeInHierarchy)
             {
@@ -102,7 +104,7 @@ public class Obstacle : MonoBehaviour
                 SceneTransport.Instance.xp++;
                 CompleteObs();
 
-                if(isWall)
+                if(isWall && !isMultiplayer)
                     other.GetComponent<PlayerController>().touchedWall = true;
             }
         }

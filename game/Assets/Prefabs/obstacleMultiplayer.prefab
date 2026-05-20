@@ -12,7 +12,7 @@ GameObject:
   - component: {fileID: 4493801159623167795}
   - component: {fileID: 223477672342646197}
   m_Layer: 0
-  m_Name: obstacle
+  m_Name: obstacleMultiplayer
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -49,6 +49,15 @@ MonoBehaviour:
   loseOffset: 40
   isLeft: 0
   isWall: 0
+  left: 0
+  speed: 8
+  downForce: 200
+  downForce2: 34
+  sideForce: 110
+  forwardForce: 20
+  forwardForce2: 100
+  skyColor: {r: 0, g: 0.8993242, b: 1, a: 1}
+  isMultiplayer: 1
 --- !u!65 &223477672342646197
 BoxCollider:
   m_ObjectHideFlags: 0

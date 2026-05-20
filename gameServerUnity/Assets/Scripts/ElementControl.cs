@@ -4,23 +4,17 @@ using UnityEngine;
 
 public class ElementControl : MonoBehaviour
 {
-    float speed;
-    int indx;
-    ObstaclesGen myGen;
-
-    public void SetIndx(int x, ObstaclesGen _myGen)
-    {
-        indx = x;
-        myGen = _myGen;
-    }
-
-    private void Start()
-    {
-        speed = myGen.speeds[indx];
-    }
+    public float speed;
 
     private void Update()
     {
+        if (stopped) return;
         transform.position = transform.position + new Vector3(0, 0, speed * Time.deltaTime);
+    }
+
+    bool stopped = false;
+    public void Stop()
+    {
+        stopped = true;
     }
 }
