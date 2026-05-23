@@ -114,8 +114,9 @@ func (c *RMQConnection) GetStartRequest(ctx context.Context) ([]byte, error) {
 	}
 
 	// NOTE: can cause issues if something breaks before server is alive
-	delivery.Accept(ctx)
-
+	if err = delivery.Accept(ctx); err != nil {
+		return []byte{}, err
+	}
 	return payload, nil
 }
 
