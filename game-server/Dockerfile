@@ -1,7 +1,14 @@
-# example server container
-FROM python:3.14-alpine
+FROM golang:1.26-alpine
 
-WORKDIR /server
-COPY main.py .
+WORKDIR /game-server
 
-CMD ["python", "main.py"]
+COPY runtime ./runtime
+RUN chmod +x runtime/example.ash
+
+COPY host/go.mod host/go.sum ./host/
+RUN cd host && go mod download
+
+COPY host ./host
+RUN cd host && go build -o ../server .
+
+CMD ["./server", "./runtime/example.ash"]
