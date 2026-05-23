@@ -6,9 +6,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Azure/go-amqp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/modules/rabbitmq"
 
 	rmq "github.com/rabbitmq/rabbitmq-amqp-go-client/pkg/rabbitmqamqp"
@@ -29,7 +29,7 @@ func RestartBroker() {
 		return
 	}
 
-	fmt.Println("Starting container for conn.go...")
+	fmt.Println("Starting rabbitmq container for conn.go...")
 
 	ctx := context.Background()
 
@@ -37,11 +37,6 @@ func RestartBroker() {
 	if err != nil {
 		panic(fmt.Errorf("rabbitmq start failed: %w", err))
 	}
-	defer func() {
-		if err := testcontainers.TerminateContainer(cont); err != nil {
-			panic(fmt.Errorf("terminate container failed: %w", err))
-		}
-	}()
 	container = cont
 
 	url, err := container.AmqpURL(ctx)
@@ -82,6 +77,15 @@ func TestConnect(t *testing.T) {
 		assert.IsType(t, &rmq.StateOpen{}, conn.conn.State())
 	})
 
+	t.Run("context cancel", func(t *testing.T) {
+		conn := NewConnection("amqp://X:Y@rabbitmq:5672/")
+
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+		err := conn.Connect(ctx)
+		assert.ErrorIs(t, err, context.Canceled)
+	})
+
 	t.Run("second connect attempt", func(t *testing.T) {
 		RestartBroker()
 
@@ -91,97 +95,130 @@ func TestConnect(t *testing.T) {
 	})
 }
 
-func TestClose_NotInitialized(t *testing.T) {
-	conn := NewConnection("")
-	err := conn.Close(context.Background())
-	assert.ErrorIs(t, err, ErrConnectionNotInitialized)
-}
+func TestClose(t *testing.T) {
+	t.Run("not initialized", func(t *testing.T) {
+		conn := NewConnection("")
+		err := conn.Close(context.Background())
+		assert.ErrorIs(t, err, ErrConnectionNotInitialized)
+	})
 
-func TestClose_Success(t *testing.T) {
-	RestartBroker()
+	t.Run("success", func(t *testing.T) {
+		RestartBroker()
 
-	conn := NewConnection(brokerUri)
-	err := conn.Connect(context.Background())
-	assert.NoError(t, err)
+		conn := NewConnection(brokerUri)
+		err := conn.Connect(context.Background())
+		assert.NoError(t, err)
 
-	cha := make(chan *rmq.StateChanged, 1)
-	conn.conn.NotifyStatusChange(cha)
+		cha := make(chan *rmq.StateChanged, 1)
+		conn.conn.NotifyStatusChange(cha)
 
-	assert.IsType(t, &rmq.StateOpen{}, conn.conn.State())
-	conn.Close(context.Background())
+		assert.IsType(t, &rmq.StateOpen{}, conn.conn.State())
+		conn.Close(context.Background())
 
-	select {
-	case change := <-cha:
-		assert.IsType(t, &rmq.StateClosed{}, change.To)
-	case <-time.After(1 * time.Second):
-		assert.Fail(t, "timeout")
-	}
-
-}
-
-func TestGetStartRequest_NotInitialized(t *testing.T) {
-	conn := NewConnection("")
-	_, err := conn.GetStartRequest(context.Background())
-	assert.ErrorIs(t, err, ErrConnectionNotInitialized)
+		select {
+		case change := <-cha:
+			assert.IsType(t, &rmq.StateClosed{}, change.To)
+		case <-time.After(1 * time.Second):
+			assert.Fail(t, "timeout")
+		}
+	})
 }
 
 func TestGetStartRequest(t *testing.T) {
-	RestartBroker()
-
-	conn := NewConnection(brokerUri)
-	err := conn.Connect(context.Background())
-	assert.NoError(t, err)
+	t.Run("not initialized", func(t *testing.T) {
+		conn := NewConnection("")
+		_, err := conn.GetStartRequest(context.Background())
+		assert.ErrorIs(t, err, ErrConnectionNotInitialized)
+	})
 
 	tests := []struct {
 		name string
 		msg  []byte
 	}{
-		{name: "example", msg: []byte{0, 1, 2}},
-		{name: "empty", msg: []byte{}},
+		{name: "success", msg: []byte{0, 1, 2}},
+		{name: "empty payload", msg: []byte{}},
 	}
+	for _, test := range tests {
+		RestartBroker()
 
-	func() {
-		ctx := context.Background()
+		// publish test messsage
+		func() {
+			ctx := context.Background()
 
-		env := rmq.NewEnvironment(brokerUri, nil)
-		conn, err := env.NewConnection(ctx)
-		require.NoError(t, err)
+			env := rmq.NewEnvironment(brokerUri, nil)
+			conn, err := env.NewConnection(ctx)
+			require.NoError(t, err)
 
-		publisher, err := conn.NewPublisher(
-			ctx,
-			&rmq.QueueAddress{Queue: statusQueueName},
-			nil,
-		)
-		require.NoError(t, err)
+			conn.Management().DeclareQueue(ctx, &rmq.QuorumQueueSpecification{Name: statusQueueName})
 
-		for _, test := range tests {
+			publisher, err := conn.NewPublisher(
+				ctx,
+				&rmq.QueueAddress{Queue: statusQueueName},
+				nil,
+			)
+			require.NoError(t, err)
+
 			_, err = publisher.Publish(ctx, rmq.NewMessage(test.msg))
 			require.NoError(t, err)
-		}
-	}()
+		}()
 
-	for _, test := range tests {
-		t.Run("", func(t *testing.T) {
+		t.Run(test.name, func(t *testing.T) {
+			conn := NewConnection(brokerUri)
+			err := conn.Connect(context.Background())
+			assert.NoError(t, err)
+
 			res, err := conn.GetStartRequest(context.Background())
 			assert.NoError(t, err)
 			assert.Equal(t, test.msg, res)
 		})
 	}
-}
 
-func TestSendMatchResult_NotInitialized(t *testing.T) {
-	conn := NewConnection("")
-	err := conn.SendMatchResult(context.Background(), []byte{})
-	assert.ErrorIs(t, err, ErrConnectionNotInitialized)
+	t.Run("context cancel", func(t *testing.T) {
+		conn := NewConnection(brokerUri)
+		err := conn.Connect(context.Background())
+		assert.NoError(t, err)
+
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+		_, err = conn.GetStartRequest(ctx)
+		assert.ErrorIs(t, err, context.Canceled)
+	})
 }
 
 func TestSendMatchResult(t *testing.T) {
-	RestartBroker()
+	t.Run("not initialized", func(t *testing.T) {
+		conn := NewConnection("")
+		err := conn.SendMatchResult(context.Background(), []byte{})
+		assert.ErrorIs(t, err, ErrConnectionNotInitialized)
+	})
 
-	conn := NewConnection(brokerUri)
-	err := conn.Connect(context.Background())
-	require.NoError(t, err)
+	t.Run("success", func(t *testing.T) {
+		RestartBroker()
 
-	err = conn.SendMatchResult(context.Background(), []byte{0, 1, 2})
-	assert.NoError(t, err)
+		conn := NewConnection(brokerUri)
+		err := conn.Connect(context.Background())
+		require.NoError(t, err)
+
+		err = conn.SendMatchResult(context.Background(), []byte{0, 1, 2})
+		assert.NoError(t, err)
+
+		// TODO: check output
+	})
+
+	t.Run("context cancel", func(t *testing.T) {
+		RestartBroker()
+
+		conn := NewConnection(brokerUri)
+		err := conn.Connect(context.Background())
+		require.NoError(t, err)
+
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+		err = conn.SendMatchResult(ctx, []byte{})
+
+		// rmq doesn't use context.Canceled instead they use this condition for ctx.Done()
+		var amqpErr *amqp.Error
+		require.ErrorAs(t, err, &amqpErr)
+		assert.Equal(t, amqp.ErrCondTransferLimitExceeded, amqpErr.Condition)
+	})
 }
