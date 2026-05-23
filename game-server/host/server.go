@@ -148,14 +148,16 @@ func (s *GameServer) GetResult(ctx context.Context) ([]byte, error) {
 }
 
 // start wait goroutine and create waitChannel
-func (s *GameServer) startWait() {
-	if s.waitChannel != nil {
-		return
+//
+// Note: use this instead of s.cmd.Wait() and only when cmd has started
+func (s *GameServer) startWait() error {
+	if s.waitChannel == nil {
+		s.waitChannel = make(chan error, 1)
+		go func() {
+			s.waitChannel <- s.cmd.Wait()
+		}()
 	}
-	s.waitChannel = make(chan error, 1)
-	go func() {
-		s.waitChannel <- s.cmd.Wait()
-	}()
+	return nil
 }
 
 func (s *GameServer) cleanup() {
