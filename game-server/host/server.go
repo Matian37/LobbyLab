@@ -120,6 +120,7 @@ func (s *GameServer) Wait(ctx context.Context) error {
 	s.startWait()
 	select {
 	case err := <-s.waitChannel:
+		s.waitChannel <- err
 		return err
 	case <-ctx.Done():
 		return ctx.Err()
