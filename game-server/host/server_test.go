@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 func TestAttachParams(t *testing.T) {
@@ -76,7 +75,7 @@ func TestStart(t *testing.T) {
 
 	})
 
-	t.Run("second start", func(t *testing.T) {
+	t.Run("already started", func(t *testing.T) {
 		server := GameServer{}
 		err := server.Start("", []string{"echo"})
 		assert.NoError(t, err)
@@ -189,8 +188,6 @@ func TestStop(t *testing.T) {
 }
 
 func TestWait(t *testing.T) {
-	// TODO: not started
-	// TODO: closed
 	t.Run("success", func(t *testing.T) {
 		server := GameServer{}
 		server.Start("", []string{"sh", "-c", "exit 1"})
@@ -226,38 +223,84 @@ func TestGetResult(t *testing.T) {
 		server.Stop(context.Background())
 
 		_, err := server.GetResult(context.Background())
-		assert.ErrorIs(t, err, ErrGameServerNotStarted)
+		assert.ErrorIs(t, err, ErrGameServerAlreadyClosed)
+	})
+
+	tests := []struct {
+		name    string
+		payload []byte
+	}{
+		{
+			name:    "success",
+			payload: []byte{1, 2, 3},
+		},
+		{
+			name:    "empty payload",
+			payload: []byte{},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			server := GameServer{}
+			server.Start("", []string{"echo"})
+			defer server.Stop(context.Background())
+
+			n, err := server.resultFile.Write(test.payload)
+			assert.NoError(t, err)
+			assert.Equal(t, len(test.payload), n)
+
+			res, err := server.GetResult(context.Background())
+			assert.NoError(t, err)
+			assert.Equal(t, test.payload, res)
+		})
+
+	}
+
+	t.Run("context canceled", func(t *testing.T) {
+		server := GameServer{}
+		server.Start("config", []string{"sleep", "inf"})
+		defer server.Stop(context.Background())
+
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+		_, err := server.GetResult(ctx)
+		assert.ErrorIs(t, err, context.Canceled)
+	})
+}
+
+func TestStartWait(t *testing.T) {
+	server := GameServer{}
+	assert.NoError(t, server.Start("", []string{"echo"}))
+
+	assert.NoError(t, server.startWait())
+	assert.NotNil(t, server.waitChannel)
+
+	assert.NoError(t, server.Stop(context.Background()))
+}
+
+func TestCleanup(t *testing.T) {
+	t.Run("nil files", func(t *testing.T) {
+		server := GameServer{}
+		server.cleanup()
 	})
 
 	t.Run("success", func(t *testing.T) {
 		server := GameServer{}
-		server.Start("config", []string{"echo"})
-		defer server.Stop(context.Background())
 
-		expected := []byte{0, 1, 2}
-		n, err := server.resultFile.Write(expected)
-		assert.NoError(t, err)
-		assert.Equal(t, len(expected), n)
+		server.configFile, _ = os.CreateTemp("", "*")
+		server.resultFile, _ = os.CreateTemp("", "*")
 
-		res, err := server.GetResult(context.Background())
-		assert.NoError(t, err)
-		assert.Equal(t, expected, res)
+		configPath := server.configFile.Name()
+		resultPath := server.resultFile.Name()
 
-		require.NoError(t, server.resultFile.Truncate(0))
-		expected = []byte{}
+		server.cleanup()
 
-		res, err = server.GetResult(context.Background())
-		assert.NoError(t, err)
-		assert.Equal(t, expected, res)
-	})
+		assert.Nil(t, server.configFile)
+		assert.Nil(t, server.resultFile)
 
-	t.Run("empty payload", func(t *testing.T) {
-		// TODO:
-	})
-
-	t.Run("context canceled", func(t *testing.T) {
-		// TODO:
+		_, err := os.Stat(configPath)
+		assert.ErrorIs(t, err, os.ErrNotExist)
+		_, err = os.Stat(resultPath)
+		assert.Error(t, err, os.ErrNotExist)
 	})
 }
-
-// TODO: startWait, cleanup
