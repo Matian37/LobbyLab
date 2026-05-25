@@ -199,10 +199,20 @@ func TestSendMatchResult(t *testing.T) {
 		err := conn.Connect(context.Background())
 		require.NoError(t, err)
 
-		err = conn.SendMatchResult(context.Background(), []byte{0, 1, 2})
+		msg := []byte{0, 1, 2}
+		err = conn.SendMatchResult(context.Background(), msg)
 		assert.NoError(t, err)
 
-		// TODO: check output
+		consumer, err := conn.conn.NewConsumer(
+			context.Background(),
+			resultQueueName,
+			&rmq.ConsumerOptions{InitialCredits: 1},
+		)
+		require.NoError(t, err)
+
+		delivery, err := consumer.Receive(context.Background())
+		require.NoError(t, err)
+		assert.Equal(t, msg, delivery.Message().Data[0])
 	})
 
 	t.Run("context cancel", func(t *testing.T) {
