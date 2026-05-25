@@ -19,7 +19,7 @@ const containerImageName = "rabbitmq:4.3-alpine"
 var container *rabbitmq.RabbitMQContainer
 var brokerUri string
 
-func RestartBroker() {
+func restartBroker() {
 	if container != nil {
 		container.Exec(context.Background(), []string{"rabbitmqctl", "stop_app"})
 		container.Exec(context.Background(), []string{"rabbitmqctl", "reset"})
@@ -53,7 +53,7 @@ func TestNewConnection(t *testing.T) {
 	assert.Equal(t, "X", conn.brokerUri)
 }
 
-func TestConnect(t *testing.T) {
+func TestRMQConnection_Connect(t *testing.T) {
 	t.Run("no connection", func(t *testing.T) {
 		conn := NewConnection("amqp://X:Y@rabbitmq:5672/")
 		err := conn.Connect(context.Background())
@@ -61,7 +61,7 @@ func TestConnect(t *testing.T) {
 	})
 
 	t.Run("success", func(t *testing.T) {
-		RestartBroker()
+		restartBroker()
 
 		conn := NewConnection(brokerUri)
 		assert.Nil(t, conn.conn)
@@ -85,7 +85,7 @@ func TestConnect(t *testing.T) {
 	})
 
 	t.Run("second connect attempt", func(t *testing.T) {
-		RestartBroker()
+		restartBroker()
 
 		conn := NewConnection(brokerUri)
 		assert.NoError(t, conn.Connect(context.Background()))
@@ -93,7 +93,7 @@ func TestConnect(t *testing.T) {
 	})
 }
 
-func TestClose(t *testing.T) {
+func TestRMQConnection_Close(t *testing.T) {
 	t.Run("not initialized", func(t *testing.T) {
 		conn := NewConnection("")
 		err := conn.Close(context.Background())
@@ -101,7 +101,7 @@ func TestClose(t *testing.T) {
 	})
 
 	t.Run("success", func(t *testing.T) {
-		RestartBroker()
+		restartBroker()
 
 		conn := NewConnection(brokerUri)
 		err := conn.Connect(context.Background())
@@ -122,7 +122,7 @@ func TestClose(t *testing.T) {
 	})
 }
 
-func TestGetStartRequest(t *testing.T) {
+func TestRMQConnection_GetStartRequest(t *testing.T) {
 	t.Run("not initialized", func(t *testing.T) {
 		conn := NewConnection("")
 		_, err := conn.GetStartRequest(context.Background())
@@ -138,7 +138,7 @@ func TestGetStartRequest(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			RestartBroker()
+			restartBroker()
 
 			conn := NewConnection(brokerUri)
 			require.NoError(t, conn.Connect(context.Background()))
@@ -170,7 +170,7 @@ func TestGetStartRequest(t *testing.T) {
 	})
 }
 
-func TestSendMatchResult(t *testing.T) {
+func TestRMQConnection_SendMatchResult(t *testing.T) {
 	t.Run("not initialized", func(t *testing.T) {
 		conn := NewConnection("")
 		err := conn.SendMatchResult(context.Background(), []byte{})
@@ -178,7 +178,7 @@ func TestSendMatchResult(t *testing.T) {
 	})
 
 	t.Run("success", func(t *testing.T) {
-		RestartBroker()
+		restartBroker()
 
 		conn := NewConnection(brokerUri)
 		err := conn.Connect(context.Background())
@@ -201,7 +201,7 @@ func TestSendMatchResult(t *testing.T) {
 	})
 
 	t.Run("context cancel", func(t *testing.T) {
-		RestartBroker()
+		restartBroker()
 
 		conn := NewConnection(brokerUri)
 		err := conn.Connect(context.Background())

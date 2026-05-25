@@ -21,7 +21,7 @@ var (
 	ErrMessageReceiveFailure    = errors.New("Failed to receive a message:")
 )
 
-// NOTE: Connection must be used only once to connect to rabbitmq
+// NOTE: Connection can be used only once to connect to rabbitmq
 type RMQConnection struct {
 	brokerUri       string
 	env             *rmq.Environment
