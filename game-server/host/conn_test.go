@@ -19,8 +19,6 @@ const containerImageName = "rabbitmq:4.3-alpine"
 var container *rabbitmq.RabbitMQContainer
 var brokerUri string
 
-// TODO: tests for contexts
-
 func RestartBroker() {
 	if container != nil {
 		container.Exec(context.Background(), []string{"rabbitmqctl", "stop_app"})
@@ -139,33 +137,20 @@ func TestGetStartRequest(t *testing.T) {
 		{name: "empty payload", msg: []byte{}},
 	}
 	for _, test := range tests {
-		RestartBroker()
+		t.Run(test.name, func(t *testing.T) {
+			RestartBroker()
 
-		// publish test messsage
-		func() {
-			ctx := context.Background()
+			conn := NewConnection(brokerUri)
+			require.NoError(t, conn.Connect(context.Background()))
 
-			env := rmq.NewEnvironment(brokerUri, nil)
-			conn, err := env.NewConnection(ctx)
-			require.NoError(t, err)
-
-			conn.Management().DeclareQueue(ctx, &rmq.QuorumQueueSpecification{Name: statusQueueName})
-
-			publisher, err := conn.NewPublisher(
-				ctx,
+			p, err := conn.conn.NewPublisher(
+				context.Background(),
 				&rmq.QueueAddress{Queue: statusQueueName},
 				nil,
 			)
 			require.NoError(t, err)
-
-			_, err = publisher.Publish(ctx, rmq.NewMessage(test.msg))
+			_, err = p.Publish(context.Background(), rmq.NewMessage(test.msg))
 			require.NoError(t, err)
-		}()
-
-		t.Run(test.name, func(t *testing.T) {
-			conn := NewConnection(brokerUri)
-			err := conn.Connect(context.Background())
-			assert.NoError(t, err)
 
 			res, err := conn.GetStartRequest(context.Background())
 			assert.NoError(t, err)
