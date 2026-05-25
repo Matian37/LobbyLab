@@ -44,6 +44,8 @@ func (app *App) Run(ctx context.Context) error {
 		return ErrAppNotInitialized
 	}
 
+	slog.Info("app loop started", "args", app.cmdArgs)
+
 	for {
 		if ctx.Err() != nil {
 			return ctx.Err()
@@ -53,25 +55,31 @@ func (app *App) Run(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
+		slog.Info("received game server start request", "payload_len", len(payload))
+		slog.Debug("request detail", "payload", string(payload))
 
+		slog.Info("starting game server")
 		if err = app.server.Start(string(payload), app.cmdArgs); err != nil {
-			slog.Error("server start failed", "error", err)
+			slog.Error("failed to start game server", "error", err, "action", "skipping_request")
 			app.server.Stop(ctx)
 			continue
 		}
-		// TODO: make delivery.Accept() here with some interaface
 
+		slog.Info("game server running, waiting for result")
 		result, err := app.server.GetResult(ctx)
 		if err != nil {
-			slog.Error("waiting for match result failed", "error", err)
+			slog.Error("failed to retrieve match result", "error", err, "action", "stopping_server")
 			app.server.Stop(ctx)
 			continue
 		}
 		_ = app.server.Stop(ctx)
 
+		slog.Info("match finished, sending result", "result_len", len(result))
+		slog.Debug("result detail", "result", string(result))
 		if err = app.conn.SendMatchResult(ctx, result); err != nil {
-			slog.Error("sending match result failed", "error", err)
+			slog.Error("failed to send match result back to broker", "error", err)
 			continue
 		}
+		slog.Info("match lifecycle complete, ready for next request")
 	}
 }
