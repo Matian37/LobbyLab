@@ -925,9 +925,49 @@ PrefabInstance:
       propertyPath: m_OnClick.m_PersistentCalls.m_Calls.Array.data[0].m_Arguments.m_IntArgument
       value: 15
       objectReference: {fileID: 0}
+    - target: {fileID: 301466213938374281, guid: de05b2cfd7a41c04985315bc53aa3969, type: 3}
+      propertyPath: m_SizeDelta.x
+      value: 886.829
+      objectReference: {fileID: 0}
+    - target: {fileID: 301466213938374281, guid: de05b2cfd7a41c04985315bc53aa3969, type: 3}
+      propertyPath: m_SizeDelta.y
+      value: 276.338
+      objectReference: {fileID: 0}
+    - target: {fileID: 301466213938374281, guid: de05b2cfd7a41c04985315bc53aa3969, type: 3}
+      propertyPath: m_LocalScale.x
+      value: 0.9232954
+      objectReference: {fileID: 0}
+    - target: {fileID: 301466213938374281, guid: de05b2cfd7a41c04985315bc53aa3969, type: 3}
+      propertyPath: m_LocalScale.y
+      value: 0.9232951
+      objectReference: {fileID: 0}
+    - target: {fileID: 301466213938374281, guid: de05b2cfd7a41c04985315bc53aa3969, type: 3}
+      propertyPath: m_LocalScale.z
+      value: 0.9232951
+      objectReference: {fileID: 0}
+    - target: {fileID: 301466213938374281, guid: de05b2cfd7a41c04985315bc53aa3969, type: 3}
+      propertyPath: m_AnchoredPosition.x
+      value: 5.846
+      objectReference: {fileID: 0}
+    - target: {fileID: 301466213938374281, guid: de05b2cfd7a41c04985315bc53aa3969, type: 3}
+      propertyPath: m_AnchoredPosition.y
+      value: -65.48
+      objectReference: {fileID: 0}
     - target: {fileID: 301466213938374282, guid: de05b2cfd7a41c04985315bc53aa3969, type: 3}
       propertyPath: m_text
-      value: Ophelia
+      value: 'The wedding list '
+      objectReference: {fileID: 0}
+    - target: {fileID: 301466213938374282, guid: de05b2cfd7a41c04985315bc53aa3969, type: 3}
+      propertyPath: m_margin.w
+      value: -99.16533
+      objectReference: {fileID: 0}
+    - target: {fileID: 301466213938374282, guid: de05b2cfd7a41c04985315bc53aa3969, type: 3}
+      propertyPath: m_margin.y
+      value: -200.6352
+      objectReference: {fileID: 0}
+    - target: {fileID: 301466213938374282, guid: de05b2cfd7a41c04985315bc53aa3969, type: 3}
+      propertyPath: m_margin.z
+      value: 27.844498
       objectReference: {fileID: 0}
     - target: {fileID: 301466215435650510, guid: de05b2cfd7a41c04985315bc53aa3969, type: 3}
       propertyPath: m_AnchoredPosition.x
@@ -3913,7 +3953,7 @@ MonoBehaviour:
   - {fileID: 8300000, guid: 6db6127619698044688a3f75669325ed, type: 3}
   - {fileID: 8300000, guid: 415d4d5457566b2488981b0aedadae5c, type: 3}
   - {fileID: 8300000, guid: 8139a8bda688b0c4691d67c91004758d, type: 3}
-  - {fileID: 8300000, guid: 710c06c7d6898504f9cb2c86481071b4, type: 3}
+  - {fileID: 8300000, guid: ff0ad96ef96ef1849a07a74fa1931dab, type: 3}
   - {fileID: 8300000, guid: 81bfe9b703c26e24e8b7b5c4946529bf, type: 3}
   - {fileID: 8300000, guid: 6ede43f0c77a590479fb2a676f9e63f8, type: 3}
   menuMusic: {fileID: 8300000, guid: 73a1f0c287a53e94dbb44d227ed26915, type: 3}
