@@ -13,10 +13,10 @@ import (
 
 func ParseArgs(args []string) ([]string, error) {
 	if len(args) != 2 {
-		return []string{}, fmt.Errorf("Expected 1 argument, got %v", len(os.Args)-1)
+		return []string{}, fmt.Errorf("Expected 1 argument, got %v", len(args)-1)
 	}
 
-	cmdArgs, err := shlex.Split(os.Args[1])
+	cmdArgs, err := shlex.Split(args[1])
 	if err != nil {
 		return []string{}, fmt.Errorf("failed to parse game server command: %w", err)
 	}
