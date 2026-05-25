@@ -4,44 +4,62 @@ import (
 	"context"
 	"errors"
 	"log/slog"
-	"os/signal"
 	"server/internal/domain"
-	"syscall"
+)
+
+var (
+	ErrAppNotInitialized     = errors.New("app not initialized")
+	ErrAppAlreadyInitialized = errors.New("app already initialized")
 )
 
 type App struct {
-	conn        domain.Connection
+	conn        domain.BrokerConnection
 	server      domain.Server
+	cmdArgs     []string
 	initialized bool
 }
 
-func NewApp(ctx context.Context, brokerUri string) (*App, error) {
-	app := &App{conn: NewConnection(brokerUri), server: &GameServer{}}
-
-	if err := app.conn.Connect(ctx); err != nil {
-		return app, err
+func NewApp(brokerUri string, cmdArgs []string) *App {
+	return &App{
+		conn:    NewConnection(brokerUri),
+		server:  &GameServer{},
+		cmdArgs: cmdArgs,
 	}
-	app.initialized = true
-
-	return app, nil
 }
 
-func (app *App) Run(ctx context.Context, cmdArgs []string) error {
+func (app *App) Init(ctx context.Context) error {
+	if app.initialized {
+		return ErrAppAlreadyInitialized
+	}
+
+	if err := app.conn.Connect(ctx); err != nil {
+		return err
+	}
+	app.initialized = true
+	return nil
+}
+
+func (app *App) Run(ctx context.Context) error {
 	if !app.initialized {
-		return errors.New("app not initialized")
+		return ErrAppNotInitialized
 	}
 
 	for {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+
 		payload, err := app.conn.GetStartRequest(ctx)
 		if err != nil {
 			return err
 		}
 
-		if err = app.server.Start(string(payload), cmdArgs); err != nil {
+		if err = app.server.Start(string(payload), app.cmdArgs); err != nil {
 			slog.Error("server start failed", "error", err)
 			app.server.Stop(ctx)
 			continue
 		}
+		// TODO: make delivery.Accept() here with some interaface
 
 		result, err := app.server.GetResult(ctx)
 		if err != nil {
@@ -49,20 +67,11 @@ func (app *App) Run(ctx context.Context, cmdArgs []string) error {
 			app.server.Stop(ctx)
 			continue
 		}
-
-		app.server.Stop(ctx)
+		_ = app.server.Stop(ctx)
 
 		if err = app.conn.SendMatchResult(ctx, result); err != nil {
 			slog.Error("sending match result failed", "error", err)
 			continue
 		}
 	}
-}
-
-func (app *App) HandleSignals(ctx context.Context) {
-	signalCtx, stop := signal.NotifyContext(
-		ctx, syscall.SIGTERM, syscall.SIGINT,
-	)
-	defer stop()
-	<-signalCtx.Done()
 }
