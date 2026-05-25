@@ -2,7 +2,7 @@ package domain
 
 import "context"
 
-type Connection interface {
+type BrokerConnection interface {
 	Connect(ctx context.Context) error
 	Close(ctx context.Context) error
 	GetStartRequest(ctx context.Context) ([]byte, error)

@@ -8,8 +8,6 @@ import (
 	rmq "github.com/rabbitmq/rabbitmq-amqp-go-client/pkg/rabbitmqamqp"
 )
 
-//go:generate mockgen -source=internal/broker/broker.go -destination=mocks/conn.go -package=mock
-
 const statusQueueName = "server.status"
 const resultQueueName = "server.result"
 
