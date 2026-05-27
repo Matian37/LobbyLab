@@ -1,8 +1,20 @@
+using System;
+using System.Collections;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using TMPro;
 using UnityEngine;
+using UnityEngine.Networking;
+
+public class UserData
+{
+    public string login;
+    public UserData(string _login)
+    {
+        login = _login;
+    }
+}
 
 public class Client : MonoBehaviour
 {
@@ -20,9 +32,30 @@ public class Client : MonoBehaviour
 
     void Start()
     {
+        StartCoroutine(SendMeToApi());
         client = new UdpClient();
         // Adres serwera (na razie localhost) i port
         serverEP = new IPEndPoint(IPAddress.Parse("127.0.0.1"), 7777);
+    }
+
+    IEnumerator SendMeToApi()
+    {
+        string url = "https://strona.pl/api/waiting";
+        string userLogin = "kacper";
+
+        UserData dane = new UserData(userLogin);
+        string jsonDane = JsonUtility.ToJson(dane);
+
+        UnityWebRequest www = new UnityWebRequest(url, "POST");
+
+        byte[] bodyRaw = Encoding.UTF8.GetBytes(jsonDane);
+        www.uploadHandler = new UploadHandlerRaw(bodyRaw);
+        www.downloadHandler = new DownloadHandlerBuffer();
+        www.SetRequestHeader("Content-Type", "application/json");
+        yield return www.SendWebRequest();
+
+        if (www.result != UnityWebRequest.Result.Success)
+            Debug.LogError("Coœ posz³o nie tak z po³¹czeniem siê z API");
     }
 
     void Update()
