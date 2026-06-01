@@ -2,218 +2,278 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"net"
 	"testing"
 	"time"
 
-	"github.com/Azure/go-amqp"
+	"github.com/nats-io/nats-server/v2/server"
+	"github.com/nats-io/nats.go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/testcontainers/testcontainers-go/modules/rabbitmq"
-
-	rmq "github.com/rabbitmq/rabbitmq-amqp-go-client/pkg/rabbitmqamqp"
 )
 
-const containerImageName = "rabbitmq:4.3-alpine"
+func newNATSServer(t *testing.T) string {
+	t.Helper()
 
-var container *rabbitmq.RabbitMQContainer
-var brokerUri string
-
-func restartBroker() {
-	if container != nil {
-		container.Exec(context.Background(), []string{"rabbitmqctl", "stop_app"})
-		container.Exec(context.Background(), []string{"rabbitmqctl", "reset"})
-		container.Exec(context.Background(), []string{"rabbitmqctl", "start_app"})
-		return
+	opts := &server.Options{
+		Port: -1,
+		Host: "127.0.0.1",
 	}
+	s, err := server.NewServer(opts)
+	require.NoError(t, err)
 
-	fmt.Println("Starting rabbitmq container for conn.go...")
+	s.Start()
+	require.True(t, s.ReadyForConnections(5*time.Second))
 
-	ctx := context.Background()
+	t.Cleanup(s.Shutdown)
 
-	cont, err := rabbitmq.Run(ctx, containerImageName)
-	if err != nil {
-		panic(fmt.Errorf("rabbitmq start failed: %w", err))
-	}
-	container = cont
-
-	url, err := container.AmqpURL(ctx)
-	if err != nil {
-		panic(fmt.Errorf("failed to  get amqp url: %w", err))
-	}
-	brokerUri = url
-}
-
-func TestGenBrokerURI(t *testing.T) {
-	assert.Equal(t, "amqp://X:Y@rabbitmq:5672/", GenBrokerUri("X", "Y"))
+	return fmt.Sprintf("nats://127.0.0.1:%d", s.Addr().(*net.TCPAddr).Port)
 }
 
 func TestNewConnection(t *testing.T) {
-	conn := NewConnection("X")
-	assert.Equal(t, "X", conn.brokerUri)
+	brokerUri := "a"
+	containerId := "b"
+
+	c := NewConnection(brokerUri, containerId)
+
+	assert.NotNil(t, c)
+
+	assert.Equal(t, brokerUri, c.brokerUri)
+	assert.Equal(t, containerId, c.containerId)
+
+	assert.Nil(t, c.conn)
+	assert.Nil(t, c.requestSub)
+
+	assert.False(t, c.initialized)
+	assert.False(t, c.closed)
 }
 
-func TestRMQConnection_Connect(t *testing.T) {
-	t.Run("no connection", func(t *testing.T) {
-		conn := NewConnection("amqp://X:Y@rabbitmq:5672/")
-		err := conn.Connect(context.Background())
-		assert.ErrorIs(t, err, ErrConnectionCreate)
+func TestNATSConnection_Connect(t *testing.T) {
+	t.Run("already_initialized", func(t *testing.T) {
+		c := NATSConnection{initialized: true}
+		err := c.Connect(150 * time.Millisecond)
+		assert.ErrorIs(t, err, ErrConnectionAlreadyInitialized)
+	})
+
+	t.Run("failure", func(t *testing.T) {
+		c := NewConnection("nats://10.255.255.1:4222", "b")
+		err := c.Connect(150 * time.Millisecond)
+		assert.Error(t, err)
+		assert.ErrorContains(t, err, "i/o timeout")
+
+		assert.False(t, c.initialized)
+		assert.Nil(t, c.conn)
 	})
 
 	t.Run("success", func(t *testing.T) {
-		restartBroker()
+		addr := newNATSServer(t)
 
-		conn := NewConnection(brokerUri)
-		assert.Nil(t, conn.conn)
+		c := NewConnection(addr, "a")
+		err := c.Connect(150 * time.Millisecond)
+		require.NoError(t, err)
 
-		assert.NoError(t, conn.Connect(context.Background()))
+		assert.True(t, c.initialized)
+		assert.False(t, c.closed)
 
-		assert.NotNil(t, conn.conn)
-		assert.NotNil(t, conn.statusConsumer)
-		assert.NotNil(t, conn.resultPublisher)
+		require.NotNil(t, c.conn)
+		assert.True(t, c.conn.IsConnected())
+		assert.NotNil(t, c.requestSub)
+	})
+}
 
-		assert.IsType(t, &rmq.StateOpen{}, conn.conn.State())
+func TestNATSConnection_Close(t *testing.T) {
+	t.Run("not_initialized", func(t *testing.T) {
+		c := NATSConnection{}
+		err := c.Close()
+		assert.ErrorIs(t, err, ErrConnectionNotInitialized)
 	})
 
-	t.Run("context cancel", func(t *testing.T) {
-		conn := NewConnection("amqp://X:Y@rabbitmq:5672/")
+	t.Run("already_closed", func(t *testing.T) {
+		c := NATSConnection{initialized: true, closed: true}
+		err := c.Close()
+		assert.ErrorIs(t, err, ErrConnectionAlreadyClosed)
+	})
+
+	t.Run("success", func(t *testing.T) {
+		addr := newNATSServer(t)
+
+		c := NewConnection(addr, "a")
+		err := c.Connect(150 * time.Millisecond)
+		require.NoError(t, err)
+		require.True(t, c.conn.IsConnected())
+
+		assert.NoError(t, c.Close())
+		assert.True(t, c.closed)
+		assert.True(t, c.conn.IsDraining())
+	})
+}
+
+func TestNATSConnection_GetMatchConfig(t *testing.T) {
+	t.Run("not_initialized", func(t *testing.T) {
+		c := NATSConnection{}
+		_, err := c.GetMatchConfig(context.Background())
+		assert.ErrorIs(t, err, ErrConnectionNotInitialized)
+	})
+
+	t.Run("closed", func(t *testing.T) {
+		c := NATSConnection{initialized: true, closed: true}
+		_, err := c.GetMatchConfig(context.Background())
+		assert.ErrorIs(t, err, ErrConnectionAlreadyClosed)
+	})
+
+	t.Run("context_cancelled", func(t *testing.T) {
+		addr := newNATSServer(t)
+
+		c := NewConnection(addr, "a")
+		err := c.Connect(150 * time.Millisecond)
+		require.NoError(t, err)
 
 		ctx, cancel := context.WithCancel(context.Background())
 		cancel()
-		err := conn.Connect(ctx)
+
+		_, err = c.GetMatchConfig(ctx)
 		assert.ErrorIs(t, err, context.Canceled)
 	})
 
-	t.Run("second connect attempt", func(t *testing.T) {
-		restartBroker()
-
-		conn := NewConnection(brokerUri)
-		assert.NoError(t, conn.Connect(context.Background()))
-		assert.ErrorIs(t, conn.Connect(context.Background()), ErrSecondConnectAttempt)
-	})
-}
-
-func TestRMQConnection_Close(t *testing.T) {
-	t.Run("not initialized", func(t *testing.T) {
-		conn := NewConnection("")
-		err := conn.Close(context.Background())
-		assert.ErrorIs(t, err, ErrConnectionNotInitialized)
-	})
-
 	t.Run("success", func(t *testing.T) {
-		restartBroker()
+		addr := newNATSServer(t)
 
-		conn := NewConnection(brokerUri)
-		err := conn.Connect(context.Background())
-		assert.NoError(t, err)
+		containerId := "a"
+		c := NewConnection(addr, containerId)
+		err := c.Connect(150 * time.Millisecond)
+		require.NoError(t, err)
 
-		cha := make(chan *rmq.StateChanged, 1)
-		conn.conn.NotifyStatusChange(cha)
+		nc, err := nats.Connect(addr)
+		require.NoError(t, err)
+		t.Cleanup(func() { nc.Close() })
 
-		assert.IsType(t, &rmq.StateOpen{}, conn.conn.State())
-		conn.Close(context.Background())
+		expectedConfig := `{"config": 123}`
 
-		select {
-		case change := <-cha:
-			assert.IsType(t, &rmq.StateClosed{}, change.To)
-		case <-time.After(1 * time.Second):
-			assert.Fail(t, "timeout")
-		}
-	})
-}
+		doneChan := make(chan struct{})
+		go func() {
+			defer close(doneChan)
 
-func TestRMQConnection_GetStartRequest(t *testing.T) {
-	t.Run("not initialized", func(t *testing.T) {
-		conn := NewConnection("")
-		_, err := conn.GetStartRequest(context.Background())
-		assert.ErrorIs(t, err, ErrConnectionNotInitialized)
-	})
-
-	tests := []struct {
-		name string
-		msg  []byte
-	}{
-		{name: "success", msg: []byte{0, 1, 2}},
-		{name: "empty payload", msg: []byte{}},
-	}
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			restartBroker()
-
-			conn := NewConnection(brokerUri)
-			require.NoError(t, conn.Connect(context.Background()))
-
-			p, err := conn.conn.NewPublisher(
-				context.Background(),
-				&rmq.QueueAddress{Queue: statusQueueName},
-				nil,
+			msg, err := nc.Request(
+				assignSubject+"."+containerId,
+				[]byte(expectedConfig),
+				1*time.Second,
 			)
 			require.NoError(t, err)
-			_, err = p.Publish(context.Background(), rmq.NewMessage(test.msg))
-			require.NoError(t, err)
+			assert.Empty(t, msg.Data)
+		}()
 
-			res, err := conn.GetStartRequest(context.Background())
-			assert.NoError(t, err)
-			assert.Equal(t, test.msg, res)
-		})
-	}
+		config, err := c.GetMatchConfig(context.Background())
+		require.NoError(t, err)
+		assert.Equal(t, string(expectedConfig), config)
 
-	t.Run("context cancel", func(t *testing.T) {
-		conn := NewConnection(brokerUri)
-		err := conn.Connect(context.Background())
-		assert.NoError(t, err)
-
-		ctx, cancel := context.WithCancel(context.Background())
-		cancel()
-		_, err = conn.GetStartRequest(ctx)
-		assert.ErrorIs(t, err, context.Canceled)
+		<-doneChan
 	})
 }
 
-func TestRMQConnection_SendMatchResult(t *testing.T) {
-	t.Run("not initialized", func(t *testing.T) {
-		conn := NewConnection("")
-		err := conn.SendMatchResult(context.Background(), []byte{})
+func TestNATSConnection_SendCancel(t *testing.T) {
+	t.Run("not_initialized", func(t *testing.T) {
+		c := NATSConnection{}
+		err := c.SendCancel()
 		assert.ErrorIs(t, err, ErrConnectionNotInitialized)
 	})
 
-	t.Run("success", func(t *testing.T) {
-		restartBroker()
-
-		conn := NewConnection(brokerUri)
-		err := conn.Connect(context.Background())
-		require.NoError(t, err)
-
-		msg := []byte{0, 1, 2}
-		err = conn.SendMatchResult(context.Background(), msg)
-		assert.NoError(t, err)
-
-		consumer, err := conn.conn.NewConsumer(
-			context.Background(),
-			resultQueueName,
-			&rmq.ConsumerOptions{InitialCredits: 1},
-		)
-		require.NoError(t, err)
-
-		delivery, err := consumer.Receive(context.Background())
-		require.NoError(t, err)
-		assert.Equal(t, msg, delivery.Message().Data[0])
+	t.Run("closed", func(t *testing.T) {
+		c := NATSConnection{initialized: true, closed: true}
+		err := c.SendCancel()
+		assert.ErrorIs(t, err, ErrConnectionAlreadyClosed)
 	})
 
-	t.Run("context cancel", func(t *testing.T) {
-		restartBroker()
+	t.Run("success", func(t *testing.T) {
+		addr := newNATSServer(t)
 
-		conn := NewConnection(brokerUri)
-		err := conn.Connect(context.Background())
+		c := NewConnection(addr, "a")
+		err := c.Connect(150 * time.Millisecond)
 		require.NoError(t, err)
 
-		ctx, cancel := context.WithCancel(context.Background())
-		cancel()
-		err = conn.SendMatchResult(ctx, []byte{})
+		nc, err := nats.Connect(addr)
+		require.NoError(t, err)
+		t.Cleanup(func() { nc.Close() })
 
-		// rmq doesn't use context.Canceled instead they use this condition for ctx.Done()
-		var amqpErr *amqp.Error
-		require.ErrorAs(t, err, &amqpErr)
-		assert.Equal(t, amqp.ErrCondTransferLimitExceeded, amqpErr.Condition)
+		sub, err := nc.SubscribeSync(resultSubject)
+		require.NoError(t, err)
+		nc.Flush()
+
+		require.NoError(t, c.SendCancel())
+
+		msg, err := sub.NextMsg(2 * time.Second)
+		require.NoError(t, err)
+
+		var result Result
+		err = json.Unmarshal(msg.Data, &result)
+		require.NoError(t, err)
+
+		assert.False(t, result.Success)
+		assert.Equal(t, json.RawMessage("{}"), result.Details)
+	})
+}
+
+func TestNATSConnection_SendResult(t *testing.T) {
+	t.Run("not_initialized", func(t *testing.T) {
+		c := NATSConnection{}
+		err := c.SendResult([]byte("data"))
+		assert.ErrorIs(t, err, ErrConnectionNotInitialized)
+	})
+
+	t.Run("closed", func(t *testing.T) {
+		c := NATSConnection{initialized: true, closed: true}
+		err := c.SendResult([]byte("data"))
+		assert.ErrorIs(t, err, ErrConnectionAlreadyClosed)
+	})
+
+	t.Run("success", func(t *testing.T) {
+		addr := newNATSServer(t)
+
+		c := NewConnection(addr, "a")
+		err := c.Connect(150 * time.Millisecond)
+		require.NoError(t, err)
+
+		nc, err := nats.Connect(addr)
+		require.NoError(t, err)
+		t.Cleanup(func() { nc.Close() })
+
+		sub, err := nc.SubscribeSync(resultSubject)
+		require.NoError(t, err)
+		nc.Flush()
+
+		result := `{"data":123}`
+		expected := `{"success":true,"details":` + result + `}`
+
+		require.NoError(t, c.SendResult([]byte(result)))
+
+		msg, err := sub.NextMsg(150 * time.Millisecond)
+		require.NoError(t, err)
+		assert.Equal(t, []byte(expected), msg.Data)
+	})
+}
+
+func TestNATSConnection_subscribeAssign(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		addr := newNATSServer(t)
+
+		c := NewConnection(addr, "a")
+
+		nc, err := nats.Connect(addr)
+		require.NoError(t, err)
+		c.conn = nc
+		t.Cleanup(func() { nc.Close() })
+
+		err = c.subscribeAssign()
+		require.NoError(t, err)
+
+		assert.NotNil(t, c.requestSub)
+		assert.True(t, c.requestSub.IsValid())
+
+		msgLimit, bytesLimit, err := c.requestSub.PendingLimits()
+		require.NoError(t, err)
+
+		assert.Equal(t, 1, msgLimit)
+		assert.Equal(t, -1, bytesLimit)
 	})
 }

@@ -17,21 +17,19 @@ services:
     networks:
       - db-net
 
-  rabbitmq:
-    image: rabbitmq:4.3-alpine
-    environment:
-      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER}
-      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS}
-      RABBITMQ_NODENAME: rabbit@rabbitmq
-    healthcheck:
-      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
-      interval: 5s
-      retries: 10
-      timeout: 2s
+  nats:
+    image: nats:2.14-alpine
+    command: ["-js", "-m", "8222", "-sd", "/data"]
     volumes:
-      - ./data/rabbitmq:/var/lib/rabbitmq
+      - /data/nats:/data
     networks:
-      - rabbitmq-net
+      - nats-net
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8222/healthz || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
 
   api:
     image: node:26-alpine
@@ -53,35 +51,21 @@ services:
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER}
-      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS}
+      NATS_URI: ${NATS_URI}
     networks:
       - db-net
-      - rabbitmq-net
+      - nats-net
     depends_on:
       db:
         condition: service_healthy
-      rabbitmq:
-        condition: service_healthy
-
-  game-server:
-    build:
-      context: ./game-server
-    environment:
-      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER}
-      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS}
-    networks:
-      - rabbitmq-net
-    depends_on:
-      rabbitmq:
+      nats:
         condition: service_healthy
 
 networks:
   db-net:
     driver: bridge
     internal: true
-  rabbitmq-net:
+  nats-net:
     driver: bridge
     internal: true
-
 

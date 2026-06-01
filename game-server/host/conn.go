@@ -2,126 +2,150 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"time"
 
-	rmq "github.com/rabbitmq/rabbitmq-amqp-go-client/pkg/rabbitmqamqp"
+	"github.com/nats-io/nats.go"
 )
 
-const statusQueueName = "server.status"
-const resultQueueName = "server.result"
+const (
+	assignSubject = "workers.assign"
+	resultSubject = "workers.results"
+)
 
 var (
-	ErrConnectionNotInitialized = errors.New("conection not initialized")
-	ErrSecondConnectAttempt     = errors.New("cannot connect twice")
-	ErrConnectionCreate         = errors.New("failed to create a new connection")
-	ErrQueueDeclare             = errors.New("failed to declare a queue")
-	ErrConsumerCreate           = errors.New("failed to create a consumer")
-	ErrPublisherCreate          = errors.New("failed to create a publisher")
-	ErrMessageReceiveFailure    = errors.New("Failed to receive a message:")
+	ErrConnectionNotInitialized     = errors.New("conection not initialized")
+	ErrConnectionAlreadyInitialized = errors.New("connection already initialized")
+	ErrConnectionAlreadyClosed      = errors.New("connection already closed")
+	ErrPingJSONEncodingFailed       = errors.New("ping json enconding failed")
+	ErrFailedToConnect              = errors.New("failed to connect")
+	ErrChannelError                 = errors.New("channel")
 )
 
-// NOTE: Connection can be used only once to connect to rabbitmq
-type RMQConnection struct {
-	brokerUri       string
-	env             *rmq.Environment
-	conn            *rmq.AmqpConnection
-	statusConsumer  *rmq.Consumer
-	resultPublisher *rmq.Publisher
+// TODO: change connect to open and initialized to opened
+// Note: closed connection cannot be reconnected
+type NATSConnection struct {
+	brokerUri   string
+	containerId string
+	conn        *nats.Conn
+
+	requestSub *nats.Subscription
+
+	initialized bool
+	closed      bool
 }
 
-func GenBrokerUri(user string, pass string) string {
-	return fmt.Sprintf("amqp://%s:%s@rabbitmq:5672/", user, pass)
-}
-
-func NewConnection(brokerUri string) *RMQConnection {
-	return &RMQConnection{
-		brokerUri: brokerUri,
-		env:       rmq.NewEnvironment(brokerUri, nil),
+func NewConnection(brokerUri string, containerId string) *NATSConnection {
+	return &NATSConnection{
+		brokerUri:   brokerUri,
+		containerId: containerId,
 	}
 }
 
-func (c *RMQConnection) Connect(ctx context.Context) error {
-	if c.conn != nil {
-		return ErrSecondConnectAttempt
+func (c *NATSConnection) Connect(timeout time.Duration) error {
+	if c.initialized {
+		// TODO: rename this error to cannot be reopened
+		return ErrConnectionAlreadyInitialized
 	}
 
-	conn, err := c.env.NewConnection(ctx)
+	conn, err := nats.Connect(c.brokerUri, nats.Timeout(timeout))
 	if err != nil {
-		return fmt.Errorf("%w: %w", ErrConnectionCreate, err)
+		return err
 	}
 	c.conn = conn
 
-	_, err = c.conn.Management().DeclareQueue(
-		ctx,
-		&rmq.QuorumQueueSpecification{Name: statusQueueName},
-	)
-	if err != nil {
-		return fmt.Errorf("%w: %w", ErrQueueDeclare, err)
+	if err := c.subscribeAssign(); err != nil {
+		c.Close()
+		return err
 	}
 
-	consumer, err := c.conn.NewConsumer(
-		ctx,
-		statusQueueName,
-		&rmq.ConsumerOptions{InitialCredits: 1},
-	)
-	if err != nil {
-		return fmt.Errorf("%w: %w", ErrConsumerCreate, err)
-	}
-	c.statusConsumer = consumer
-
-	_, err = c.conn.Management().DeclareQueue(
-		ctx,
-		&rmq.QuorumQueueSpecification{Name: resultQueueName},
-	)
-	if err != nil {
-		return fmt.Errorf("%w: %w", ErrQueueDeclare, err)
-	}
-
-	publisher, err := c.conn.NewPublisher(ctx, &rmq.QueueAddress{Queue: resultQueueName}, nil)
-	if err != nil {
-		return fmt.Errorf("%w: %w", ErrPublisherCreate, err)
-	}
-	c.resultPublisher = publisher
+	c.initialized = true
 
 	return nil
 }
 
-func (c *RMQConnection) Close(ctx context.Context) error {
-	if c.conn == nil {
+func (c *NATSConnection) Close() error {
+	if !c.initialized {
 		return ErrConnectionNotInitialized
 	}
-	return c.env.CloseConnections(ctx)
+	if c.closed {
+		return ErrConnectionAlreadyClosed
+	}
+	c.closed = true
+	return c.conn.Drain()
 }
 
-func (c *RMQConnection) GetStartRequest(ctx context.Context) ([]byte, error) {
-	if c.statusConsumer == nil {
-		return []byte{}, ErrConnectionNotInitialized
+func (c *NATSConnection) GetMatchConfig(ctx context.Context) (string, error) {
+	if !c.initialized {
+		return "", ErrConnectionNotInitialized
+	}
+	if c.closed {
+		return "", ErrConnectionAlreadyClosed
 	}
 
-	delivery, err := c.statusConsumer.Receive(ctx)
+	msg, err := c.requestSub.NextMsgWithContext(ctx)
 	if err != nil {
-		return []byte{}, fmt.Errorf("%w: %w", ErrMessageReceiveFailure, err)
+		return "", err
 	}
 
-	msg := delivery.Message()
-
-	var payload []byte
-	if len(msg.Data) > 0 {
-		payload = msg.Data[0]
+	// acknowledge request
+	if err := c.conn.Publish(msg.Reply, []byte{}); err != nil {
+		return "", err
 	}
-
-	// NOTE: can cause issues if something breaks before server is alive
-	if err = delivery.Accept(ctx); err != nil {
-		return []byte{}, err
-	}
-	return payload, nil
+	return string(msg.Data), nil
 }
 
-func (c *RMQConnection) SendMatchResult(ctx context.Context, payload []byte) error {
-	if c.resultPublisher == nil {
+type Result struct {
+	Success bool            `json:"success"`
+	Details json.RawMessage `json:"details"`
+}
+
+func (c *NATSConnection) SendCancel() error {
+	if !c.initialized {
 		return ErrConnectionNotInitialized
 	}
-	_, err := c.resultPublisher.Publish(ctx, rmq.NewMessage(payload))
-	return err
+	if c.closed {
+		return ErrConnectionAlreadyClosed
+	}
+	return c.conn.Publish(
+		resultSubject,
+		[]byte(`{"success": false, "details":{}}`),
+	)
+}
+
+// TODO: use jetstream here
+func (c *NATSConnection) SendResult(result []byte) error {
+	if !c.initialized {
+		return ErrConnectionNotInitialized
+	}
+	if c.closed {
+		return ErrConnectionAlreadyClosed
+	}
+
+	payload, err := json.Marshal(Result{
+		Success: true,
+		Details: result,
+	})
+	if err != nil {
+		return fmt.Errorf("the result is not valid JSON")
+	}
+
+	return c.conn.Publish(resultSubject, payload)
+}
+
+func (c *NATSConnection) subscribeAssign() error {
+	sub, err := c.conn.SubscribeSync(assignSubject + "." + c.containerId)
+	if err != nil {
+		c.Close()
+		return err
+	}
+	if err := sub.SetPendingLimits(1, -1); err != nil {
+		c.Close()
+		return err
+	}
+	c.requestSub = sub
+
+	return nil
 }

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log/slog"
 	"server/internal/domain"
+	"time"
 )
 
 var (
@@ -19,20 +20,20 @@ type App struct {
 	initialized bool
 }
 
-func NewApp(brokerUri string, cmdArgs []string) *App {
+func NewApp(brokerUri string, containerId string, cmdArgs []string) *App {
 	return &App{
-		conn:    NewConnection(brokerUri),
+		conn:    NewConnection(brokerUri, containerId),
 		server:  &GameServer{},
 		cmdArgs: cmdArgs,
 	}
 }
 
-func (app *App) Init(ctx context.Context) error {
+func (app *App) Init(timeout time.Duration) error {
 	if app.initialized {
 		return ErrAppAlreadyInitialized
 	}
 
-	if err := app.conn.Connect(ctx); err != nil {
+	if err := app.conn.Connect(timeout); err != nil {
 		return err
 	}
 	app.initialized = true
@@ -46,40 +47,38 @@ func (app *App) Run(ctx context.Context) error {
 
 	slog.Info("app loop started", "args", app.cmdArgs)
 
-	for {
-		if ctx.Err() != nil {
-			return ctx.Err()
-		}
-
-		payload, err := app.conn.GetStartRequest(ctx)
+	// TODO: prevent logging context errors like Canceled, DeadlineExceeded...
+	for ctx.Err() == nil {
+		config, err := app.conn.GetMatchConfig(ctx)
 		if err != nil {
-			return err
+			slog.Error("get match config failed", "error", err)
+			continue
 		}
-		slog.Info("received game server start request", "payload_len", len(payload))
-		slog.Debug("request detail", "payload", string(payload))
+		slog.Info("received game server start request", "config_len", len(config))
 
 		slog.Info("starting game server")
-		if err = app.server.Start(string(payload), app.cmdArgs); err != nil {
-			slog.Error("failed to start game server", "error", err, "action", "skipping_request")
-			app.server.Stop(ctx)
+		if err := app.server.Start(config, app.cmdArgs); err != nil {
+			slog.Error("failed to start game server", "error", err)
+			_ = app.conn.SendCancel()
 			continue
 		}
 
 		slog.Info("game server running, waiting for result")
 		result, err := app.server.GetResult(ctx)
 		if err != nil {
-			slog.Error("failed to retrieve match result", "error", err, "action", "stopping_server")
-			app.server.Stop(ctx)
+			slog.Error("failed to retrieve match result", "error", err)
+			_ = app.conn.SendCancel()
 			continue
 		}
-		_ = app.server.Stop(ctx)
+		slog.Info("match result retrieved, sending...")
 
-		slog.Info("match finished, sending result", "result_len", len(result))
-		slog.Debug("result detail", "result", string(result))
-		if err = app.conn.SendMatchResult(ctx, result); err != nil {
-			slog.Error("failed to send match result back to broker", "error", err)
+		if err := app.conn.SendResult(result); err != nil {
+			slog.Error("failed to send match result", "error", err)
+			_ = app.conn.SendCancel()
 			continue
 		}
 		slog.Info("match lifecycle complete, ready for next request")
 	}
+
+	return ctx.Err()
 }

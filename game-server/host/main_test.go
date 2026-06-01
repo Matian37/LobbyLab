@@ -13,27 +13,47 @@ func TestParseArgs(t *testing.T) {
 		fail     bool
 		expected []string
 	}{
-		{name: "too few arguments", args: []string{"x"}, fail: true},
-		{name: "too many arguments", args: []string{"x", "./x", "x"}, fail: true},
-		{name: "parsing error", args: []string{"/", "/\\"}, fail: true},
 		{
-			name:     "too few arguments",
-			args:     []string{"/", "./x --arg 1 -e 4"},
+			name: "too few arguments",
+			args: []string{"x"},
+			fail: true,
+		},
+		{
+			name: "too many arguments",
+			args: []string{"x", "./x", "x"},
+			fail: true,
+		},
+		{
+			name: "unterminated quote",
+			args: []string{"/", "./game --name \"unclosed"},
+			fail: true,
+		},
+		{
+			name:     "success",
+			args:     []string{"/", "./game args"},
 			fail:     false,
-			expected: []string{"./x", "--arg", "1", "-e", "4"},
+			expected: []string{"./game", "args"},
 		},
 	}
 
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			res, err := ParseArgs(test.args)
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			res, err := ParseArgs(tc.args)
 
-			if test.fail {
+			if tc.fail {
 				assert.Error(t, err)
 			} else {
 				assert.NoError(t, err)
-				assert.Equal(t, test.expected, res)
+				assert.Equal(t, tc.expected, res)
 			}
 		})
 	}
+}
+
+func TestParseArgs_InputNotModified(t *testing.T) {
+	original := []string{"/", "./x"}
+	result, err := ParseArgs(original)
+	assert.NoError(t, err)
+	assert.Equal(t, []string{"./x"}, result)
+	assert.Equal(t, []string{"/", "./x"}, original, "input slice must not be modified")
 }
