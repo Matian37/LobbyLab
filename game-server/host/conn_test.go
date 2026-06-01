@@ -44,6 +44,7 @@ func TestNewConnection(t *testing.T) {
 	assert.Equal(t, containerId, c.containerId)
 
 	assert.Nil(t, c.conn)
+	assert.Nil(t, c.healthSub)
 	assert.Nil(t, c.requestSub)
 
 	assert.False(t, c.initialized)
@@ -79,6 +80,7 @@ func TestNATSConnection_Connect(t *testing.T) {
 
 		require.NotNil(t, c.conn)
 		assert.True(t, c.conn.IsConnected())
+		assert.NotNil(t, c.healthSub)
 		assert.NotNil(t, c.requestSub)
 	})
 }
@@ -275,5 +277,60 @@ func TestNATSConnection_subscribeAssign(t *testing.T) {
 
 		assert.Equal(t, 1, msgLimit)
 		assert.Equal(t, -1, bytesLimit)
+	})
+}
+
+func TestNATSConnection_subscribeHealth(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		addr := newNATSServer(t)
+
+		c := NewConnection(addr, "a")
+
+		nc, err := nats.Connect(addr)
+		require.NoError(t, err)
+		c.conn = nc
+		t.Cleanup(func() { nc.Close() })
+
+		require.NoError(t, c.subscribeHealth())
+		assert.NotNil(t, c.healthSub)
+
+		pub, err := nats.Connect(addr)
+		require.NoError(t, err)
+		t.Cleanup(func() { pub.Close() })
+
+		pongSubject := healthSubject + "." + c.containerId
+		pong, err := pub.SubscribeSync(pongSubject)
+		require.NoError(t, err)
+		pub.Flush()
+
+		err = pub.Publish(healthSubject, []byte{})
+		require.NoError(t, err)
+
+		msg, err := pong.NextMsg(150 * time.Millisecond)
+		require.NoError(t, err)
+		assert.Empty(t, msg.Data)
+	})
+}
+
+func TestNATSConnection_HealthPing(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		addr := newNATSServer(t)
+
+		c := NewConnection(addr, "a")
+		err := c.Connect(150 * time.Millisecond)
+		require.NoError(t, err)
+
+		nc, err := nats.Connect(addr)
+		require.NoError(t, err)
+		t.Cleanup(func() { nc.Close() })
+
+		pong, err := nc.SubscribeSync(healthSubject + "." + c.containerId)
+		require.NoError(t, err)
+		nc.Flush()
+
+		require.NoError(t, nc.Publish(healthSubject, []byte{}))
+		msg, err := pong.NextMsg(1 * time.Second)
+		require.NoError(t, err)
+		assert.Empty(t, msg.Data)
 	})
 }

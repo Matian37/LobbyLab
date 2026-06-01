@@ -5,12 +5,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/nats-io/nats.go"
 )
 
 const (
+	healthSubject = "workers.health"
 	assignSubject = "workers.assign"
 	resultSubject = "workers.results"
 )
@@ -31,6 +33,7 @@ type NATSConnection struct {
 	containerId string
 	conn        *nats.Conn
 
+	healthSub  *nats.Subscription
 	requestSub *nats.Subscription
 
 	initialized bool
@@ -60,7 +63,10 @@ func (c *NATSConnection) Connect(timeout time.Duration) error {
 		c.Close()
 		return err
 	}
-
+	if err := c.subscribeHealth(); err != nil {
+		c.Close()
+		return err
+	}
 	c.initialized = true
 
 	return nil
@@ -147,5 +153,28 @@ func (c *NATSConnection) subscribeAssign() error {
 	}
 	c.requestSub = sub
 
+	return nil
+}
+
+func (c *NATSConnection) subscribeHealth() error {
+	sub, err := c.conn.Subscribe(healthSubject, func(msg *nats.Msg) {
+		slog.Debug("received ping, sending pong...")
+
+		responseErr := c.conn.Publish(healthSubject+"."+c.containerId, []byte{})
+		if responseErr != nil {
+			slog.Error("failed to publish health response", "error", responseErr)
+		}
+
+		slog.Debug("pong sent successfuly...")
+	})
+	if err != nil {
+		return err
+	}
+	if err := sub.SetPendingLimits(1, -1); err != nil {
+		return err
+	}
+	c.healthSub = sub
+
+	// it doesnt make sense to store more than one ping msg
 	return nil
 }
