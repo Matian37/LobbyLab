@@ -71,7 +71,8 @@ func (c *NATSConnection) Open(timeout time.Duration) error {
 }
 
 func (c *NATSConnection) Close() error {
-	if !c.opened {
+	// c.conn == nil allows partialy opened NATSConn to be closed
+	if !c.opened && c.conn == nil {
 		return ErrConnectionNotOpen
 	}
 	if c.closed {

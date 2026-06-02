@@ -61,7 +61,6 @@ func TestNATSConnection_Open(t *testing.T) {
 	t.Run("failure", func(t *testing.T) {
 		c := NewConnection("nats://10.255.255.1:4222", "b")
 		err := c.Open(150 * time.Millisecond)
-		assert.Error(t, err)
 		assert.ErrorContains(t, err, "i/o timeout")
 
 		assert.False(t, c.opened)
@@ -83,6 +82,18 @@ func TestNATSConnection_Open(t *testing.T) {
 		assert.NotNil(t, c.healthSub)
 		assert.NotNil(t, c.requestSub)
 	})
+
+	t.Run("partial opening", func(t *testing.T) {
+		addr := newNATSServer(t)
+
+		// space in containerId trigger error in subscribeAssign
+		c := NewConnection(addr, "a b")
+		err := c.Open(150 * time.Millisecond)
+		assert.ErrorIs(t, err, nats.ErrBadSubject)
+
+		assert.False(t, c.opened)
+		assert.True(t, c.closed)
+	})
 }
 
 func TestNATSConnection_Close(t *testing.T) {
@@ -99,6 +110,19 @@ func TestNATSConnection_Close(t *testing.T) {
 	})
 
 	t.Run("success", func(t *testing.T) {
+		addr := newNATSServer(t)
+
+		c := NewConnection(addr, "a")
+		err := c.Open(150 * time.Millisecond)
+		require.NoError(t, err)
+		require.True(t, c.conn.IsConnected())
+
+		assert.NoError(t, c.Close())
+		assert.True(t, c.closed)
+		assert.True(t, c.conn.IsDraining())
+	})
+
+	t.Run("partially opened", func(t *testing.T) {
 		addr := newNATSServer(t)
 
 		c := NewConnection(addr, "a")
