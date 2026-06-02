@@ -39,7 +39,7 @@ func TestCreateTempFile(t *testing.T) {
 	})
 }
 
-func TestCleanup(t *testing.T) {
+func TestGameServer_Cleanup(t *testing.T) {
 	t.Run("nil files", func(t *testing.T) {
 		server := GameServer{}
 		server.cleanup()
@@ -66,7 +66,7 @@ func TestCleanup(t *testing.T) {
 	})
 }
 
-func TestStartWait(t *testing.T) {
+func TestGameServer_StartWait(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		server := GameServer{}
 		require.NoError(t, server.Start("", []string{"echo"}))
@@ -78,7 +78,7 @@ func TestStartWait(t *testing.T) {
 	})
 }
 
-func TestStart(t *testing.T) {
+func TestGameServer_Start(t *testing.T) {
 	t.Run("no command", func(t *testing.T) {
 		server := GameServer{}
 		err := server.Start("", []string{})
@@ -131,7 +131,7 @@ func TestStart(t *testing.T) {
 	})
 }
 
-func TestWait(t *testing.T) {
+func TestGameServer_Wait(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		server := GameServer{}
 		require.NoError(t, server.Start("", []string{"sh", "-c", "exit 1"}))
@@ -154,7 +154,7 @@ func TestWait(t *testing.T) {
 	})
 }
 
-func TestStop(t *testing.T) {
+func TestGameServer_Stop(t *testing.T) {
 	assertProcessEnded := func(server *GameServer, signal syscall.Signal) {
 		require.NotNil(t, server.cmd)
 		require.NotNil(t, server.cmd.ProcessState)
@@ -253,7 +253,7 @@ func TestStop(t *testing.T) {
 	})
 }
 
-func TestGetResult(t *testing.T) {
+func TestGameServer_GetResult(t *testing.T) {
 	t.Run("not started", func(t *testing.T) {
 		server := GameServer{}
 		_, err := server.GetResult(context.Background())
