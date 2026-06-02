@@ -138,8 +138,6 @@ func (s *GameServer) GetResult(ctx context.Context) ([]byte, error) {
 	if err := s.Wait(ctx); err != nil {
 		return []byte{}, err
 	}
-	// TODO: GetResult shouldn't use stop, use it in main.go
-	defer s.Stop(ctx)
 
 	s.resultFile.Seek(0, 0)
 	result, err := io.ReadAll(s.resultFile)

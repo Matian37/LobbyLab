@@ -165,6 +165,7 @@ func TestApp_Run(t *testing.T) {
 		mockConn.EXPECT().GetMatchConfig(gomock.Any()).Return(config, nil)
 		mockSrv.EXPECT().Start(config, app.cmdArgs).Return(nil)
 		mockSrv.EXPECT().GetResult(ctx).Return(nil, errors.New("server crash"))
+		mockSrv.EXPECT().Stop(ctx).Return(nil)
 		mockConn.EXPECT().SendCancel().Return(nil)
 
 		mockConn.EXPECT().GetMatchConfig(gomock.Any()).

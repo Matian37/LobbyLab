@@ -48,6 +48,7 @@ func (app *App) Run(ctx context.Context) error {
 	slog.Info("app loop started", "args", app.cmdArgs)
 
 	// TODO: prevent logging context errors like Canceled, DeadlineExceeded...
+	// TODO: handle SendCancel errors and server.Stop?
 	for ctx.Err() == nil {
 		config, err := app.conn.GetMatchConfig(ctx)
 		if err != nil {
@@ -67,6 +68,7 @@ func (app *App) Run(ctx context.Context) error {
 		result, err := app.server.GetResult(ctx)
 		if err != nil {
 			slog.Error("failed to retrieve match result", "error", err)
+			_ = app.server.Stop(ctx)
 			_ = app.conn.SendCancel()
 			continue
 		}
