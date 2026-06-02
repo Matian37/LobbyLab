@@ -136,7 +136,7 @@ func TestWait(t *testing.T) {
 		server := GameServer{}
 		require.NoError(t, server.Start("", []string{"sh", "-c", "exit 1"}))
 
-		err := server.Wait(context.Background())
+		err := server.wait(context.Background())
 
 		_, ok := err.(*exec.ExitError)
 		assert.True(t, ok)
@@ -149,7 +149,7 @@ func TestWait(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		cancel()
 
-		err := server.Wait(ctx)
+		err := server.wait(ctx)
 		assert.ErrorIs(t, err, context.Canceled)
 	})
 }

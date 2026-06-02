@@ -109,7 +109,27 @@ func (s *GameServer) Stop(ctx context.Context) error {
 	}
 }
 
-func (s *GameServer) Wait(ctx context.Context) error {
+func (s *GameServer) GetResult(ctx context.Context) ([]byte, error) {
+	if !s.started {
+		return []byte{}, ErrGameServerNotStarted
+	}
+	if s.closed {
+		return []byte{}, ErrGameServerAlreadyClosed
+	}
+
+	if err := s.wait(ctx); err != nil {
+		return []byte{}, err
+	}
+
+	s.resultFile.Seek(0, 0)
+	result, err := io.ReadAll(s.resultFile)
+	if err != nil {
+		return []byte{}, err
+	}
+	return result, nil
+}
+
+func (s *GameServer) wait(ctx context.Context) error {
 	if !s.started {
 		return ErrGameServerNotStarted
 	}
@@ -125,26 +145,6 @@ func (s *GameServer) Wait(ctx context.Context) error {
 	case <-ctx.Done():
 		return ctx.Err()
 	}
-}
-
-func (s *GameServer) GetResult(ctx context.Context) ([]byte, error) {
-	if !s.started {
-		return []byte{}, ErrGameServerNotStarted
-	}
-	if s.closed {
-		return []byte{}, ErrGameServerAlreadyClosed
-	}
-
-	if err := s.Wait(ctx); err != nil {
-		return []byte{}, err
-	}
-
-	s.resultFile.Seek(0, 0)
-	result, err := io.ReadAll(s.resultFile)
-	if err != nil {
-		return []byte{}, err
-	}
-	return result, nil
 }
 
 // start wait goroutine and create waitChannel
