@@ -55,20 +55,6 @@ func (mr *MockBrokerConnectionMockRecorder) Close() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Close", reflect.TypeOf((*MockBrokerConnection)(nil).Close))
 }
 
-// Connect mocks base method.
-func (m *MockBrokerConnection) Connect(timeout time.Duration) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Connect", timeout)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// Connect indicates an expected call of Connect.
-func (mr *MockBrokerConnectionMockRecorder) Connect(timeout any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Connect", reflect.TypeOf((*MockBrokerConnection)(nil).Connect), timeout)
-}
-
 // GetMatchConfig mocks base method.
 func (m *MockBrokerConnection) GetMatchConfig(ctx context.Context) (string, error) {
 	m.ctrl.T.Helper()
@@ -82,6 +68,20 @@ func (m *MockBrokerConnection) GetMatchConfig(ctx context.Context) (string, erro
 func (mr *MockBrokerConnectionMockRecorder) GetMatchConfig(ctx any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetMatchConfig", reflect.TypeOf((*MockBrokerConnection)(nil).GetMatchConfig), ctx)
+}
+
+// Open mocks base method.
+func (m *MockBrokerConnection) Open(timeout time.Duration) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Open", timeout)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Open indicates an expected call of Open.
+func (mr *MockBrokerConnectionMockRecorder) Open(timeout any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Open", reflect.TypeOf((*MockBrokerConnection)(nil).Open), timeout)
 }
 
 // SendCancel mocks base method.

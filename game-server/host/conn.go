@@ -18,16 +18,15 @@ const (
 )
 
 var (
-	ErrConnectionNotInitialized     = errors.New("conection not initialized")
-	ErrConnectionAlreadyInitialized = errors.New("connection already initialized")
-	ErrConnectionAlreadyClosed      = errors.New("connection already closed")
-	ErrPingJSONEncodingFailed       = errors.New("ping json enconding failed")
-	ErrFailedToConnect              = errors.New("failed to connect")
-	ErrChannelError                 = errors.New("channel")
+	ErrConnectionNotOpen       = errors.New("conection not initialized")
+	ErrConnectionNotReopenable = errors.New("connection cannot be reopened")
+	ErrConnectionClosed        = errors.New("connection already closed")
+	ErrPingJSONEncodingFailed  = errors.New("ping json enconding failed")
+	ErrFailedToConnect         = errors.New("failed to connect")
+	ErrChannelError            = errors.New("channel")
 )
 
-// TODO: change connect to open and initialized to opened
-// Note: closed connection cannot be reconnected
+// Note: closed connection cannot be reopened
 type NATSConnection struct {
 	brokerUri   string
 	containerId string
@@ -36,8 +35,8 @@ type NATSConnection struct {
 	healthSub  *nats.Subscription
 	requestSub *nats.Subscription
 
-	initialized bool
-	closed      bool
+	opened bool
+	closed bool
 }
 
 func NewConnection(brokerUri string, containerId string) *NATSConnection {
@@ -47,10 +46,9 @@ func NewConnection(brokerUri string, containerId string) *NATSConnection {
 	}
 }
 
-func (c *NATSConnection) Connect(timeout time.Duration) error {
-	if c.initialized {
-		// TODO: rename this error to cannot be reopened
-		return ErrConnectionAlreadyInitialized
+func (c *NATSConnection) Open(timeout time.Duration) error {
+	if c.opened {
+		return ErrConnectionNotReopenable
 	}
 
 	conn, err := nats.Connect(c.brokerUri, nats.Timeout(timeout))
@@ -67,28 +65,28 @@ func (c *NATSConnection) Connect(timeout time.Duration) error {
 		c.Close()
 		return err
 	}
-	c.initialized = true
+	c.opened = true
 
 	return nil
 }
 
 func (c *NATSConnection) Close() error {
-	if !c.initialized {
-		return ErrConnectionNotInitialized
+	if !c.opened {
+		return ErrConnectionNotOpen
 	}
 	if c.closed {
-		return ErrConnectionAlreadyClosed
+		return ErrConnectionClosed
 	}
 	c.closed = true
 	return c.conn.Drain()
 }
 
 func (c *NATSConnection) GetMatchConfig(ctx context.Context) (string, error) {
-	if !c.initialized {
-		return "", ErrConnectionNotInitialized
+	if !c.opened {
+		return "", ErrConnectionNotOpen
 	}
 	if c.closed {
-		return "", ErrConnectionAlreadyClosed
+		return "", ErrConnectionClosed
 	}
 
 	msg, err := c.requestSub.NextMsgWithContext(ctx)
@@ -109,11 +107,11 @@ type Result struct {
 }
 
 func (c *NATSConnection) SendCancel() error {
-	if !c.initialized {
-		return ErrConnectionNotInitialized
+	if !c.opened {
+		return ErrConnectionNotOpen
 	}
 	if c.closed {
-		return ErrConnectionAlreadyClosed
+		return ErrConnectionClosed
 	}
 	return c.conn.Publish(
 		resultSubject,
@@ -123,11 +121,11 @@ func (c *NATSConnection) SendCancel() error {
 
 // TODO: use jetstream here
 func (c *NATSConnection) SendResult(result []byte) error {
-	if !c.initialized {
-		return ErrConnectionNotInitialized
+	if !c.opened {
+		return ErrConnectionNotOpen
 	}
 	if c.closed {
-		return ErrConnectionAlreadyClosed
+		return ErrConnectionClosed
 	}
 
 	payload, err := json.Marshal(Result{

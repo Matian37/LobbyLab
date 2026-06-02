@@ -8,7 +8,7 @@ import (
 //go:generate go run go.uber.org/mock/mockgen -source=./interfaces.go -destination=../mocks/mocks.go -package=mocks
 
 type BrokerConnection interface {
-	Connect(timeout time.Duration) error
+	Open(timeout time.Duration) error
 	Close() error
 	GetMatchConfig(ctx context.Context) (string, error)
 	SendCancel() error

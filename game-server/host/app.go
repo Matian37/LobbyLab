@@ -33,7 +33,7 @@ func (app *App) Init(timeout time.Duration) error {
 		return ErrAppAlreadyInitialized
 	}
 
-	if err := app.conn.Connect(timeout); err != nil {
+	if err := app.conn.Open(timeout); err != nil {
 		return err
 	}
 	app.initialized = true

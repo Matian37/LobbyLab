@@ -51,7 +51,7 @@ func TestNewApp(t *testing.T) {
 func TestApp_Init(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		mockConn, _, app := newMockApp(t)
-		mockConn.EXPECT().Connect(gomock.Any()).Return(nil)
+		mockConn.EXPECT().Open(gomock.Any()).Return(nil)
 
 		err := app.Init(150 * time.Millisecond)
 		assert.NoError(t, err)
@@ -67,7 +67,7 @@ func TestApp_Init(t *testing.T) {
 	t.Run("connection error", func(t *testing.T) {
 		mockConn, _, app := newMockApp(t)
 		expectedErr := errors.New("nats connection failed")
-		mockConn.EXPECT().Connect(gomock.Any()).Return(expectedErr)
+		mockConn.EXPECT().Open(gomock.Any()).Return(expectedErr)
 
 		err := app.Init(150 * time.Millisecond)
 		assert.ErrorIs(t, err, expectedErr)

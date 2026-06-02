@@ -47,24 +47,24 @@ func TestNewConnection(t *testing.T) {
 	assert.Nil(t, c.healthSub)
 	assert.Nil(t, c.requestSub)
 
-	assert.False(t, c.initialized)
+	assert.False(t, c.opened)
 	assert.False(t, c.closed)
 }
 
-func TestNATSConnection_Connect(t *testing.T) {
-	t.Run("already_initialized", func(t *testing.T) {
-		c := NATSConnection{initialized: true}
-		err := c.Connect(150 * time.Millisecond)
-		assert.ErrorIs(t, err, ErrConnectionAlreadyInitialized)
+func TestNATSConnection_Open(t *testing.T) {
+	t.Run("already_open", func(t *testing.T) {
+		c := NATSConnection{opened: true}
+		err := c.Open(150 * time.Millisecond)
+		assert.ErrorIs(t, err, ErrConnectionNotReopenable)
 	})
 
 	t.Run("failure", func(t *testing.T) {
 		c := NewConnection("nats://10.255.255.1:4222", "b")
-		err := c.Connect(150 * time.Millisecond)
+		err := c.Open(150 * time.Millisecond)
 		assert.Error(t, err)
 		assert.ErrorContains(t, err, "i/o timeout")
 
-		assert.False(t, c.initialized)
+		assert.False(t, c.opened)
 		assert.Nil(t, c.conn)
 	})
 
@@ -72,10 +72,10 @@ func TestNATSConnection_Connect(t *testing.T) {
 		addr := newNATSServer(t)
 
 		c := NewConnection(addr, "a")
-		err := c.Connect(150 * time.Millisecond)
+		err := c.Open(150 * time.Millisecond)
 		require.NoError(t, err)
 
-		assert.True(t, c.initialized)
+		assert.True(t, c.opened)
 		assert.False(t, c.closed)
 
 		require.NotNil(t, c.conn)
@@ -86,23 +86,23 @@ func TestNATSConnection_Connect(t *testing.T) {
 }
 
 func TestNATSConnection_Close(t *testing.T) {
-	t.Run("not_initialized", func(t *testing.T) {
+	t.Run("not_open", func(t *testing.T) {
 		c := NATSConnection{}
 		err := c.Close()
-		assert.ErrorIs(t, err, ErrConnectionNotInitialized)
+		assert.ErrorIs(t, err, ErrConnectionNotOpen)
 	})
 
 	t.Run("already_closed", func(t *testing.T) {
-		c := NATSConnection{initialized: true, closed: true}
+		c := NATSConnection{opened: true, closed: true}
 		err := c.Close()
-		assert.ErrorIs(t, err, ErrConnectionAlreadyClosed)
+		assert.ErrorIs(t, err, ErrConnectionClosed)
 	})
 
 	t.Run("success", func(t *testing.T) {
 		addr := newNATSServer(t)
 
 		c := NewConnection(addr, "a")
-		err := c.Connect(150 * time.Millisecond)
+		err := c.Open(150 * time.Millisecond)
 		require.NoError(t, err)
 		require.True(t, c.conn.IsConnected())
 
@@ -113,23 +113,23 @@ func TestNATSConnection_Close(t *testing.T) {
 }
 
 func TestNATSConnection_GetMatchConfig(t *testing.T) {
-	t.Run("not_initialized", func(t *testing.T) {
+	t.Run("not_open", func(t *testing.T) {
 		c := NATSConnection{}
 		_, err := c.GetMatchConfig(context.Background())
-		assert.ErrorIs(t, err, ErrConnectionNotInitialized)
+		assert.ErrorIs(t, err, ErrConnectionNotOpen)
 	})
 
 	t.Run("closed", func(t *testing.T) {
-		c := NATSConnection{initialized: true, closed: true}
+		c := NATSConnection{opened: true, closed: true}
 		_, err := c.GetMatchConfig(context.Background())
-		assert.ErrorIs(t, err, ErrConnectionAlreadyClosed)
+		assert.ErrorIs(t, err, ErrConnectionClosed)
 	})
 
 	t.Run("context_cancelled", func(t *testing.T) {
 		addr := newNATSServer(t)
 
 		c := NewConnection(addr, "a")
-		err := c.Connect(150 * time.Millisecond)
+		err := c.Open(150 * time.Millisecond)
 		require.NoError(t, err)
 
 		ctx, cancel := context.WithCancel(context.Background())
@@ -144,7 +144,7 @@ func TestNATSConnection_GetMatchConfig(t *testing.T) {
 
 		containerId := "a"
 		c := NewConnection(addr, containerId)
-		err := c.Connect(150 * time.Millisecond)
+		err := c.Open(150 * time.Millisecond)
 		require.NoError(t, err)
 
 		nc, err := nats.Connect(addr)
@@ -175,23 +175,23 @@ func TestNATSConnection_GetMatchConfig(t *testing.T) {
 }
 
 func TestNATSConnection_SendCancel(t *testing.T) {
-	t.Run("not_initialized", func(t *testing.T) {
+	t.Run("not_open", func(t *testing.T) {
 		c := NATSConnection{}
 		err := c.SendCancel()
-		assert.ErrorIs(t, err, ErrConnectionNotInitialized)
+		assert.ErrorIs(t, err, ErrConnectionNotOpen)
 	})
 
 	t.Run("closed", func(t *testing.T) {
-		c := NATSConnection{initialized: true, closed: true}
+		c := NATSConnection{opened: true, closed: true}
 		err := c.SendCancel()
-		assert.ErrorIs(t, err, ErrConnectionAlreadyClosed)
+		assert.ErrorIs(t, err, ErrConnectionClosed)
 	})
 
 	t.Run("success", func(t *testing.T) {
 		addr := newNATSServer(t)
 
 		c := NewConnection(addr, "a")
-		err := c.Connect(150 * time.Millisecond)
+		err := c.Open(150 * time.Millisecond)
 		require.NoError(t, err)
 
 		nc, err := nats.Connect(addr)
@@ -217,23 +217,23 @@ func TestNATSConnection_SendCancel(t *testing.T) {
 }
 
 func TestNATSConnection_SendResult(t *testing.T) {
-	t.Run("not_initialized", func(t *testing.T) {
+	t.Run("not_open", func(t *testing.T) {
 		c := NATSConnection{}
 		err := c.SendResult([]byte("data"))
-		assert.ErrorIs(t, err, ErrConnectionNotInitialized)
+		assert.ErrorIs(t, err, ErrConnectionNotOpen)
 	})
 
 	t.Run("closed", func(t *testing.T) {
-		c := NATSConnection{initialized: true, closed: true}
+		c := NATSConnection{opened: true, closed: true}
 		err := c.SendResult([]byte("data"))
-		assert.ErrorIs(t, err, ErrConnectionAlreadyClosed)
+		assert.ErrorIs(t, err, ErrConnectionClosed)
 	})
 
 	t.Run("success", func(t *testing.T) {
 		addr := newNATSServer(t)
 
 		c := NewConnection(addr, "a")
-		err := c.Connect(150 * time.Millisecond)
+		err := c.Open(150 * time.Millisecond)
 		require.NoError(t, err)
 
 		nc, err := nats.Connect(addr)
@@ -317,7 +317,7 @@ func TestNATSConnection_HealthPing(t *testing.T) {
 		addr := newNATSServer(t)
 
 		c := NewConnection(addr, "a")
-		err := c.Connect(150 * time.Millisecond)
+		err := c.Open(150 * time.Millisecond)
 		require.NoError(t, err)
 
 		nc, err := nats.Connect(addr)
