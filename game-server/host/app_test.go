@@ -33,10 +33,10 @@ func newMockAppWithInit(t *testing.T) (*mocks.MockBrokerConnection, *mocks.MockS
 
 func TestNewApp(t *testing.T) {
 	cmdArgs := []string{"./game", "--arg1"}
-	brokerUri := "nats://localhost:4222"
-	containerId := "worker-1"
+	brokerURI := "nats://localhost:4222"
+	containerID := "worker-1"
 
-	app := NewApp(brokerUri, containerId, cmdArgs)
+	app := NewApp(brokerURI, containerID, cmdArgs)
 
 	assert.NotNil(t, app.conn)
 	assert.NotNil(t, app.server)
@@ -45,8 +45,8 @@ func TestNewApp(t *testing.T) {
 
 	nc, ok := app.conn.(*NATSConnection)
 	assert.True(t, ok, "NewApp should create a NATSConnection")
-	assert.Equal(t, brokerUri, nc.brokerUri)
-	assert.Equal(t, containerId, nc.containerId)
+	assert.Equal(t, brokerURI, nc.brokerURI)
+	assert.Equal(t, containerID, nc.containerID)
 }
 
 func TestApp_Init(t *testing.T) {

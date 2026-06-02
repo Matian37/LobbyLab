@@ -42,18 +42,18 @@ func run() error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	containerId, err := os.Hostname()
+	containerID, err := os.Hostname()
 	if err != nil {
 		return fmt.Errorf("failed to get hostname: %w", err)
 	}
 
 	// fix incorrect naming of variable
-	natsUri := os.Getenv("NATS_URI")
-	if natsUri == "" {
-		natsUri = "nats://localhost:4222"
+	natsURI := os.Getenv("NATS_URI")
+	if natsURI == "" {
+		natsURI = "nats://localhost:4222"
 	}
 
-	app := NewApp(natsUri, containerId, cmdArgs)
+	app := NewApp(natsURI, containerID, cmdArgs)
 
 	if err := app.Init(1 * time.Second); err != nil {
 		return fmt.Errorf("failed to init app: %w", err)

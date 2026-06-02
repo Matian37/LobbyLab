@@ -65,15 +65,15 @@ func newNATSServerWithoutResultStream(t *testing.T) string {
 }
 
 func TestNewConnection(t *testing.T) {
-	brokerUri := "a"
-	containerId := "b"
+	brokerURI := "a"
+	containerID := "b"
 
-	c := NewConnection(brokerUri, containerId)
+	c := NewConnection(brokerURI, containerID)
 
 	assert.NotNil(t, c)
 
-	assert.Equal(t, brokerUri, c.brokerUri)
-	assert.Equal(t, containerId, c.containerId)
+	assert.Equal(t, brokerURI, c.brokerURI)
+	assert.Equal(t, containerID, c.containerID)
 
 	assert.Nil(t, c.conn)
 	assert.Nil(t, c.healthSub)
@@ -84,7 +84,7 @@ func TestNewConnection(t *testing.T) {
 }
 
 func TestNATSConnection_Open(t *testing.T) {
-	t.Run("already_open", func(t *testing.T) {
+	t.Run("already open", func(t *testing.T) {
 		c := NATSConnection{opened: true}
 		err := c.Open(150 * time.Millisecond)
 		assert.ErrorIs(t, err, ErrConnectionNotReopenable)
@@ -100,7 +100,7 @@ func TestNATSConnection_Open(t *testing.T) {
 		assert.Nil(t, c.conn)
 	})
 
-	t.Run("missing_result_stream", func(t *testing.T) {
+	t.Run("missing result stream", func(t *testing.T) {
 		addr := newNATSServerWithoutResultStream(t)
 
 		c := NewConnection(addr, "a")
@@ -136,7 +136,7 @@ func TestNATSConnection_Open(t *testing.T) {
 	t.Run("partial opening", func(t *testing.T) {
 		addr := newNATSServer(t)
 
-		// space in containerId trigger error in subscribeAssign
+		// space in containerID trigger error in subscribeAssign
 		c := NewConnection(addr, "a b")
 		err := c.Open(150 * time.Millisecond)
 		assert.ErrorIs(t, err, nats.ErrBadSubject)
@@ -147,13 +147,13 @@ func TestNATSConnection_Open(t *testing.T) {
 }
 
 func TestNATSConnection_Close(t *testing.T) {
-	t.Run("not_open", func(t *testing.T) {
+	t.Run("not open", func(t *testing.T) {
 		c := NATSConnection{}
 		err := c.Close()
 		assert.ErrorIs(t, err, ErrConnectionNotOpen)
 	})
 
-	t.Run("already_closed", func(t *testing.T) {
+	t.Run("already closed", func(t *testing.T) {
 		c := NATSConnection{opened: true, closed: true}
 		err := c.Close()
 		assert.ErrorIs(t, err, ErrConnectionClosed)
@@ -187,7 +187,7 @@ func TestNATSConnection_Close(t *testing.T) {
 }
 
 func TestNATSConnection_GetMatchConfig(t *testing.T) {
-	t.Run("not_open", func(t *testing.T) {
+	t.Run("not open", func(t *testing.T) {
 		c := NATSConnection{}
 		_, err := c.GetMatchConfig(context.Background())
 		assert.ErrorIs(t, err, ErrConnectionNotOpen)
@@ -199,7 +199,7 @@ func TestNATSConnection_GetMatchConfig(t *testing.T) {
 		assert.ErrorIs(t, err, ErrConnectionClosed)
 	})
 
-	t.Run("context_cancelled", func(t *testing.T) {
+	t.Run("context cancelled", func(t *testing.T) {
 		addr := newNATSServer(t)
 
 		c := NewConnection(addr, "a")
@@ -216,8 +216,8 @@ func TestNATSConnection_GetMatchConfig(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		addr := newNATSServer(t)
 
-		containerId := "a"
-		c := NewConnection(addr, containerId)
+		containerID := "a"
+		c := NewConnection(addr, containerID)
 		err := c.Open(150 * time.Millisecond)
 		require.NoError(t, err)
 
@@ -232,7 +232,7 @@ func TestNATSConnection_GetMatchConfig(t *testing.T) {
 			defer close(doneChan)
 
 			msg, err := nc.Request(
-				assignSubject+"."+containerId,
+				assignSubject+"."+containerID,
 				[]byte(expectedConfig),
 				1*time.Second,
 			)
@@ -249,7 +249,7 @@ func TestNATSConnection_GetMatchConfig(t *testing.T) {
 }
 
 func TestNATSConnection_SendCancel(t *testing.T) {
-	t.Run("not_open", func(t *testing.T) {
+	t.Run("not open", func(t *testing.T) {
 		c := NATSConnection{}
 		err := c.SendCancel(context.Background())
 		assert.ErrorIs(t, err, ErrConnectionNotOpen)
@@ -307,7 +307,7 @@ func TestNATSConnection_SendCancel(t *testing.T) {
 }
 
 func TestNATSConnection_SendResult(t *testing.T) {
-	t.Run("not_open", func(t *testing.T) {
+	t.Run("not open", func(t *testing.T) {
 		c := NATSConnection{}
 		err := c.SendResult(context.Background(), []byte("data"))
 		assert.ErrorIs(t, err, ErrConnectionNotOpen)
@@ -406,7 +406,7 @@ func TestNATSConnection_subscribeHealth(t *testing.T) {
 		require.NoError(t, err)
 		t.Cleanup(func() { pub.Close() })
 
-		pongSubject := healthSubject + "." + c.containerId
+		pongSubject := healthSubject + "." + c.containerID
 		pong, err := pub.SubscribeSync(pongSubject)
 		require.NoError(t, err)
 		pub.Flush()
@@ -432,7 +432,7 @@ func TestNATSConnection_HealthPing(t *testing.T) {
 		require.NoError(t, err)
 		t.Cleanup(func() { nc.Close() })
 
-		pong, err := nc.SubscribeSync(healthSubject + "." + c.containerId)
+		pong, err := nc.SubscribeSync(healthSubject + "." + c.containerID)
 		require.NoError(t, err)
 		nc.Flush()
 

@@ -26,8 +26,8 @@ var (
 
 // Note: closed connection cannot be reopened
 type NATSConnection struct {
-	brokerUri   string
-	containerId string
+	brokerURI   string
+	containerID string
 
 	conn *nats.Conn
 	js   jetstream.JetStream
@@ -39,10 +39,10 @@ type NATSConnection struct {
 	closed bool
 }
 
-func NewConnection(brokerUri string, containerId string) *NATSConnection {
+func NewConnection(brokerURI string, containerID string) *NATSConnection {
 	return &NATSConnection{
-		brokerUri:   brokerUri,
-		containerId: containerId,
+		brokerURI:   brokerURI,
+		containerID: containerID,
 	}
 }
 
@@ -51,7 +51,7 @@ func (c *NATSConnection) Open(timeout time.Duration) error {
 		return ErrConnectionNotReopenable
 	}
 
-	conn, err := nats.Connect(c.brokerUri, nats.Timeout(timeout))
+	conn, err := nats.Connect(c.brokerURI, nats.Timeout(timeout))
 	if err != nil {
 		return err
 	}
@@ -158,7 +158,7 @@ func (c *NATSConnection) SendResult(ctx context.Context, result []byte) error {
 }
 
 func (c *NATSConnection) subscribeAssign() error {
-	sub, err := c.conn.SubscribeSync(assignSubject + "." + c.containerId)
+	sub, err := c.conn.SubscribeSync(assignSubject + "." + c.containerID)
 	if err != nil {
 		c.Close()
 		return err
@@ -176,7 +176,7 @@ func (c *NATSConnection) subscribeHealth() error {
 	sub, err := c.conn.Subscribe(healthSubject, func(msg *nats.Msg) {
 		slog.Debug("received ping, sending pong...")
 
-		responseErr := c.conn.Publish(healthSubject+"."+c.containerId, []byte{})
+		responseErr := c.conn.Publish(healthSubject+"."+c.containerID, []byte{})
 		if responseErr != nil {
 			slog.Error("failed to publish health response", "error", responseErr)
 		}

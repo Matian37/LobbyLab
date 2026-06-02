@@ -20,9 +20,9 @@ type App struct {
 	initialized bool
 }
 
-func NewApp(brokerUri string, containerId string, cmdArgs []string) *App {
+func NewApp(brokerURI string, containerID string, cmdArgs []string) *App {
 	return &App{
-		conn:    NewConnection(brokerUri, containerId),
+		conn:    NewConnection(brokerURI, containerID),
 		server:  &GameServer{},
 		cmdArgs: cmdArgs,
 	}
