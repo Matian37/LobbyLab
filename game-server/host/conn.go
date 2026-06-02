@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/nats-io/nats.go"
+	"github.com/nats-io/nats.go/jetstream"
 )
 
 const (
@@ -21,16 +22,15 @@ var (
 	ErrConnectionNotOpen       = errors.New("conection not initialized")
 	ErrConnectionNotReopenable = errors.New("connection cannot be reopened")
 	ErrConnectionClosed        = errors.New("connection already closed")
-	ErrPingJSONEncodingFailed  = errors.New("ping json enconding failed")
-	ErrFailedToConnect         = errors.New("failed to connect")
-	ErrChannelError            = errors.New("channel")
 )
 
 // Note: closed connection cannot be reopened
 type NATSConnection struct {
 	brokerUri   string
 	containerId string
-	conn        *nats.Conn
+
+	conn *nats.Conn
+	js   jetstream.JetStream
 
 	healthSub  *nats.Subscription
 	requestSub *nats.Subscription
@@ -56,6 +56,21 @@ func (c *NATSConnection) Open(timeout time.Duration) error {
 		return err
 	}
 	c.conn = conn
+
+	js, err := jetstream.New(conn)
+	if err != nil {
+		c.Close()
+		return err
+	}
+	c.js = js
+
+	// check whether the result stream exists
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	if _, err := c.js.StreamNameBySubject(ctx, resultSubject); err != nil {
+		c.Close()
+		return err
+	}
 
 	if err := c.subscribeAssign(); err != nil {
 		c.Close()
@@ -107,21 +122,22 @@ type Result struct {
 	Details json.RawMessage `json:"details"`
 }
 
-func (c *NATSConnection) SendCancel() error {
+func (c *NATSConnection) SendCancel(ctx context.Context) error {
 	if !c.opened {
 		return ErrConnectionNotOpen
 	}
 	if c.closed {
 		return ErrConnectionClosed
 	}
-	return c.conn.Publish(
+	_, err := c.js.Publish(
+		ctx,
 		resultSubject,
 		[]byte(`{"success": false, "details":{}}`),
 	)
+	return err
 }
 
-// TODO: use jetstream here
-func (c *NATSConnection) SendResult(result []byte) error {
+func (c *NATSConnection) SendResult(ctx context.Context, result []byte) error {
 	if !c.opened {
 		return ErrConnectionNotOpen
 	}
@@ -134,10 +150,11 @@ func (c *NATSConnection) SendResult(result []byte) error {
 		Details: result,
 	})
 	if err != nil {
-		return fmt.Errorf("the result is not valid JSON")
+		return fmt.Errorf("the result is not valid JSON: %w", err)
 	}
 
-	return c.conn.Publish(resultSubject, payload)
+	_, err = c.js.Publish(ctx, resultSubject, payload)
+	return err
 }
 
 func (c *NATSConnection) subscribeAssign() error {

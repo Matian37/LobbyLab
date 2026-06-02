@@ -85,31 +85,31 @@ func (mr *MockBrokerConnectionMockRecorder) Open(timeout any) *gomock.Call {
 }
 
 // SendCancel mocks base method.
-func (m *MockBrokerConnection) SendCancel() error {
+func (m *MockBrokerConnection) SendCancel(ctx context.Context) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SendCancel")
+	ret := m.ctrl.Call(m, "SendCancel", ctx)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // SendCancel indicates an expected call of SendCancel.
-func (mr *MockBrokerConnectionMockRecorder) SendCancel() *gomock.Call {
+func (mr *MockBrokerConnectionMockRecorder) SendCancel(ctx any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SendCancel", reflect.TypeOf((*MockBrokerConnection)(nil).SendCancel))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SendCancel", reflect.TypeOf((*MockBrokerConnection)(nil).SendCancel), ctx)
 }
 
 // SendResult mocks base method.
-func (m *MockBrokerConnection) SendResult(result []byte) error {
+func (m *MockBrokerConnection) SendResult(ctx context.Context, result []byte) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SendResult", result)
+	ret := m.ctrl.Call(m, "SendResult", ctx, result)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // SendResult indicates an expected call of SendResult.
-func (mr *MockBrokerConnectionMockRecorder) SendResult(result any) *gomock.Call {
+func (mr *MockBrokerConnectionMockRecorder) SendResult(ctx, result any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SendResult", reflect.TypeOf((*MockBrokerConnection)(nil).SendResult), result)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SendResult", reflect.TypeOf((*MockBrokerConnection)(nil).SendResult), ctx, result)
 }
 
 // MockServer is a mock of Server interface.

@@ -49,6 +49,7 @@ func (app *App) Run(ctx context.Context) error {
 
 	// TODO: prevent logging context errors like Canceled, DeadlineExceeded...
 	// TODO: handle SendCancel errors and server.Stop?
+	// TODO: add timeouts
 	for ctx.Err() == nil {
 		config, err := app.conn.GetMatchConfig(ctx)
 		if err != nil {
@@ -60,7 +61,7 @@ func (app *App) Run(ctx context.Context) error {
 		slog.Info("starting game server")
 		if err := app.server.Start(config, app.cmdArgs); err != nil {
 			slog.Error("failed to start game server", "error", err)
-			_ = app.conn.SendCancel()
+			_ = app.conn.SendCancel(context.Background())
 			continue
 		}
 
@@ -68,15 +69,15 @@ func (app *App) Run(ctx context.Context) error {
 		result, err := app.server.GetResult(ctx)
 		if err != nil {
 			slog.Error("failed to retrieve match result", "error", err)
-			_ = app.server.Stop(ctx)
-			_ = app.conn.SendCancel()
+			_ = app.server.Stop(context.Background())
+			_ = app.conn.SendCancel(context.Background())
 			continue
 		}
 		slog.Info("match result retrieved, sending...")
 
-		if err := app.conn.SendResult(result); err != nil {
+		if err := app.conn.SendResult(ctx, result); err != nil {
 			slog.Error("failed to send match result", "error", err)
-			_ = app.conn.SendCancel()
+			_ = app.conn.SendCancel(context.Background())
 			continue
 		}
 		slog.Info("match lifecycle complete, ready for next request")

@@ -11,8 +11,8 @@ type BrokerConnection interface {
 	Open(timeout time.Duration) error
 	Close() error
 	GetMatchConfig(ctx context.Context) (string, error)
-	SendCancel() error
-	SendResult(result []byte) error
+	SendCancel(ctx context.Context) error
+	SendResult(ctx context.Context, result []byte) error
 }
 
 type Server interface {

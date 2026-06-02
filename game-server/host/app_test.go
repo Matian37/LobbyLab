@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 )
 
@@ -76,6 +77,11 @@ func TestApp_Init(t *testing.T) {
 }
 
 func TestApp_Run(t *testing.T) {
+	ensureContextNotDone := func(ctx context.Context) error {
+		require.NoError(t, ctx.Err())
+		return nil
+	}
+
 	t.Run("not initialized", func(t *testing.T) {
 		app := App{}
 		err := app.Run(context.Background())
@@ -104,7 +110,7 @@ func TestApp_Run(t *testing.T) {
 		mockConn.EXPECT().GetMatchConfig(ctx).Return(config, nil)
 		mockSrv.EXPECT().Start(config, app.cmdArgs).Return(nil)
 		mockSrv.EXPECT().GetResult(ctx).Return(result, nil)
-		mockConn.EXPECT().SendResult(result).Return(nil)
+		mockConn.EXPECT().SendResult(ctx, result).Return(nil)
 
 		mockConn.EXPECT().GetMatchConfig(ctx).
 			DoAndReturn(func(_ context.Context) (string, error) {
@@ -142,9 +148,8 @@ func TestApp_Run(t *testing.T) {
 
 		mockConn.EXPECT().GetMatchConfig(gomock.Any()).Return(config, nil)
 		mockSrv.EXPECT().Start(config, app.cmdArgs).Return(errors.New("binary not found"))
-		mockConn.EXPECT().SendCancel().Return(nil)
-
-		mockConn.EXPECT().GetMatchConfig(gomock.Any()).
+		mockConn.EXPECT().SendCancel(gomock.Any()).Do(ensureContextNotDone).Return(nil)
+		mockConn.EXPECT().GetMatchConfig(ctx).
 			DoAndReturn(func(_ context.Context) (string, error) {
 				cancel()
 				return "", context.Canceled
@@ -164,15 +169,13 @@ func TestApp_Run(t *testing.T) {
 
 		mockConn.EXPECT().GetMatchConfig(gomock.Any()).Return(config, nil)
 		mockSrv.EXPECT().Start(config, app.cmdArgs).Return(nil)
-		mockSrv.EXPECT().GetResult(ctx).Return(nil, errors.New("server crash"))
-		mockSrv.EXPECT().Stop(ctx).Return(nil)
-		mockConn.EXPECT().SendCancel().Return(nil)
-
-		mockConn.EXPECT().GetMatchConfig(gomock.Any()).
-			DoAndReturn(func(_ context.Context) (string, error) {
+		mockSrv.EXPECT().GetResult(ctx).
+			DoAndReturn(func(_ context.Context) ([]byte, error) {
 				cancel()
-				return "", context.Canceled
+				return nil, errors.New("server crash")
 			})
+		mockSrv.EXPECT().Stop(gomock.Any()).Do(ensureContextNotDone).Return(nil)
+		mockConn.EXPECT().SendCancel(gomock.Any()).Do(ensureContextNotDone).Return(nil)
 
 		err := app.Run(ctx)
 		assert.ErrorIs(t, err, context.Canceled)

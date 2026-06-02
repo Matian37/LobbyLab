@@ -10,16 +10,21 @@ import (
 
 	"github.com/nats-io/nats-server/v2/server"
 	"github.com/nats-io/nats.go"
+	"github.com/nats-io/nats.go/jetstream"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func newNATSServer(t *testing.T) string {
+const ResultStreamName = "RESULTS"
+
+func createNATSServer(t *testing.T, enableJetstream bool, createResultStream bool) string {
 	t.Helper()
 
 	opts := &server.Options{
-		Port: -1,
-		Host: "127.0.0.1",
+		Port:      -1,
+		Host:      "127.0.0.1",
+		JetStream: enableJetstream,
+		StoreDir:  t.TempDir(),
 	}
 	s, err := server.NewServer(opts)
 	require.NoError(t, err)
@@ -29,7 +34,34 @@ func newNATSServer(t *testing.T) string {
 
 	t.Cleanup(s.Shutdown)
 
-	return fmt.Sprintf("nats://127.0.0.1:%d", s.Addr().(*net.TCPAddr).Port)
+	addr := fmt.Sprintf("nats://127.0.0.1:%d", s.Addr().(*net.TCPAddr).Port)
+
+	if createResultStream {
+		nc, err := nats.Connect(addr)
+		require.NoError(t, err)
+		t.Cleanup(func() { nc.Close() })
+
+		js, err := jetstream.New(nc)
+		require.NoError(t, err)
+		_, err = js.CreateStream(
+			context.Background(),
+			jetstream.StreamConfig{
+				Name:     ResultStreamName,
+				Subjects: []string{resultSubject},
+			},
+		)
+		require.NoError(t, err)
+	}
+
+	return addr
+}
+
+func newNATSServer(t *testing.T) string {
+	return createNATSServer(t, true, true)
+}
+
+func newNATSServerWithoutResultStream(t *testing.T) string {
+	return createNATSServer(t, true, false)
 }
 
 func TestNewConnection(t *testing.T) {
@@ -64,7 +96,19 @@ func TestNATSConnection_Open(t *testing.T) {
 		assert.ErrorContains(t, err, "i/o timeout")
 
 		assert.False(t, c.opened)
+		assert.False(t, c.closed)
 		assert.Nil(t, c.conn)
+	})
+
+	t.Run("missing_result_stream", func(t *testing.T) {
+		addr := newNATSServerWithoutResultStream(t)
+
+		c := NewConnection(addr, "a")
+		err := c.Open(150 * time.Millisecond)
+		require.ErrorIs(t, err, jetstream.ErrStreamNotFound)
+
+		assert.False(t, c.opened)
+		assert.True(t, c.closed)
 	})
 
 	t.Run("success", func(t *testing.T) {
@@ -79,8 +123,14 @@ func TestNATSConnection_Open(t *testing.T) {
 
 		require.NotNil(t, c.conn)
 		assert.True(t, c.conn.IsConnected())
-		assert.NotNil(t, c.healthSub)
-		assert.NotNil(t, c.requestSub)
+
+		require.NotNil(t, c.js)
+
+		require.NotNil(t, c.healthSub)
+		assert.True(t, c.healthSub.IsValid())
+
+		require.NotNil(t, c.requestSub)
+		assert.True(t, c.requestSub.IsValid())
 	})
 
 	t.Run("partial opening", func(t *testing.T) {
@@ -201,14 +251,28 @@ func TestNATSConnection_GetMatchConfig(t *testing.T) {
 func TestNATSConnection_SendCancel(t *testing.T) {
 	t.Run("not_open", func(t *testing.T) {
 		c := NATSConnection{}
-		err := c.SendCancel()
+		err := c.SendCancel(context.Background())
 		assert.ErrorIs(t, err, ErrConnectionNotOpen)
 	})
 
 	t.Run("closed", func(t *testing.T) {
 		c := NATSConnection{opened: true, closed: true}
-		err := c.SendCancel()
+		err := c.SendCancel(context.Background())
 		assert.ErrorIs(t, err, ErrConnectionClosed)
+	})
+
+	t.Run("context cancelled", func(t *testing.T) {
+		addr := newNATSServer(t)
+
+		c := NewConnection(addr, "a")
+		err := c.Open(150 * time.Millisecond)
+		require.NoError(t, err)
+
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+
+		err = c.SendCancel(ctx)
+		require.ErrorIs(t, err, context.Canceled)
 	})
 
 	t.Run("success", func(t *testing.T) {
@@ -222,19 +286,21 @@ func TestNATSConnection_SendCancel(t *testing.T) {
 		require.NoError(t, err)
 		t.Cleanup(func() { nc.Close() })
 
-		sub, err := nc.SubscribeSync(resultSubject)
+		ctx := context.Background()
+
+		js, err := jetstream.New(nc)
 		require.NoError(t, err)
-		nc.Flush()
+		stream, err := js.Stream(ctx, ResultStreamName)
+		require.NoError(t, err)
 
-		require.NoError(t, c.SendCancel())
+		require.NoError(t, c.SendCancel(context.Background()))
 
-		msg, err := sub.NextMsg(2 * time.Second)
+		msg, err := stream.GetLastMsgForSubject(ctx, resultSubject)
 		require.NoError(t, err)
 
 		var result Result
 		err = json.Unmarshal(msg.Data, &result)
 		require.NoError(t, err)
-
 		assert.False(t, result.Success)
 		assert.Equal(t, json.RawMessage("{}"), result.Details)
 	})
@@ -243,14 +309,28 @@ func TestNATSConnection_SendCancel(t *testing.T) {
 func TestNATSConnection_SendResult(t *testing.T) {
 	t.Run("not_open", func(t *testing.T) {
 		c := NATSConnection{}
-		err := c.SendResult([]byte("data"))
+		err := c.SendResult(context.Background(), []byte("data"))
 		assert.ErrorIs(t, err, ErrConnectionNotOpen)
 	})
 
 	t.Run("closed", func(t *testing.T) {
 		c := NATSConnection{opened: true, closed: true}
-		err := c.SendResult([]byte("data"))
+		err := c.SendResult(context.Background(), []byte("data"))
 		assert.ErrorIs(t, err, ErrConnectionClosed)
+	})
+
+	t.Run("context cancelled", func(t *testing.T) {
+		addr := newNATSServer(t)
+
+		c := NewConnection(addr, "a")
+		err := c.Open(150 * time.Millisecond)
+		require.NoError(t, err)
+
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+
+		err = c.SendResult(ctx, []byte("{}"))
+		require.ErrorIs(t, err, context.Canceled)
 	})
 
 	t.Run("success", func(t *testing.T) {
@@ -264,17 +344,21 @@ func TestNATSConnection_SendResult(t *testing.T) {
 		require.NoError(t, err)
 		t.Cleanup(func() { nc.Close() })
 
-		sub, err := nc.SubscribeSync(resultSubject)
+		ctx := context.Background()
+
+		js, err := jetstream.New(nc)
 		require.NoError(t, err)
-		nc.Flush()
+		stream, err := js.Stream(ctx, ResultStreamName)
+		require.NoError(t, err)
 
 		result := `{"data":123}`
 		expected := `{"success":true,"details":` + result + `}`
 
-		require.NoError(t, c.SendResult([]byte(result)))
+		require.NoError(t, c.SendResult(context.Background(), []byte(result)))
 
-		msg, err := sub.NextMsg(150 * time.Millisecond)
+		msg, err := stream.GetLastMsgForSubject(ctx, resultSubject)
 		require.NoError(t, err)
+
 		assert.Equal(t, []byte(expected), msg.Data)
 	})
 }
