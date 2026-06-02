@@ -180,4 +180,27 @@ func TestApp_Run(t *testing.T) {
 		err := app.Run(ctx)
 		assert.ErrorIs(t, err, context.Canceled)
 	})
+
+	t.Run("SendResult error skip request", func(t *testing.T) {
+		mockConn, mockSrv, app := newMockAppWithInit(t)
+
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		config := `{"config":123}`
+		result := []byte(`{"result":345}`)
+
+		mockConn.EXPECT().GetMatchConfig(gomock.Any()).Return(config, nil)
+		mockSrv.EXPECT().Start(config, app.cmdArgs).Return(nil)
+		mockSrv.EXPECT().GetResult(ctx).Return(result, nil)
+		mockConn.EXPECT().SendResult(ctx, result).
+			DoAndReturn(func(_ context.Context, _ []byte) error {
+				cancel()
+				return context.Canceled
+			})
+		mockConn.EXPECT().SendCancel(gomock.Any()).Do(ensureContextNotDone).Return(nil)
+
+		err := app.Run(ctx)
+		assert.ErrorIs(t, err, context.Canceled)
+	})
 }
