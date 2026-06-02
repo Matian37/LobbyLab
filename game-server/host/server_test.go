@@ -13,12 +13,14 @@ import (
 )
 
 func TestAttachParams(t *testing.T) {
-	expected := []string{"a", "--match-config", "b", "--match-result", "c"}
-	inputCommand := []string{"a"}
+	t.Run("success", func(t *testing.T) {
+		expected := []string{"a", "--match-config", "b", "--match-result", "c"}
+		inputCommand := []string{"a"}
 
-	result := attachParams(inputCommand, "b", "c")
-	assert.Equal(t, expected, result)
-	assert.Equal(t, &inputCommand[0], &result[0])
+		result := attachParams(inputCommand, "b", "c")
+		assert.Equal(t, expected, result)
+		assert.Equal(t, &inputCommand[0], &result[0])
+	})
 }
 
 func TestCreateTempFile(t *testing.T) {
@@ -32,6 +34,45 @@ func TestCreateTempFile(t *testing.T) {
 		assert.NoError(t, err)
 		_, err = file.Stat()
 		assert.NoError(t, err)
+	})
+}
+
+func TestCleanup(t *testing.T) {
+	t.Run("nil files", func(t *testing.T) {
+		server := GameServer{}
+		server.cleanup()
+	})
+
+	t.Run("success", func(t *testing.T) {
+		server := GameServer{}
+
+		server.configFile, _ = os.CreateTemp("", "*")
+		server.resultFile, _ = os.CreateTemp("", "*")
+
+		configPath := server.configFile.Name()
+		resultPath := server.resultFile.Name()
+
+		server.cleanup()
+
+		assert.Nil(t, server.configFile)
+		assert.Nil(t, server.resultFile)
+
+		_, err := os.Stat(configPath)
+		assert.ErrorIs(t, err, os.ErrNotExist)
+		_, err = os.Stat(resultPath)
+		assert.Error(t, err, os.ErrNotExist)
+	})
+}
+
+func TestStartWait(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		server := GameServer{}
+		assert.NoError(t, server.Start("", []string{"echo"}))
+
+		assert.NoError(t, server.startWait())
+		assert.NotNil(t, server.waitChannel)
+
+		assert.NoError(t, server.Stop(context.Background()))
 	})
 }
 
@@ -82,6 +123,29 @@ func TestStart(t *testing.T) {
 
 		err = server.Start("", []string{"echo"})
 		assert.ErrorIs(t, err, ErrGameServerAlreadyStarted)
+	})
+}
+
+func TestWait(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		server := GameServer{}
+		server.Start("", []string{"sh", "-c", "exit 1"})
+
+		err := server.Wait(context.Background())
+
+		_, ok := err.(*exec.ExitError)
+		assert.True(t, ok)
+	})
+
+	t.Run("context cancel", func(t *testing.T) {
+		server := GameServer{}
+		server.Start("", []string{"sleep", "inf"})
+
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+
+		err := server.Wait(ctx)
+		assert.ErrorIs(t, err, context.Canceled)
 	})
 }
 
@@ -187,29 +251,6 @@ func TestStop(t *testing.T) {
 	})
 }
 
-func TestWait(t *testing.T) {
-	t.Run("success", func(t *testing.T) {
-		server := GameServer{}
-		server.Start("", []string{"sh", "-c", "exit 1"})
-
-		err := server.Wait(context.Background())
-
-		_, ok := err.(*exec.ExitError)
-		assert.True(t, ok)
-	})
-
-	t.Run("context cancel", func(t *testing.T) {
-		server := GameServer{}
-		server.Start("", []string{"sleep", "inf"})
-
-		ctx, cancel := context.WithCancel(context.Background())
-		cancel()
-
-		err := server.Wait(ctx)
-		assert.ErrorIs(t, err, context.Canceled)
-	})
-}
-
 func TestGetResult(t *testing.T) {
 	t.Run("not started", func(t *testing.T) {
 		server := GameServer{}
@@ -265,42 +306,5 @@ func TestGetResult(t *testing.T) {
 		cancel()
 		_, err := server.GetResult(ctx)
 		assert.ErrorIs(t, err, context.Canceled)
-	})
-}
-
-func TestStartWait(t *testing.T) {
-	server := GameServer{}
-	assert.NoError(t, server.Start("", []string{"echo"}))
-
-	assert.NoError(t, server.startWait())
-	assert.NotNil(t, server.waitChannel)
-
-	assert.NoError(t, server.Stop(context.Background()))
-}
-
-func TestCleanup(t *testing.T) {
-	t.Run("nil files", func(t *testing.T) {
-		server := GameServer{}
-		server.cleanup()
-	})
-
-	t.Run("success", func(t *testing.T) {
-		server := GameServer{}
-
-		server.configFile, _ = os.CreateTemp("", "*")
-		server.resultFile, _ = os.CreateTemp("", "*")
-
-		configPath := server.configFile.Name()
-		resultPath := server.resultFile.Name()
-
-		server.cleanup()
-
-		assert.Nil(t, server.configFile)
-		assert.Nil(t, server.resultFile)
-
-		_, err := os.Stat(configPath)
-		assert.ErrorIs(t, err, os.ErrNotExist)
-		_, err = os.Stat(resultPath)
-		assert.Error(t, err, os.ErrNotExist)
 	})
 }
