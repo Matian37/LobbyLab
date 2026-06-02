@@ -110,6 +110,7 @@ func TestApp_Run(t *testing.T) {
 		mockConn.EXPECT().GetMatchConfig(ctx).Return(config, nil)
 		mockSrv.EXPECT().Start(config, app.cmdArgs).Return(nil)
 		mockSrv.EXPECT().GetResult(ctx).Return(result, nil)
+		mockSrv.EXPECT().Stop(ctx).Return(nil)
 		mockConn.EXPECT().SendResult(ctx, result).Return(nil)
 
 		mockConn.EXPECT().GetMatchConfig(ctx).
@@ -174,7 +175,7 @@ func TestApp_Run(t *testing.T) {
 				cancel()
 				return nil, errors.New("server crash")
 			})
-		mockSrv.EXPECT().Stop(gomock.Any()).Do(ensureContextNotDone).Return(nil)
+		mockSrv.EXPECT().Stop(ctx).Return(nil)
 		mockConn.EXPECT().SendCancel(gomock.Any()).Do(ensureContextNotDone).Return(nil)
 
 		err := app.Run(ctx)
@@ -193,6 +194,7 @@ func TestApp_Run(t *testing.T) {
 		mockConn.EXPECT().GetMatchConfig(gomock.Any()).Return(config, nil)
 		mockSrv.EXPECT().Start(config, app.cmdArgs).Return(nil)
 		mockSrv.EXPECT().GetResult(ctx).Return(result, nil)
+		mockSrv.EXPECT().Stop(ctx).Return(nil)
 		mockConn.EXPECT().SendResult(ctx, result).
 			DoAndReturn(func(_ context.Context, _ []byte) error {
 				cancel()

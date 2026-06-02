@@ -17,14 +17,11 @@ var (
 	ErrFailedToWriteConfig      = errors.New("failed to write config")
 	ErrGameServerStartFailed    = errors.New("failed to start game server")
 	ErrGameServerNotStarted     = errors.New("game server not started")
-	ErrGameServerNoConfig       = errors.New("game server has no config")
-	ErrGameServerAlreadyClosed  = errors.New("game server already closed")
 	ErrGameServerAlreadyStarted = errors.New("game server already started")
 )
 
 type GameServer struct {
 	started     bool
-	closed      bool
 	configFile  *os.File
 	resultFile  *os.File
 	cmd         *exec.Cmd
@@ -35,10 +32,6 @@ type GameServer struct {
 func (s *GameServer) Start(config string, command []string) error {
 	if len(command) == 0 {
 		return ErrCommandEmpty
-	}
-
-	if s.closed {
-		return ErrGameServerAlreadyClosed
 	}
 	if s.started {
 		return ErrGameServerAlreadyStarted
@@ -86,9 +79,6 @@ func (s *GameServer) Stop(ctx context.Context) error {
 	if !s.started {
 		return ErrGameServerNotStarted
 	}
-	if s.closed {
-		return ErrGameServerAlreadyClosed
-	}
 	defer s.cleanup()
 
 	s.startWait()
@@ -99,22 +89,18 @@ func (s *GameServer) Stop(ctx context.Context) error {
 	case <-s.waitChannel:
 		// kill remaining children
 		syscall.Kill(-s.pgid, syscall.SIGKILL)
-		s.closed = true
 		return nil
 	case <-ctx.Done():
 		syscall.Kill(-s.pgid, syscall.SIGKILL)
 		<-s.waitChannel
-		s.closed = true
 		return ctx.Err()
 	}
 }
 
+// Note: function does not stop cmd, always run Stop function manually
 func (s *GameServer) GetResult(ctx context.Context) ([]byte, error) {
 	if !s.started {
 		return []byte{}, ErrGameServerNotStarted
-	}
-	if s.closed {
-		return []byte{}, ErrGameServerAlreadyClosed
 	}
 
 	if err := s.wait(ctx); err != nil {
@@ -132,9 +118,6 @@ func (s *GameServer) GetResult(ctx context.Context) ([]byte, error) {
 func (s *GameServer) wait(ctx context.Context) error {
 	if !s.started {
 		return ErrGameServerNotStarted
-	}
-	if s.closed {
-		return ErrGameServerAlreadyClosed
 	}
 
 	s.startWait()
@@ -171,6 +154,13 @@ func (s *GameServer) cleanup() {
 		os.Remove(s.resultFile.Name())
 		s.resultFile = nil
 	}
+	if s.waitChannel != nil {
+		close(s.waitChannel)
+		s.waitChannel = nil
+	}
+	s.cmd = nil
+	s.pgid = 0
+	s.started = false
 }
 
 func createTempFile(subname string) (*os.File, error) {

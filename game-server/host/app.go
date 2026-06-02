@@ -67,9 +67,9 @@ func (app *App) Run(ctx context.Context) error {
 
 		slog.Info("game server running, waiting for result")
 		result, err := app.server.GetResult(ctx)
+		_ = app.server.Stop(ctx)
 		if err != nil {
 			slog.Error("failed to retrieve match result", "error", err)
-			_ = app.server.Stop(context.Background())
 			_ = app.conn.SendCancel(context.Background())
 			continue
 		}
