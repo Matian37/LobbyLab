@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -10,6 +11,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestAttachParams(t *testing.T) {
@@ -31,7 +33,7 @@ func TestCreateTempFile(t *testing.T) {
 
 	t.Run("succes", func(t *testing.T) {
 		file, err := createTempFile("")
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		_, err = file.Stat()
 		assert.NoError(t, err)
 	})
@@ -67,10 +69,10 @@ func TestCleanup(t *testing.T) {
 func TestStartWait(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		server := GameServer{}
-		assert.NoError(t, server.Start("", []string{"echo"}))
+		require.NoError(t, server.Start("", []string{"echo"}))
 
-		assert.NoError(t, server.startWait())
-		assert.NotNil(t, server.waitChannel)
+		require.NoError(t, server.startWait())
+		require.NotNil(t, server.waitChannel)
 
 		assert.NoError(t, server.Stop(context.Background()))
 	})
@@ -89,6 +91,8 @@ func TestStart(t *testing.T) {
 		err := server.Start("", []string{""})
 		assert.ErrorIs(t, err, ErrGameServerStartFailed)
 		assert.False(t, server.started)
+
+		require.NotNil(t, server.cmd)
 		assert.Nil(t, server.cmd.Process)
 	})
 
@@ -96,11 +100,12 @@ func TestStart(t *testing.T) {
 		server := GameServer{}
 
 		err := server.Start("", []string{"echo"})
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
-		assert.NotNil(t, server.cmd)
-		assert.NotNil(t, server.configFile)
-		assert.NotNil(t, server.resultFile)
+		require.NotNil(t, server.cmd)
+		require.NotNil(t, server.cmd.Process)
+		require.NotNil(t, server.configFile)
+		require.NotNil(t, server.resultFile)
 		assert.NotZero(t, server.pgid)
 		assert.True(t, server.started)
 		assert.False(t, server.closed)
@@ -111,7 +116,7 @@ func TestStart(t *testing.T) {
 		assert.NoError(t, err)
 
 		pgid, err := syscall.Getpgid(server.cmd.Process.Pid)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, pgid, server.pgid)
 
 	})
@@ -119,7 +124,7 @@ func TestStart(t *testing.T) {
 	t.Run("already started", func(t *testing.T) {
 		server := GameServer{}
 		err := server.Start("", []string{"echo"})
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		err = server.Start("", []string{"echo"})
 		assert.ErrorIs(t, err, ErrGameServerAlreadyStarted)
@@ -129,7 +134,7 @@ func TestStart(t *testing.T) {
 func TestWait(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		server := GameServer{}
-		server.Start("", []string{"sh", "-c", "exit 1"})
+		require.NoError(t, server.Start("", []string{"sh", "-c", "exit 1"}))
 
 		err := server.Wait(context.Background())
 
@@ -139,7 +144,7 @@ func TestWait(t *testing.T) {
 
 	t.Run("context cancel", func(t *testing.T) {
 		server := GameServer{}
-		server.Start("", []string{"sleep", "inf"})
+		require.NoError(t, server.Start("", []string{"sleep", "inf"}))
 
 		ctx, cancel := context.WithCancel(context.Background())
 		cancel()
@@ -151,7 +156,9 @@ func TestWait(t *testing.T) {
 
 func TestStop(t *testing.T) {
 	assertProcessEnded := func(server *GameServer, signal syscall.Signal) {
-		assert.ErrorIs(t, server.cmd.Process.Signal(syscall.Signal(0)), os.ErrProcessDone)
+		require.NotNil(t, server.cmd)
+		require.NotNil(t, server.cmd.ProcessState)
+		require.ErrorIs(t, server.cmd.Process.Signal(syscall.Signal(0)), os.ErrProcessDone)
 
 		assert.False(t, server.cmd.ProcessState.Exited()) // check if sent signal to kill
 		assert.Equal(t, signal, server.cmd.ProcessState.Sys().(syscall.WaitStatus).Signal())
@@ -166,11 +173,11 @@ func TestStop(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		server := GameServer{}
 		err := server.Start("", []string{"sleep", "inf"})
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		ctx := context.Background()
 		err = server.Stop(ctx)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Nil(t, ctx.Err())
 
 		assert.True(t, server.closed)
@@ -180,10 +187,10 @@ func TestStop(t *testing.T) {
 	t.Run("already closed", func(t *testing.T) {
 		server := GameServer{}
 		err := server.Start("", []string{"echo"})
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		err = server.Stop(context.Background())
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		err = server.Stop(context.Background())
 		assert.ErrorIs(t, err, ErrGameServerAlreadyClosed)
@@ -192,7 +199,7 @@ func TestStop(t *testing.T) {
 	t.Run("context cancel", func(t *testing.T) {
 		server := GameServer{}
 		err := server.Start("", []string{"echo"})
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		ctx, cancel := context.WithCancel(context.Background())
 		cancel()
@@ -207,7 +214,7 @@ func TestStop(t *testing.T) {
 
 		cmd := []string{"sh", "-c", "trap '' TERM; kill -USR1 $PPID; sleep inf"}
 		err := server.Start("", cmd)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		// wait for script to send signal
 		// it must be set to ignore SIGTERM signals before it can be stopped
@@ -227,7 +234,7 @@ func TestStop(t *testing.T) {
 
 		cmd := []string{"sh", "-c", "sleep inf & exit"}
 		err := server.Start("", cmd)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		pgid := server.cmd.Process.Pid
 		server.cmd.Wait()
@@ -236,18 +243,13 @@ func TestStop(t *testing.T) {
 		assert.NoError(t, syscall.Kill(-pgid, 0))
 
 		err = server.Stop(context.Background())
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
-		// poll until the process group is gone, or 1s elapses
-		err = nil
-		for range 50 {
+		// wait for the process group to be gone
+		assert.Eventually(t, func() bool {
 			err = syscall.Kill(-pgid, 0)
-			if err != nil {
-				break
-			}
-			time.Sleep(20 * time.Millisecond)
-		}
-		assert.ErrorIs(t, err, syscall.ESRCH)
+			return errors.Is(err, syscall.ESRCH)
+		}, 1*time.Second, 20*time.Millisecond)
 	})
 }
 
@@ -260,8 +262,8 @@ func TestGetResult(t *testing.T) {
 
 	t.Run("closed", func(t *testing.T) {
 		server := GameServer{}
-		server.Start("", []string{"echo"})
-		server.Stop(context.Background())
+		require.NoError(t, server.Start("", []string{"echo"}))
+		require.NoError(t, server.Stop(context.Background()))
 
 		_, err := server.GetResult(context.Background())
 		assert.ErrorIs(t, err, ErrGameServerAlreadyClosed)
@@ -283,15 +285,15 @@ func TestGetResult(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			server := GameServer{}
-			server.Start("", []string{"echo"})
+			require.NoError(t, server.Start("", []string{"echo"}))
 			defer server.Stop(context.Background())
 
 			n, err := server.resultFile.Write(test.payload)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assert.Equal(t, len(test.payload), n)
 
 			res, err := server.GetResult(context.Background())
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assert.Equal(t, test.payload, res)
 		})
 
@@ -299,7 +301,7 @@ func TestGetResult(t *testing.T) {
 
 	t.Run("context canceled", func(t *testing.T) {
 		server := GameServer{}
-		server.Start("config", []string{"sleep", "inf"})
+		require.NoError(t, server.Start("config", []string{"sleep", "inf"}))
 		defer server.Stop(context.Background())
 
 		ctx, cancel := context.WithCancel(context.Background())

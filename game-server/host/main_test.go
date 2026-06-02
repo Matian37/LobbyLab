@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestParseArgs(t *testing.T) {
@@ -43,7 +44,7 @@ func TestParseArgs(t *testing.T) {
 			if tc.fail {
 				assert.Error(t, err)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.Equal(t, tc.expected, res)
 			}
 		})
@@ -53,7 +54,7 @@ func TestParseArgs(t *testing.T) {
 func TestParseArgs_InputNotModified(t *testing.T) {
 	original := []string{"/", "./x"}
 	result, err := ParseArgs(original)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, []string{"./x"}, result)
 	assert.Equal(t, []string{"/", "./x"}, original, "input slice must not be modified")
 }
