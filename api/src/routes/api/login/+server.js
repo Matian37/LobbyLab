@@ -1,6 +1,7 @@
 import { findUserByLogin } from '$lib/db.js';
 import bcrypt from 'bcryptjs';
 import { json } from '@sveltejs/kit';
+import { generateToken } from '$lib/user_data.js';
 
 export async function POST({request})
 {
@@ -15,7 +16,7 @@ export async function POST({request})
     if(await bcrypt.compare(password, result.password)){
         return json({
             sukces: true,
-            user: result
+            token: generateToken(login)
         })
     }
     else{

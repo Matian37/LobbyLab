@@ -1,6 +1,7 @@
 import { addUser } from '$lib/db.js';
 import bcrypt from 'bcryptjs';
 import { json } from '@sveltejs/kit';
+import { generateToken } from '$lib/user_data.js';
 
 export async function POST({request})
 {
@@ -11,6 +12,7 @@ export async function POST({request})
     if(!result) sukces = false;
 
     return json({
-        sukces: sukces
+        sukces: sukces,
+        token: generateToken(login)
     });
 }

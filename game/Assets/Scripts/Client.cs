@@ -1,25 +1,34 @@
 using System;
 using System.Collections;
+using System.IO;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using TMPro;
+using UnityEditor.PackageManager;
 using UnityEngine;
 using UnityEngine.Networking;
 
-public class UserData
+public class  WaitingUserData
 {
     public string login;
-    public UserData(string _login)
+    public WaitingUserData(string _login)
     {
         login = _login;
     }
+}
+
+public class SSE
+{
+    public string ip;
+    public int port;
 }
 
 public class Client : MonoBehaviour
 {
     UdpClient client;
     IPEndPoint serverEP;
+    string url = "https://strona.pl/api/connections";
 
     public Transform player1, player2;
     public GameObject[] lives1, lives2;
@@ -30,36 +39,73 @@ public class Client : MonoBehaviour
     public Transform obstacleParent;
     public ObstaclesGen leftObstacleGen, rightObstacleGen;
 
+    private WebClient klient;
+    private StreamReader czytnik;
+    bool gotServerSocket = false;
+
     void Start()
     {
-        StartCoroutine(SendMeToApi());
-        client = new UdpClient();
-        // Adres serwera (na razie localhost) i port
-        serverEP = new IPEndPoint(IPAddress.Parse("127.0.0.1"), 7777);
+        SendMeToApi();
+
+        //open sse source
+        try
+        {
+            klient = new WebClient();
+            // Otwieramy strumieñ GET pod wskazanym adresem
+            Stream strumien = klient.OpenRead(url + $"?login={UserAccountData.Instance.login}");
+            czytnik = new StreamReader(strumien);
+
+            Debug.Log("Po³¹czono z SSE!");
+        }
+        catch (Exception e)
+        {
+            Debug.LogError("B³¹d po³¹czenia: " + e.Message);
+        }
+
     }
 
-    IEnumerator SendMeToApi()
+    void OnDestroy()
+    {
+        // Sprz¹tamy po wy³¹czeniu gry
+        if (czytnik != null) czytnik.Close();
+        if (klient != null) klient.Dispose();
+    }
+
+    void SendMeToApi()
     {
         string url = "https://strona.pl/api/waiting";
         string userLogin = "kacper";
 
-        UserData dane = new UserData(userLogin);
-        string jsonDane = JsonUtility.ToJson(dane);
-
-        UnityWebRequest www = new UnityWebRequest(url, "POST");
-
-        byte[] bodyRaw = Encoding.UTF8.GetBytes(jsonDane);
-        www.uploadHandler = new UploadHandlerRaw(bodyRaw);
-        www.downloadHandler = new DownloadHandlerBuffer();
-        www.SetRequestHeader("Content-Type", "application/json");
-        yield return www.SendWebRequest();
-
-        if (www.result != UnityWebRequest.Result.Success)
-            Debug.LogError("Coœ posz³o nie tak z po³¹czeniem siê z API");
+        WaitingUserData dane = new WaitingUserData(userLogin);
+        StartCoroutine(ApiSender.Instance.SendQuery(dane, url, (jsonWynik) =>
+        {
+            if (jsonWynik != null)
+            {
+                Debug.Log("jestes na waitliscie");
+            }
+        }));
     }
 
     void Update()
     {
+        // Sprawdzamy w ka¿dej klatce, czy serwer coœ przys³a³
+        if (czytnik != null && !czytnik.EndOfStream)
+        {
+            string linia = czytnik.ReadLine();
+
+            if (!string.IsNullOrEmpty(linia))
+            {
+                string jsonData = linia.Substring(5).Trim();
+                if (jsonData == "ping") return;
+                SSE sseData = JsonUtility.FromJson<SSE>(jsonData);
+                client = new UdpClient();
+                serverEP = new IPEndPoint(IPAddress.Parse(sseData.ip), sseData.port);
+                gotServerSocket = true;
+            }
+        }
+
+        if (!gotServerSocket)
+            return;
         byte[] data;
         if (Input.GetKeyDown(KeyCode.A))
             data = Encoding.ASCII.GetBytes("A");
@@ -96,7 +142,7 @@ public class Client : MonoBehaviour
             for (int i = 0; i < lives1.Length; i++)
                 if (lives1[i].activeInHierarchy)
                     before++;
-            for(int i = 0; i < lives1.Length; i++)
+            for (int i = 0; i < lives1.Length; i++)
             {
                 lives1[i].SetActive(false);
                 lives2[i].SetActive(false);
@@ -105,7 +151,7 @@ public class Client : MonoBehaviour
                 lives1[i].SetActive(true);
             for (int i = 0; i < hearts2; i++)
                 lives2[i].SetActive(true);
-            if(hearts1 < before)
+            if (hearts1 < before)
                 SkyBoxManager.Instance.ChangeSky(SkyBoxManager.Instance.red, true, 4, true, false);
             if (win == 1)
                 man.MultEndGame($"Wygra³ {nick1}!");

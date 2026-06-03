@@ -1,9 +1,11 @@
-import { findWaitingByLogin, addToWaiting, deleteFromWaiting } from '$lib/db.js';
+import { findWaitingByLogin, addToWaiting, deleteFromWaiting, getLoginFromToken } from '$lib/db.js';
 import { json } from '@sveltejs/kit';
 
 export async function POST({request}){   
     try{
-        const {login} = await request.json();
+        const {token} = await request.json();
+        const login = getLoginFromToken(token);
+        
         const res = addToWaiting(login);
         return json({sukces: true});
     }
@@ -14,7 +16,9 @@ export async function POST({request}){
 
 export async function DELETE({request}){
     try{
-        const {login} = await request.json();
+        const {token} = await request.json();
+        const login = getLoginFromToken(token);
+        
         const res = deleteFromWaiting(login);
         return json({sukces: true});
     }
@@ -24,7 +28,9 @@ export async function DELETE({request}){
 }
 
 export async function GET({url}){
-    const login = url.searchParams.get('login');
+    const token = url.searchParams.get('token');
+    const login = getLoginFromToken(token);
+    
     if(findWaitingByLogin(login))
         return json({sukces: true});
 

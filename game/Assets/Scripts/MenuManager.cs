@@ -5,6 +5,8 @@ using TMPro;
 using UnityEngine.SceneManagement;
 using System.IO;
 using UnityEngine.UI;
+using System.Text;
+using UnityEngine.Networking;
 
 [System.Serializable]
 public class Tim
@@ -28,6 +30,10 @@ public class MenuManager : MonoBehaviour
     public Color[] rankColors;
     public string[] ranks;
     public int[] percentRanks;
+
+    public TMP_InputField passwordField, loginField;
+    public GameObject loginPage;
+    [SerializeField] string loginUrl = "https://strona.www/api/login", registerUrl = "https://strona.www/api/register";
 
     public void tutPageSwitch(bool x)
     {
@@ -310,5 +316,43 @@ public class MenuManager : MonoBehaviour
         File.WriteAllText(Application.persistentDataPath + "/levelinfo.json", JsonUtility.ToJson(levelInfo));
         SoundManager.Instance.StopMusic();
         SceneManager.LoadScene("SampleScene");
+    }
+
+    public void LoginPageLoad(bool login)
+    {
+        loginPage.SetActive(login);
+        mainPage.SetActive(!login);
+    }
+
+    public void LoginButtonClicked()
+    {
+        StartCoroutine(ApiSender.Instance.SendQuery(new UserData(loginField.text, passwordField.text), loginUrl, (jsonWynik) =>
+        {
+            if (jsonWynik != null)
+            {
+                ApiResponse result = JsonUtility.FromJson<ApiResponse>(jsonWynik);
+                if (result.sukces)
+                {
+                    UserAccountData.Instance.SetLogin(loginField.text);
+                    LoginPageLoad(false);
+                }
+            }
+        }));
+    }
+
+    public void RegisterButtonClicked()
+    {
+        StartCoroutine(ApiSender.Instance.SendQuery(new UserData(loginField.text, passwordField.text), registerUrl, (jsonWynik) =>
+        {
+            if(jsonWynik != null)
+            {
+                ApiResponse result = JsonUtility.FromJson<ApiResponse>(jsonWynik);
+                if (result.sukces)
+                {
+                    UserAccountData.Instance.SetLogin(loginField.text);
+                    LoginPageLoad(false);
+                }
+            }
+        }));
     }
 }

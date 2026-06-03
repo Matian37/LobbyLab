@@ -19,8 +19,8 @@
         });
 
         const sukces = await response.json();
-        if(sukces.sukces == true){
-            updateData(sukces.user);
+        if(sukces.sukces){
+            updateData({token: sukces.token, login: login});
             pokazBlad = false;
             changePage('/')
         }

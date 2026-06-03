@@ -10,7 +10,7 @@
     else{
         title = user.login;
         onMount(async () =>{
-            if(await isInWaitingList(user.login)) buttonText = 'Stop';
+            if(await isInWaitingList(user.token)) buttonText = 'Stop';
         });
     }
 
@@ -24,40 +24,21 @@
     }
 
     async function play(){
-        user = getData();
         if(!user) 
         {
             console.debug('zaloguj sie~!!');
             return;
         }
-        let meth = 'POST';
-        if(await isInWaitingList(user.login)) meth = 'DELETE';
-
-        const response = await fetch('/api/waiting', {
-            method: meth,
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({login: user.login})
-        });
-
-        const wynik = await response.json();
-        if(wynik.sukces){ 
-            if(meth == 'POST')
-            {
-                buttonText = 'Stop';
-
-                stream = new EventSource(`/api/connection?login=${user.login}`);
-            }
-            else buttonText = 'Play';
+        if(await isInWaitingList(user.token)){
+            console.debug('jestes juz w kolejce');
+            return;
         }
-        else
-            console.debug("cos poszlo nie tak z dobieraniem graczy");
+        //window.location.href = `game-run://webplay?login=${user.login}`;
     }
 
-    async function isInWaitingList(login)
+    async function isInWaitingList(token)
     {
-        let response = await fetch(`/api/waiting?login=${login}`);
+        let response = await fetch(`/api/waiting?token=${token}`);
         let wynik = await response.json();
         return wynik.sukces;
     }
