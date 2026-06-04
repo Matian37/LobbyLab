@@ -5,6 +5,7 @@ import { Client } from 'pg';
 export async function GET({url}){
     const token = url.searchParams.get('token');
     const login = getLoginFromToken(token);
+    if(!login) return json({sukces: false});
     
     let interval;
     return new Response(

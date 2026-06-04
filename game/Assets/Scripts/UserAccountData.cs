@@ -6,6 +6,8 @@ public class UserAccountData : MonoBehaviour
 {
     public static UserAccountData Instance { get; private set; }
     public string login;
+    public string token;
+    public bool isLoggedIn = false;
 
     private void OnDestroy()
     {
@@ -25,9 +27,18 @@ public class UserAccountData : MonoBehaviour
         DontDestroyOnLoad(gameObject);
     }
 
-    public void SetLogin(string _login)
+    public void SetUser(string _login, string _token)
     {
         login = _login;
+        token = _token;
+        isLoggedIn = true;
+    }
+
+
+    public void LogOut()
+    {
+        isLoggedIn = false;
+        login = token = "";
     }
 }
 

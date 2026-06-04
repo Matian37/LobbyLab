@@ -33,7 +33,8 @@ public class MenuManager : MonoBehaviour
 
     public TMP_InputField passwordField, loginField;
     public GameObject loginPage;
-    [SerializeField] string loginUrl = "https://strona.www/api/login", registerUrl = "https://strona.www/api/register";
+    [SerializeField] string loginUrl = "http://localhost:5173/login", registerUrl = "http://localhost:5173/register";
+    public TextMeshProUGUI usernameLabel;
 
     public void tutPageSwitch(bool x)
     {
@@ -326,6 +327,7 @@ public class MenuManager : MonoBehaviour
 
     public void LoginButtonClicked()
     {
+        LogOutButtonClicked();
         StartCoroutine(ApiSender.Instance.SendQuery(new UserData(loginField.text, passwordField.text), loginUrl, (jsonWynik) =>
         {
             if (jsonWynik != null)
@@ -333,8 +335,9 @@ public class MenuManager : MonoBehaviour
                 ApiResponse result = JsonUtility.FromJson<ApiResponse>(jsonWynik);
                 if (result.sukces)
                 {
-                    UserAccountData.Instance.SetLogin(loginField.text);
+                    UserAccountData.Instance.SetUser(loginField.text, result.token);
                     LoginPageLoad(false);
+                    SetLocalUser(true);
                 }
             }
         }));
@@ -342,6 +345,7 @@ public class MenuManager : MonoBehaviour
 
     public void RegisterButtonClicked()
     {
+        LogOutButtonClicked();
         StartCoroutine(ApiSender.Instance.SendQuery(new UserData(loginField.text, passwordField.text), registerUrl, (jsonWynik) =>
         {
             if(jsonWynik != null)
@@ -349,10 +353,35 @@ public class MenuManager : MonoBehaviour
                 ApiResponse result = JsonUtility.FromJson<ApiResponse>(jsonWynik);
                 if (result.sukces)
                 {
-                    UserAccountData.Instance.SetLogin(loginField.text);
+                    UserAccountData.Instance.SetUser(loginField.text, result.token);
                     LoginPageLoad(false);
+                    SetLocalUser(true);
                 }
             }
         }));
+    }
+
+    public void LogOutButtonClicked()
+    {
+        if (!UserAccountData.Instance.isLoggedIn) return;
+        StartCoroutine(ApiSender.Instance.SendQuery(new LogOutApi(UserAccountData.Instance.token), loginUrl, (jsonWynik) =>
+        {
+            if (jsonWynik != null)
+            {
+                ApiResponse result = JsonUtility.FromJson<ApiResponse>(jsonWynik);
+                if (result.sukces)
+                {
+                    UserAccountData.Instance.LogOut();
+                    SetLocalUser(false);
+                }
+            }
+        }, "DELETE"));
+    }
+
+    void SetLocalUser(bool czy)
+    {
+        usernameLabel.gameObject.SetActive(czy);
+        if (!czy) return;
+        usernameLabel.text = UserAccountData.Instance.login;
     }
 }

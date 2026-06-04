@@ -5,7 +5,6 @@ using System.Text;
 using TMPro;
 using UnityEngine;
 using UnityEngine.Networking;
-using static Unity.VisualScripting.Member;
 
 public class UserData
 {
@@ -18,9 +17,19 @@ public class UserData
     }
 }
 
+public class LogOutApi
+{
+    public string token;
+    public LogOutApi(string _token)
+    {
+        token = _token;
+    }
+}
+
 public class ApiResponse
 {
     public bool sukces;
+    public string token;
 }
 
 public class ApiSender : MonoBehaviour

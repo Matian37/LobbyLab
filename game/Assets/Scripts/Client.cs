@@ -11,10 +11,10 @@ using UnityEngine.Networking;
 
 public class  WaitingUserData
 {
-    public string login;
-    public WaitingUserData(string _login)
+    public string token;
+    public WaitingUserData(string _token)
     {
-        login = _login;
+        token = _token;
     }
 }
 
@@ -45,7 +45,7 @@ public class Client : MonoBehaviour
 
     void Start()
     {
-        SendMeToApi();
+        AddToWaitingList();
 
         //open sse source
         try
@@ -71,12 +71,11 @@ public class Client : MonoBehaviour
         if (klient != null) klient.Dispose();
     }
 
-    void SendMeToApi()
+    void AddToWaitingList()
     {
-        string url = "https://strona.pl/api/waiting";
-        string userLogin = "kacper";
+        string url = "http://localhost:5173/waiting";
 
-        WaitingUserData dane = new WaitingUserData(userLogin);
+        WaitingUserData dane = new WaitingUserData(UserAccountData.Instance.token);
         StartCoroutine(ApiSender.Instance.SendQuery(dane, url, (jsonWynik) =>
         {
             if (jsonWynik != null)

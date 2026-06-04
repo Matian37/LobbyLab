@@ -4,7 +4,7 @@
     import { onMount } from "svelte";
     let title = $state('');
     let buttonText = $state('Play');
-
+    
     let user = getData();
     if(!user) title = "Zaloguj sie";
     else{
@@ -18,8 +18,18 @@
         goto(path);
     }
 
-    function logout(){
+    async function logout(){
+        if(!user) return;
         resetData();
+        const response = await fetch('/api/login', {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({token: user.token})
+        });
+        user = null;
+
         title = "Zaloguj sie";
     }
 

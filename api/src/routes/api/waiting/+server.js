@@ -2,34 +2,28 @@ import { findWaitingByLogin, addToWaiting, deleteFromWaiting, getLoginFromToken 
 import { json } from '@sveltejs/kit';
 
 export async function POST({request}){   
-    try{
-        const {token} = await request.json();
-        const login = getLoginFromToken(token);
+    const {token} = await request.json();
+    const login = getLoginFromToken(token);
+    if(!login) return json({sukces: false});
         
-        const res = addToWaiting(login);
-        return json({sukces: true});
-    }
-    catch{
-        return json({sukces: false});
-    }
+    if(!addToWaiting(login)) return json({sukces: false});
+    return json({sukces: true});
+
 }
 
 export async function DELETE({request}){
-    try{
-        const {token} = await request.json();
-        const login = getLoginFromToken(token);
+    const {token} = await request.json();
+    const login = getLoginFromToken(token);
+    if(!login) return json({sukces: false});
         
-        const res = deleteFromWaiting(login);
-        return json({sukces: true});
-    }
-    catch{
-        return json({sukces: false});
-    }
+    if(!deleteFromWaiting(login)) return json({sukces: false});
+    return json({sukces: true});
 }
 
 export async function GET({url}){
     const token = url.searchParams.get('token');
     const login = getLoginFromToken(token);
+    if(!login) return json({sukces: false});
     
     if(findWaitingByLogin(login))
         return json({sukces: true});

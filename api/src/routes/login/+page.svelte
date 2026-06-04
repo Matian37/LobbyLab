@@ -20,6 +20,7 @@
 
         const sukces = await response.json();
         if(sukces.sukces){
+            console.debug("poprawnie zalogowano");
             updateData({token: sukces.token, login: login});
             pokazBlad = false;
             changePage('/')

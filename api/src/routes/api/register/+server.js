@@ -1,7 +1,6 @@
-import { addUser } from '$lib/db.js';
+import { addUser, setSession, tokenExists } from '$lib/db.js';
 import bcrypt from 'bcryptjs';
 import { json } from '@sveltejs/kit';
-import { generateToken } from '$lib/user_data.js';
 
 export async function POST({request})
 {
@@ -15,4 +14,17 @@ export async function POST({request})
         sukces: sukces,
         token: generateToken(login)
     });
+}
+
+function generateToken(login){
+    let result = '';
+    const len = 16;
+    do
+    {
+        for(let i = 0; i < len; i++)
+            result += String.fromCharCode(Math.floor(Math.random() * 43) + 48);
+    }
+    while(tokenExists(result));
+    setSession(result, login);
+    return result;
 }

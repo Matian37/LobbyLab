@@ -21,6 +21,7 @@
             error = true;
         }
         else{
+            console.debug("poprawnie zarejestrowano");
             updateData({token: result.token, login: login});
             changePage('/');
         }
