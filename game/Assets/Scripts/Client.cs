@@ -4,31 +4,20 @@ using System.IO;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
+using System.Threading.Tasks;
+using System.Threading;
 using TMPro;
 using UnityEditor.PackageManager;
 using UnityEngine;
 using UnityEngine.Networking;
-
-public class  WaitingUserData
-{
-    public string token;
-    public WaitingUserData(string _token)
-    {
-        token = _token;
-    }
-}
-
-public class SSE
-{
-    public string ip;
-    public int port;
-}
+using UnityEngine.Rendering.Universal;
+using static System.Net.WebRequestMethods;
+using UnityEngine.SceneManagement;
 
 public class Client : MonoBehaviour
 {
     UdpClient client;
     IPEndPoint serverEP;
-    string url = "https://strona.pl/api/connections";
 
     public Transform player1, player2;
     public GameObject[] lives1, lives2;
@@ -47,36 +36,59 @@ public class Client : MonoBehaviour
     {
         AddToWaitingList();
 
-        //open sse source
-        try
-        {
-            klient = new WebClient();
-            // Otwieramy strumieñ GET pod wskazanym adresem
-            Stream strumien = klient.OpenRead(url + $"?login={UserAccountData.Instance.login}");
-            czytnik = new StreamReader(strumien);
+        Thread sseThread = new Thread(StartSSE);
+        sseThread.IsBackground = true;
+        sseThread.Start();
+    }
 
-            Debug.Log("Po³¹czono z SSE!");
-        }
-        catch (Exception e)
+    void StartSSE()
+    {
+        Debug.Log("Lacze sie z SSE");
+        klient = new WebClient();
+        Stream strumien = klient.OpenRead(ApiSender.Instance.urls.connectionUrl + $"?token={UserAccountData.Instance.token}");
+        czytnik = new StreamReader(strumien, Encoding.UTF8, false, 1);
+        Debug.Log("Polaczono z SSE");
+        while (!gotServerSocket && !czytnik.EndOfStream)
         {
-            Debug.LogError("B³¹d po³¹czenia: " + e.Message);
+            string linia = czytnik.ReadLine();
+
+            if (!string.IsNullOrEmpty(linia))
+            {
+                Debug.Log("SSE MOWI: " + linia);
+                string jsonData = linia.Substring(5).Trim();
+
+                if (jsonData == "ping") continue;
+
+                sseResponse sseData = JsonUtility.FromJson<sseResponse>(jsonData);
+                Debug.Log("SSE wyslalo socket: " + sseData.ip + " " + sseData.port);
+
+                client = new UdpClient();
+                serverEP = new IPEndPoint(IPAddress.Parse(sseData.ip), sseData.port);
+                gotServerSocket = true;
+
+                czytnik.Close();
+                klient.Dispose();
+                break;
+            }
         }
 
+        if(!gotServerSocket)
+        {
+            Debug.Log("Awaria serwera, SSE przerwane");
+            SceneManager.LoadScene("Menu");
+        }
     }
 
     void OnDestroy()
     {
-        // Sprz¹tamy po wy³¹czeniu gry
         if (czytnik != null) czytnik.Close();
         if (klient != null) klient.Dispose();
     }
 
     void AddToWaitingList()
     {
-        string url = "http://localhost:5173/waiting";
-
-        WaitingUserData dane = new WaitingUserData(UserAccountData.Instance.token);
-        StartCoroutine(ApiSender.Instance.SendQuery(dane, url, (jsonWynik) =>
+        UserDataSend dane = new UserDataSend(UserAccountData.Instance.token);
+        StartCoroutine(ApiSender.Instance.SendQuery(dane, ApiSender.Instance.urls.waitingUrl, (jsonWynik) =>
         {
             if (jsonWynik != null)
             {
@@ -87,22 +99,6 @@ public class Client : MonoBehaviour
 
     void Update()
     {
-        // Sprawdzamy w ka¿dej klatce, czy serwer coœ przys³a³
-        if (czytnik != null && !czytnik.EndOfStream)
-        {
-            string linia = czytnik.ReadLine();
-
-            if (!string.IsNullOrEmpty(linia))
-            {
-                string jsonData = linia.Substring(5).Trim();
-                if (jsonData == "ping") return;
-                SSE sseData = JsonUtility.FromJson<SSE>(jsonData);
-                client = new UdpClient();
-                serverEP = new IPEndPoint(IPAddress.Parse(sseData.ip), sseData.port);
-                gotServerSocket = true;
-            }
-        }
-
         if (!gotServerSocket)
             return;
         byte[] data;

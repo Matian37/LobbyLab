@@ -1,23 +1,30 @@
 import { deleteFromWaiting, getLoginFromToken } from '$lib/db.js';
 import { json } from '@sveltejs/kit';
 import { Client } from 'pg';
+import { handleError } from '$lib/error_handler.js';
 
 export async function GET({url}){
     const token = url.searchParams.get('token');
     const login = getLoginFromToken(token);
-    if(!login) return json({sukces: false});
+    if(!login) 
+    {
+        handleError(0);
+        return json({sukces: false});
+    }
     
     let interval;
     return new Response(
         new ReadableStream({
             start(controller){
-                listen(login, controller);
+                //listen(login, controller);
                 interval = setInterval(()=>{
+                    console.debug("wysylam ping");
                     controller.enqueue('data: ping\n\n');
                 }, 10000);
             },
             cancel(){
                 clearInterval(interval);
+                handleError(3);
                 deleteFromWaiting(login);
             }
         }),
@@ -42,6 +49,7 @@ async function listen(login, controller){
       
     client.on("notification", (msg) => {
         if(msg.payload.username != login) return;
+        console.debug("wysylam socket serwera");
         controller.equeue(`data: ${msg.payload}\n\n`);
         controller.close();
     });

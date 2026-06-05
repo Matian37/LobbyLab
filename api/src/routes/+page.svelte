@@ -6,8 +6,9 @@
     let buttonText = $state('Play');
     
     let user = getData();
-    if(!user) title = "Zaloguj sie";
+    if(!user || user == undefined) title = "Zaloguj sie";
     else{
+        console.debug(user);
         title = user.login;
         onMount(async () =>{
             if(await isInWaitingList(user.token)) buttonText = 'Stop';
@@ -43,7 +44,6 @@
             console.debug('jestes juz w kolejce');
             return;
         }
-        //window.location.href = `game-run://webplay?login=${user.login}`;
     }
 
     async function isInWaitingList(token)

@@ -6,35 +6,57 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.Networking;
 
-public class UserData
+//api sending classes
+public class LoginUserDataSend
 {
     public string login;
     public string password;
-    public UserData(string _login, string _password)
+    public LoginUserDataSend(string _login, string _password)
     {
         login = _login;
         password = _password;
     }
 }
 
-public class LogOutApi
+public class UserDataSend
 {
     public string token;
-    public LogOutApi(string _token)
+    public UserDataSend(string _token)
     {
         token = _token;
     }
 }
 
+//api response classes
 public class ApiResponse
 {
     public bool sukces;
-    public string token;
+    public string msg;
+}
+
+
+public class sseResponse
+{
+    public string ip;
+    public int port;
+}
+
+public class URL
+{
+    public string loginUrl, registerUrl, waitingUrl, connectionUrl;
+    public URL(string prefix)
+    {
+        loginUrl = prefix + "/api/login";
+        registerUrl = prefix + "/api/register";
+        waitingUrl = prefix + "/api/waiting";
+        connectionUrl = prefix + "/api/connection";
+    }
 }
 
 public class ApiSender : MonoBehaviour
 {
     public static ApiSender Instance { get; set; }
+    public URL urls = new URL("http://localhost:5173");
 
     private void OnDestroy()
     {

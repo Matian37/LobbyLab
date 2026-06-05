@@ -32,6 +32,8 @@ public class UserAccountData : MonoBehaviour
         login = _login;
         token = _token;
         isLoggedIn = true;
+        PlayerPrefs.SetString("sessionToken", _token);
+        PlayerPrefs.SetString("sessionLogin", _login);
     }
 
 
@@ -39,6 +41,19 @@ public class UserAccountData : MonoBehaviour
     {
         isLoggedIn = false;
         login = token = "";
+        PlayerPrefs.DeleteKey("sessionToken");
+        PlayerPrefs.DeleteKey("sessionLogin");
+    }
+
+    public void LoadUser()
+    {
+        if (PlayerPrefs.HasKey("sessionToken"))
+        {
+            isLoggedIn = true;
+            token = PlayerPrefs.GetString("sessionToken");
+            login = PlayerPrefs.GetString("sessionLogin");
+        }
+
     }
 }
 

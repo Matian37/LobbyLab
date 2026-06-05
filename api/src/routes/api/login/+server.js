@@ -1,35 +1,38 @@
 import { findUserByLogin, setSession, tokenExists, deleteSession, getLoginFromToken } from '$lib/db.js';
 import bcrypt from 'bcryptjs';
 import { json } from '@sveltejs/kit';
+import { handleError } from '$lib/error_handler.js';
 
 export async function POST({request})
 {
     const {login, password} = await request.json();
     const result = findUserByLogin(login);
     if(!result) {
-        return json({
-        sukces: false
-        });
+        return json({sukces: false, msg: "Podany login nie istnieje"});
     }
     
     if(await bcrypt.compare(password, result.password)){
         return json({
             sukces: true,
-            token: generateToken(login)
-        })
+            msg: generateToken(login)
+        });
     }
     else{
         return json({
             sukces: false,
-            token: null
-        })
+            msg: "Podane hasło jest błędne"
+        });
     }
 }
 
 export async function DELETE({request}){
     const {token} = await request.json();
 
-    if(!deleteSession(token)) return json({sukces: false});
+    if(!deleteSession(token))
+    {
+        handleError(4);
+        return json({sukces: false});
+    }
     return json({sukces: true});
 }
 

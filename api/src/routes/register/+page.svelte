@@ -2,7 +2,7 @@
     import { goto } from "$app/navigation";
     import { updateData } from "$lib/user_data";
 
-    let login = $state(''), password = $state(''), error = $state(false);
+    let login = $state(''), password = $state(''), errorText = $state('');
     function changePage(path){
         goto(path);
     }
@@ -18,11 +18,11 @@
         });
         const result = await response.json();
         if(!result.sukces){
-            error = true;
+            errorText = result.msg;
         }
         else{
             console.debug("poprawnie zarejestrowano");
-            updateData({token: result.token, login: login});
+            updateData({token: result.msg, login: login});
             changePage('/');
         }
     }
@@ -32,9 +32,7 @@
 Login <input bind:value={login}/>
 Password <input bind:value={password} type="password"/>
 <button onclick={()=>submit()}> Submit </button>
-{#if error}
-Blad logowania
-{/if}
+{errorText}
 <style>
 
 </style>

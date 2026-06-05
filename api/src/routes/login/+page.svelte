@@ -2,7 +2,7 @@
     import { goto } from "$app/navigation";
     import { updateData } from "$lib/user_data.js";
 
-    let login = $state(''), password = $state(''), pokazBlad = $state(false);
+    let login = $state(''), password = $state(''), tekstBledu = $state("");
     
     function changePage(path){
         goto(path);
@@ -21,12 +21,12 @@
         const sukces = await response.json();
         if(sukces.sukces){
             console.debug("poprawnie zalogowano");
-            updateData({token: sukces.token, login: login});
-            pokazBlad = false;
+            updateData({token: sukces.msg, login: login});
+            tekstBledu = "";
             changePage('/')
         }
         else{
-            pokazBlad = true;
+            tekstBledu = sukces.msg;
         }
     }
 </script>
@@ -35,9 +35,8 @@
 Login <input bind:value={login}/>
 Password <input bind:value={password} type="password"/>
 <button onclick={()=>submit()}>Submit</button>
-{#if pokazBlad}
-Blad logowania
-{/if}
+
+{tekstBledu}
 
 <style>
 

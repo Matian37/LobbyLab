@@ -33,8 +33,7 @@ public class MenuManager : MonoBehaviour
 
     public TMP_InputField passwordField, loginField;
     public GameObject loginPage;
-    [SerializeField] string loginUrl = "http://localhost:5173/login", registerUrl = "http://localhost:5173/register";
-    public TextMeshProUGUI usernameLabel;
+    public TextMeshProUGUI usernameLabel, errorText;
 
     public void tutPageSwitch(bool x)
     {
@@ -66,6 +65,8 @@ public class MenuManager : MonoBehaviour
 
     private void Start()
     {
+        UserAccountData.Instance.LoadUser();
+
         SoundManager.Instance.PlayMenuMusic();
         odblText.text = SceneTransport.Instance.odb.ToString();
         int don = 0;
@@ -229,6 +230,7 @@ public class MenuManager : MonoBehaviour
     
     public void Multiplayer()
     {
+        if (!UserAccountData.Instance.isLoggedIn) return;
         SoundManager.Instance.Sfx(SoundManager.Instance.click);
         unlockMode = false;
         levelInfo.mode = 3;
@@ -321,50 +323,73 @@ public class MenuManager : MonoBehaviour
 
     public void LoginPageLoad(bool login)
     {
+        errorText.gameObject.SetActive(false);
         loginPage.SetActive(login);
         mainPage.SetActive(!login);
+    }
+
+    void HandleLoginError(string message)
+    {
+        errorText.gameObject.SetActive(true);
+        errorText.text = message;
     }
 
     public void LoginButtonClicked()
     {
         LogOutButtonClicked();
-        StartCoroutine(ApiSender.Instance.SendQuery(new UserData(loginField.text, passwordField.text), loginUrl, (jsonWynik) =>
+        StartCoroutine(ApiSender.Instance.SendQuery(new LoginUserDataSend(loginField.text, passwordField.text), ApiSender.Instance.urls.loginUrl, (jsonWynik) =>
         {
             if (jsonWynik != null)
             {
                 ApiResponse result = JsonUtility.FromJson<ApiResponse>(jsonWynik);
                 if (result.sukces)
                 {
-                    UserAccountData.Instance.SetUser(loginField.text, result.token);
+                    Debug.Log("poprawnie zalogowano");
+                    UserAccountData.Instance.SetUser(loginField.text, result.msg);
                     LoginPageLoad(false);
                     SetLocalUser(true);
                 }
+                else
+                {
+                    Debug.Log("logowanie nieudane");
+                    HandleLoginError(result.msg);
+                }
             }
         }));
+
+        loginField.text = passwordField.text = "";
     }
 
     public void RegisterButtonClicked()
     {
         LogOutButtonClicked();
-        StartCoroutine(ApiSender.Instance.SendQuery(new UserData(loginField.text, passwordField.text), registerUrl, (jsonWynik) =>
+        StartCoroutine(ApiSender.Instance.SendQuery(new LoginUserDataSend(loginField.text, passwordField.text), ApiSender.Instance.urls.registerUrl, (jsonWynik) =>
         {
             if(jsonWynik != null)
             {
                 ApiResponse result = JsonUtility.FromJson<ApiResponse>(jsonWynik);
                 if (result.sukces)
                 {
-                    UserAccountData.Instance.SetUser(loginField.text, result.token);
+                    Debug.Log("poprawnie zarejestrowano");
+                    UserAccountData.Instance.SetUser(loginField.text, result.msg);
                     LoginPageLoad(false);
                     SetLocalUser(true);
                 }
+                else
+                {
+                    Debug.Log("rejestracja nieudana");
+                    HandleLoginError(result.msg);
+                }
             }
         }));
+
+        loginField.text = passwordField.text = "";
     }
 
     public void LogOutButtonClicked()
     {
         if (!UserAccountData.Instance.isLoggedIn) return;
-        StartCoroutine(ApiSender.Instance.SendQuery(new LogOutApi(UserAccountData.Instance.token), loginUrl, (jsonWynik) =>
+        StartCoroutine(ApiSender.Instance.SendQuery(new UserDataSend(UserAccountData.Instance.token), ApiSender.Instance.urls.loginUrl, (jsonWynik) =>
         {
             if (jsonWynik != null)
             {
@@ -373,6 +398,10 @@ public class MenuManager : MonoBehaviour
                 {
                     UserAccountData.Instance.LogOut();
                     SetLocalUser(false);
+                }
+                else
+                {
+                    Debug.Log("dziwny blad api przy wylogowywaniu");
                 }
             }
         }, "DELETE"));
