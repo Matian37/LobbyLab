@@ -8,7 +8,6 @@
     let user = getData();
     if(!user || user == undefined) title = "Zaloguj sie";
     else{
-        console.debug(user);
         title = user.login;
         onMount(async () =>{
             if(await isInWaitingList(user.token)) buttonText = 'Stop';

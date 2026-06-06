@@ -5,9 +5,17 @@ export function updateData(data){
         localStorage.setItem('logged', JSON.stringify(data));
 }
 
-export function getData(){
+export async function getData(){
     if(browser)
-        return JSON.parse(localStorage.getItem('logged'));
+    {
+        const dane = JSON.parse(localStorage.getItem('logged'));
+        const odp = await fetch(`/api/login?token=${dane.token}`);
+        const wynik = await odp.json();
+        if(wynik.sukces)
+            return dane;
+        resetData();
+        return false;
+    }
     return null;
 }
 

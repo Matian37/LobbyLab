@@ -1,4 +1,5 @@
 import Database from 'better-sqlite3';
+import { handleError } from './error_handler';
 const db = new Database('../base.db');
 
 db.exec(`CREATE TABLE IF NOT EXISTS users(
@@ -12,7 +13,8 @@ CREATE TABLE IF NOT EXISTS waiting(
 
 CREATE TABLE IF NOT EXISTS sessions(
     token TEXT PRIMARY KEY,
-    login TEXT NOT NULL
+    login TEXT NOT NULL,
+    date DATE
 );
 `);
 
@@ -24,15 +26,13 @@ export function findUserByLogin(login){
 }
 
 export function addUser(login, password){
-    console.debug(login + " elo " + password);
     try{
         const q = db.prepare('INSERT INTO users (login, password) VALUES(?, ?)');
         q.run(login, password);
-        console.debug("true");
         return true;
     }
     catch (err){
-        console.debug(err + "<-blad");
+        handleError(-1, err);
         return false;
     }
 }
@@ -48,7 +48,8 @@ export function addToWaiting(login){
         q.run(login);
         return true;
     }
-    catch{
+    catch (err){
+        handleError(-1, err);
         return false;
     }
 }
@@ -59,7 +60,8 @@ export function deleteFromWaiting(login){
         q.run(login);
         return true;
     }
-    catch{
+    catch (err){
+        handleError(-1, err);
         return false;
     }
 }
@@ -75,7 +77,8 @@ export function setSession(token, login){
         q.run(token, login);
         return true;
     }
-    catch{
+    catch (err){
+        handleError(-1, err);
         return false;
     }
 }
@@ -86,7 +89,8 @@ export function deleteSession(token){
         q.run(token);
         return true;
     }
-    catch{
+    catch (err){
+        handleError(-1, err);
         return false;
     }
 }
@@ -95,3 +99,10 @@ export function tokenExists(token){
     const q = db.prepare('SELECT * FROM sessions WHERE token = ?');
     return q.get(token);
 }
+
+function deleteOldSessions(){
+    const q = db.prepare(`DELETE FROM sessions WHERE date < datetime('now', '-3 months'`);
+    q.run();
+}
+
+setInterval(deleteOldSessions, 1000 * 60 * 60 * 24);

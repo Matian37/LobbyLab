@@ -49,6 +49,18 @@ public class UserAccountData : MonoBehaviour
     {
         if (PlayerPrefs.HasKey("sessionToken"))
         {
+            ApiSender.Instance.SendQuery(null, ApiSender.Instance.urls.loginUrl, jsonWynik =>
+            {
+                if(jsonWynik != null)
+                {
+                    ApiResponse result = JsonUtility.FromJson<ApiResponse>(jsonWynik);
+                    if (!result.sukces)
+                    {
+                        LogOut();
+                        return;
+                    }
+                }
+            }, "GET");
             isLoggedIn = true;
             token = PlayerPrefs.GetString("sessionToken");
             login = PlayerPrefs.GetString("sessionLogin");

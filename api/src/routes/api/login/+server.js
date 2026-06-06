@@ -1,7 +1,8 @@
-import { findUserByLogin, setSession, tokenExists, deleteSession, getLoginFromToken } from '$lib/db.js';
+import { findUserByLogin, setSession, deleteSession, getLoginFromToken, tokenExists } from '$lib/db.js';
 import bcrypt from 'bcryptjs';
 import { json } from '@sveltejs/kit';
 import { handleError } from '$lib/error_handler.js';
+import { generateToken } from '$lib/helpers.js';
 
 export async function POST({request})
 {
@@ -36,15 +37,9 @@ export async function DELETE({request}){
     return json({sukces: true});
 }
 
-function generateToken(login){
-    let result = '';
-    const len = 16;
-    do
-    {
-        for(let i = 0; i < len; i++)
-            result += String.fromCharCode(Math.floor(Math.random() * 43) + 48);
-    }
-    while(tokenExists(result));
-    setSession(result, login);
-    return result;
+export async function GET({url}){
+    const token = url.searchParams.get('token');
+    
+    if(tokenExists(token)) return json({sukces: true});
+    return json({sukces: false});
 }

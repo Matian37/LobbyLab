@@ -81,10 +81,14 @@ public class ApiSender : MonoBehaviour
 
         UnityWebRequest www = new UnityWebRequest(url, meth);
 
-        byte[] bodyRaw = Encoding.UTF8.GetBytes(jsonDane);
-        www.uploadHandler = new UploadHandlerRaw(bodyRaw);
+        if (meth != "GET")
+        {
+            byte[] bodyRaw = Encoding.UTF8.GetBytes(jsonDane);
+            www.uploadHandler = new UploadHandlerRaw(bodyRaw);
+            www.SetRequestHeader("Content-Type", "application/json");
+        }
         www.downloadHandler = new DownloadHandlerBuffer();
-        www.SetRequestHeader("Content-Type", "application/json");
+
         yield return www.SendWebRequest();
 
         if (www.result != UnityWebRequest.Result.Success)

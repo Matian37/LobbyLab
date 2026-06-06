@@ -5149,7 +5149,7 @@ MonoBehaviour:
   loginField: {fileID: 367729961}
   loginPage: {fileID: 674591529}
   usernameLabel: {fileID: 146063285}
-  errorText: {fileID: 0}
+  errorText: {fileID: 619253322}
 --- !u!4 &444868712
 Transform:
   m_ObjectHideFlags: 0
@@ -6979,7 +6979,7 @@ MonoBehaviour:
   m_VertexBufferAutoSizeReduction: 0
   m_useMaxVisibleDescender: 1
   m_pageToDisplay: 1
-  m_margin: {x: 0, y: 0, z: 0, w: 0}
+  m_margin: {x: -974.5893, y: 0, z: -786.2582, w: 0}
   m_isUsingLegacyAnimationComponent: 0
   m_isVolumetricText: 0
   m_hasFontAssetChanged: 0
