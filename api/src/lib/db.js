@@ -73,7 +73,7 @@ export function getLoginFromToken(token){
 
 export function setSession(token, login){
     try{
-        const q = db.prepare('INSERT INTO sessions (token, login) VALUES (?, ?)');
+        const q = db.prepare('INSERT INTO sessions (token, login, date) VALUES (?, ?, CURRENT_TIMESTAMP)');
         q.run(token, login);
         return true;
     }
@@ -101,7 +101,7 @@ export function tokenExists(token){
 }
 
 function deleteOldSessions(){
-    const q = db.prepare(`DELETE FROM sessions WHERE date < datetime('now', '-3 months'`);
+    const q = db.prepare(`DELETE FROM sessions WHERE date < datetime('now', '-3 months')`);
     q.run();
 }
 

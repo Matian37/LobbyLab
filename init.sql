@@ -17,7 +17,8 @@ CREATE TABLE IF NOT EXISTS waiting(
 
 CREATE TABLE IF NOT EXISTS sessions(
     token TEXT PRIMARY KEY,
-    login TEXT NOT NULL REFERENCES users(login) ON DELETE CASCADE
+    login TEXT NOT NULL REFERENCES users(login) ON DELETE CASCADE,
+    date DATE
 );
 
 
