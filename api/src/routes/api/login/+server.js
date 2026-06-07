@@ -7,12 +7,12 @@ import { generateToken } from '$lib/helpers.js';
 export async function POST({request})
 {
     const {login, password} = await request.json();
-    const result = findUserByLogin(login);
-    if(!result) {
+    const result = await findUserByLogin(login);
+    if(result.length == 0) {
         return json({sukces: false, msg: "Podany login nie istnieje"});
     }
     
-    if(await bcrypt.compare(password, result.password)){
+    if(await bcrypt.compare(password, result[0].password)){
         return json({
             sukces: true,
             msg: generateToken(login)
@@ -29,7 +29,7 @@ export async function POST({request})
 export async function DELETE({request}){
     const {token} = await request.json();
 
-    if(!deleteSession(token))
+    if(!(await deleteSession(token)))
     {
         handleError(4);
         return json({sukces: false});
@@ -40,6 +40,6 @@ export async function DELETE({request}){
 export async function GET({url}){
     const token = url.searchParams.get('token');
     
-    if(tokenExists(token)) return json({sukces: true});
+    if((await tokenExists(token)).length == 0) return json({sukces: true});
     return json({sukces: false});
 }

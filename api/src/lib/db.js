@@ -1,34 +1,39 @@
-import Database from 'better-sqlite3';
-import { handleError } from './error_handler';
-const db = new Database('../base.db');
+import postgres from "postgres";
 
-db.exec(`CREATE TABLE IF NOT EXISTS users(
-    login TEXT PRIMARY KEY,
-    password TEXT NOT NULL
-);
+const sql = postgres(process.env.DATABASE_URL);
 
-CREATE TABLE IF NOT EXISTS waiting(
-    login TEXT PRIMARY KEY
-);
-
-CREATE TABLE IF NOT EXISTS sessions(
-    token TEXT PRIMARY KEY,
-    login TEXT NOT NULL,
-    date DATE
-);
-`);
-
-export function findUserByLogin(login){
-    const q = db.prepare(`SELECT * FROM users
-        WHERE login = ?
-    `);
-    return q.get(login);
+export async function findUserByLogin(login){
+    const q = await sql`
+        SELECT * FROM users WHERE login = ${login}
+    `
+    return q;
 }
 
-export function addUser(login, password){
+export async function addUser(login, password){
     try{
-        const q = db.prepare('INSERT INTO users (login, password) VALUES(?, ?)');
-        q.run(login, password);
+        await sql`
+            INSERT INTO users (login, password) VALUES(${login}, ${password})
+        `
+        return true;
+    }
+    catch (err){
+        handleError(-1, err);
+        return false;   
+    }
+}
+
+export async function findWaitingByLogin(login){
+    const q = await sql`
+        SELECT * FROM waiting WHERE login = ${login}
+    `
+    return q;
+}
+
+export async function addToWaiting(login){
+    try{
+        await sql`
+            INSERT INTO waiting (login) VALUES(${login})
+        `
         return true;
     }
     catch (err){
@@ -37,15 +42,11 @@ export function addUser(login, password){
     }
 }
 
-export function findWaitingByLogin(login){
-    const q = db.prepare(`SELECT * FROM waiting WHERE login = ?`);
-    return q.get(login);
-}
-
-export function addToWaiting(login){
+export async function deleteFromWaiting(login){
     try{
-        const q = db.prepare(`INSERT INTO waiting (login) VALUES(?)`);
-        q.run(login);
+        await sql`
+            DELETE FROM waiting WHERE login=${login}
+        `
         return true;
     }
     catch (err){
@@ -54,10 +55,18 @@ export function addToWaiting(login){
     }
 }
 
-export function deleteFromWaiting(login){
+export async function getLoginFromToken(token){
+    const q = await sql`
+        SELECT login FROM sessions WHERE token = ${token}
+    `
+    return q;
+}
+
+export async function setSession(token, login){
     try{
-        const q = db.prepare('DELETE FROM waiting WHERE login=?');
-        q.run(login);
+        await sql`
+            INSERT INTO sessions (token, login, date) VALUES (${token}, ${login}, CURRENT_TIMESTAMP)
+        `
         return true;
     }
     catch (err){
@@ -66,17 +75,11 @@ export function deleteFromWaiting(login){
     }
 }
 
-export function getLoginFromToken(token){
-    const q = db.prepare('SELECT login FROM sessions WHERE token = ?');
-    const result = q.get(token);
-    if(!result) return false;
-    return result.login;
-}
-
-export function setSession(token, login){
+export async function deleteSession(token){
     try{
-        const q = db.prepare('INSERT INTO sessions (token, login, date) VALUES (?, ?, CURRENT_TIMESTAMP)');
-        q.run(token, login);
+        await sql`
+            DELETE FROM sessions WHERE token = ${token}
+        `
         return true;
     }
     catch (err){
@@ -85,26 +88,17 @@ export function setSession(token, login){
     }
 }
 
-export function deleteSession(token){
-    try{
-        const q = db.prepare('DELETE FROM sessions WHERE token = ?');
-        q.run(token);
-        return true;
-    }
-    catch (err){
-        handleError(-1, err);
-        return false;
-    }
+export async function tokenExists(token){
+    const q = await sql`
+        SELECT * FROM sessions WHERE token = ${token}
+    `
+    return q;
 }
 
-export function tokenExists(token){
-    const q = db.prepare('SELECT * FROM sessions WHERE token = ?');
-    return q.get(token);
-}
-
-function deleteOldSessions(){
-    const q = db.prepare(`DELETE FROM sessions WHERE date < datetime('now', '-3 months')`);
-    q.run();
+async function deleteOldSessions(){
+    await sql`
+        DELETE FROM sessions WHERE date < NOW() - INTERVAL '3 months'
+    `
 }
 
 setInterval(deleteOldSessions, 1000 * 60 * 60 * 24);

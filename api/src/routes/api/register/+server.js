@@ -7,7 +7,7 @@ export async function POST({request})
 {
     const {login, password} = await request.json();
     const hashed = await bcrypt.hash(password, 10);
-    const result = addUser(login, hashed);
+    const result = await addUser(login, hashed);
     if(!result){
         return json({
             sukces: false,
@@ -17,7 +17,7 @@ export async function POST({request})
     else{
         return json({
             sukces: true,
-            msg: generateToken(login)
+            msg: await generateToken(login)
         });
     }
 }

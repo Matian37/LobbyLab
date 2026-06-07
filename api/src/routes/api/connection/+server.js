@@ -5,12 +5,13 @@ import { handleError } from '$lib/error_handler.js';
 
 export async function GET({url}){
     const token = url.searchParams.get('token');
-    const login = getLoginFromToken(token);
-    if(!login) 
+    const response = await getLoginFromToken(token);
+    if(response.length == 0) 
     {
         handleError(0);
         return json({sukces: false});
     }
+    const login = response[0].login;
     
     let interval;
     return new Response(
@@ -25,7 +26,7 @@ export async function GET({url}){
             cancel(){
                 clearInterval(interval);
                 handleError(3);
-                deleteFromWaiting(login);
+                await deleteFromWaiting(login);
             }
         }),
         {
