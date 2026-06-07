@@ -8,6 +8,11 @@
     }
 
     async function submit(){
+        if(password.length < 3)
+        {
+            errorText = 'Haslo musi miec co najmniej 3 znaki';
+            return;
+        }
         let data = {login: login, password: password};
         let response = await fetch('/api/register', {
             method: 'POST',

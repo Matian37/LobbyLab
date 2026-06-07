@@ -1,3 +1,5 @@
+import { setSession, tokenExists } from "./db.js";
+
 export function generateToken(login){
     let result = '';
     const len = 16;

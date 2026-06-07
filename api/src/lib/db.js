@@ -68,7 +68,9 @@ export function deleteFromWaiting(login){
 
 export function getLoginFromToken(token){
     const q = db.prepare('SELECT login FROM sessions WHERE token = ?');
-    return q.get(token).login;
+    const result = q.get(token);
+    if(!result) return false;
+    return result.login;
 }
 
 export function setSession(token, login){

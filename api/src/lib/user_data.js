@@ -9,6 +9,7 @@ export async function getData(){
     if(browser)
     {
         const dane = JSON.parse(localStorage.getItem('logged'));
+        if(!dane || dane == undefined || dane == null) return false;
         const odp = await fetch(`/api/login?token=${dane.token}`);
         const wynik = await odp.json();
         if(wynik.sukces)

@@ -1,17 +1,18 @@
 <script>
     import { goto } from "$app/navigation";
     import { getData, resetData } from "$lib/user_data";
-    import { onMount } from "svelte";
     let title = $state('');
     let buttonText = $state('Play');
-    
-    let user = getData();
-    if(!user || user == undefined) title = "Zaloguj sie";
-    else{
-        title = user.login;
-        onMount(async () =>{
-            if(await isInWaitingList(user.token)) buttonText = 'Stop';
-        });
+    let user = false;
+    LoadUser();
+    async function LoadUser(){
+        let data = await getData();
+        if(!data || data == undefined) title = "Zaloguj sie";
+        else{
+            user = {login: data.login, token: data.token};
+            title = data.login;
+            if(await isInWaitingList(data.token)) buttonText = 'Stop';
+        } 
     }
 
     function changePage(path) {
@@ -67,7 +68,3 @@
 </button>
 
 <h1>{title}</h1>
-
-<style>
-
-</style>
