@@ -41,10 +41,7 @@ export async function GET({url}){
     const token = url.searchParams.get('token');
     const response = await getLoginFromToken(token);
     if(response.length == 0)
-    {
-        handleError(0);
         return json({sukces: false});
-    }
     const login = response[0].login;
     
     if(findWaitingByLogin(login))

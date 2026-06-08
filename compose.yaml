@@ -39,6 +39,7 @@ services:
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
     ports:
       - "3000:3000"
     networks:
@@ -66,7 +67,7 @@ services:
 networks:
   db-net:
     driver: bridge
-    internal: true
+    #internal: true
   nats-net:
     driver: bridge
     internal: true

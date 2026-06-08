@@ -23,7 +23,7 @@ export async function GET({url}){
                     controller.enqueue('data: ping\n\n');
                 }, 10000);
             },
-            cancel(){
+            async cancel(){
                 clearInterval(interval);
                 handleError(3);
                 await deleteFromWaiting(login);
