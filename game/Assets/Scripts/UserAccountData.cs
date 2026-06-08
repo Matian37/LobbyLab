@@ -49,7 +49,9 @@ public class UserAccountData : MonoBehaviour
     {
         if (PlayerPrefs.HasKey("sessionToken"))
         {
-            ApiSender.Instance.SendQuery(null, ApiSender.Instance.urls.loginUrl, jsonWynik =>
+            string _token = PlayerPrefs.GetString("sessionToken");
+            string _login = PlayerPrefs.GetString("sessionLogin");
+            ApiSender.Instance.SendQuery(null, ApiSender.Instance.urls.loginUrl + $"?token={token}", jsonWynik =>
             {
                 if(jsonWynik != null)
                 {
@@ -62,8 +64,8 @@ public class UserAccountData : MonoBehaviour
                 }
             }, "GET");
             isLoggedIn = true;
-            token = PlayerPrefs.GetString("sessionToken");
-            login = PlayerPrefs.GetString("sessionLogin");
+            token = _token;
+            login = _login;
         }
 
     }
