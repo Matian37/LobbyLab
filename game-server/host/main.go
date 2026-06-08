@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -47,10 +48,9 @@ func run() error {
 		return fmt.Errorf("failed to get hostname: %w", err)
 	}
 
-	// fix incorrect naming of variable
-	natsURI := os.Getenv("NATS_URI")
-	if natsURI == "" {
-		natsURI = "nats://localhost:4222"
+	natsURI, ok := os.LookupEnv("NATS_URI")
+	if !ok {
+		return errors.New("failed to find NATS_URI env")
 	}
 
 	app := NewApp(natsURI, containerID, cmdArgs)
