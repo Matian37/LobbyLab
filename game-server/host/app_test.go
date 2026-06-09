@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 )
 
@@ -18,9 +17,13 @@ func newMockApp(t *testing.T) (*mocks.MockBrokerConnection, *mocks.MockServer, *
 	mockConn := mocks.NewMockBrokerConnection(ctrl)
 	mockSrv := mocks.NewMockServer(ctrl)
 	app := &App{
-		conn:    mockConn,
-		server:  mockSrv,
-		cmdArgs: []string{"./game"},
+		conn:              mockConn,
+		server:            mockSrv,
+		cmdArgs:           []string{"./game"},
+		initTimeout:       150 * time.Millisecond,
+		serverStopTimeout: 150 * time.Millisecond,
+		sendResultTimeout: 150 * time.Millisecond,
+		sendCancelTimeout: 150 * time.Millisecond,
 	}
 	return mockConn, mockSrv, app
 }
@@ -29,6 +32,15 @@ func newMockAppWithInit(t *testing.T) (*mocks.MockBrokerConnection, *mocks.MockS
 	mockConn, mockSrv, app := newMockApp(t)
 	app.initialized = true
 	return mockConn, mockSrv, app
+}
+
+// newUniqueCtx returns a cancellable context distinct from background/todo,
+// useful as a gomock matcher to verify the exact context flows through.
+func newUniqueCtx(t *testing.T) context.Context {
+	t.Helper()
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
+	return ctx
 }
 
 func TestNewApp(t *testing.T) {
@@ -42,6 +54,9 @@ func TestNewApp(t *testing.T) {
 	assert.NotNil(t, app.server)
 	assert.Equal(t, cmdArgs, app.cmdArgs)
 	assert.False(t, app.initialized)
+	assert.Equal(t, 5*time.Second, app.serverStopTimeout)
+	assert.Equal(t, 15*time.Second, app.sendResultTimeout)
+	assert.Equal(t, 5*time.Second, app.sendCancelTimeout)
 
 	nc, ok := app.conn.(*NATSConnection)
 	assert.True(t, ok, "NewApp should create a NATSConnection")
@@ -52,43 +67,236 @@ func TestNewApp(t *testing.T) {
 func TestApp_Init(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		mockConn, _, app := newMockApp(t)
-		mockConn.EXPECT().Open(gomock.Any()).Return(nil)
+		mockConn.EXPECT().Open(app.initTimeout).Return(nil)
 
-		err := app.Init(150 * time.Millisecond)
+		err := app.Init()
 		assert.NoError(t, err)
 		assert.True(t, app.initialized)
 	})
 
 	t.Run("already initialized", func(t *testing.T) {
 		app := App{initialized: true}
-		err := app.Init(150 * time.Millisecond)
+		err := app.Init()
 		assert.ErrorIs(t, err, ErrAppAlreadyInitialized)
 	})
 
 	t.Run("connection error", func(t *testing.T) {
 		mockConn, _, app := newMockApp(t)
-		expectedErr := errors.New("nats connection failed")
-		mockConn.EXPECT().Open(gomock.Any()).Return(expectedErr)
+		expectedErr := errors.New("")
+		mockConn.EXPECT().Open(app.initTimeout).Return(expectedErr)
 
-		err := app.Init(150 * time.Millisecond)
+		err := app.Init()
 		assert.ErrorIs(t, err, expectedErr)
 		assert.False(t, app.initialized)
 	})
 }
 
-func TestApp_Run(t *testing.T) {
-	ensureContextNotDone := func(ctx context.Context) error {
-		require.NoError(t, ctx.Err())
-		return nil
-	}
+func TestApp_sendResult(t *testing.T) {
+	result := []byte(`{"result":345}`)
 
+	t.Run("success", func(t *testing.T) {
+		mockConn, _, app := newMockApp(t)
+		mockConn.EXPECT().SendResult(gomock.Any(), result).Return(nil)
+
+		err := app.sendResult(context.Background(), result)
+		assert.NoError(t, err)
+	})
+
+	t.Run("timeout", func(t *testing.T) {
+		mockConn, _, app := newMockApp(t)
+		app.sendResultTimeout = 5 * time.Millisecond
+		mockConn.EXPECT().
+			SendResult(gomock.Any(), result).
+			DoAndReturn(func(ctx context.Context, _ []byte) error {
+				deadline, ok := ctx.Deadline()
+				assert.True(t, ok)
+				assert.WithinDuration(t, time.Now().Add(5*time.Millisecond), deadline, 50*time.Millisecond)
+
+				<-ctx.Done()
+				return ctx.Err()
+			})
+
+		err := app.sendResult(context.Background(), result)
+		assert.ErrorIs(t, err, context.DeadlineExceeded)
+	})
+
+	t.Run("canceled by parent context", func(t *testing.T) {
+		mockConn, _, app := newMockApp(t)
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+		mockConn.EXPECT().
+			SendResult(gomock.Any(), result).
+			DoAndReturn(func(ctx context.Context, _ []byte) error {
+				return ctx.Err()
+			})
+
+		err := app.sendResult(ctx, result)
+		assert.ErrorIs(t, err, context.Canceled)
+	})
+}
+
+func TestApp_sendCancel(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		mockConn, _, app := newMockApp(t)
+		mockConn.EXPECT().SendCancel(gomock.Any()).Return(nil)
+
+		app.sendCancel()
+	})
+
+	t.Run("timeout", func(t *testing.T) {
+		mockConn, _, app := newMockApp(t)
+		app.sendCancelTimeout = 5 * time.Millisecond
+		mockConn.EXPECT().SendCancel(gomock.Any()).DoAndReturn(func(ctx context.Context) error {
+			deadline, ok := ctx.Deadline()
+			assert.True(t, ok)
+			assert.WithinDuration(t, time.Now().Add(5*time.Millisecond), deadline, 50*time.Millisecond)
+
+			<-ctx.Done()
+			return ctx.Err()
+		})
+
+		app.sendCancel()
+	})
+}
+
+func TestApp_stopServer(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		_, mockSrv, app := newMockApp(t)
+		mockSrv.EXPECT().Stop(gomock.Any()).Return(nil)
+
+		app.stopServer(context.Background())
+	})
+
+	t.Run("timeout", func(t *testing.T) {
+		_, mockSrv, app := newMockApp(t)
+		app.serverStopTimeout = 5 * time.Millisecond
+		mockSrv.EXPECT().Stop(gomock.Any()).DoAndReturn(func(ctx context.Context) error {
+			deadline, ok := ctx.Deadline()
+			assert.True(t, ok)
+			assert.WithinDuration(t, time.Now().Add(5*time.Millisecond), deadline, 50*time.Millisecond)
+
+			<-ctx.Done()
+			return ctx.Err()
+		})
+
+		app.stopServer(context.Background())
+	})
+
+	t.Run("canceled by parent context", func(t *testing.T) {
+		_, mockSrv, app := newMockApp(t)
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+		mockSrv.EXPECT().Stop(gomock.Any()).Return(context.Canceled)
+
+		app.stopServer(ctx)
+	})
+}
+
+func TestApp_runServer(t *testing.T) {
+	config := `{"config":123}`
+
+	t.Run("success", func(t *testing.T) {
+		_, mockSrv, app := newMockApp(t)
+		ctx := newUniqueCtx(t)
+		result := []byte(`{"result":345}`)
+
+		mockSrv.EXPECT().Start(config, app.cmdArgs).Return(nil)
+		mockSrv.EXPECT().GetResult(ctx).Return(result, nil)
+		mockSrv.EXPECT().Stop(gomock.Any()).Return(nil)
+
+		res, err := app.runServer(ctx, config)
+		assert.NoError(t, err)
+		assert.Equal(t, result, res)
+	})
+
+	t.Run("start error", func(t *testing.T) {
+		_, mockSrv, app := newMockApp(t)
+		mockSrv.EXPECT().Start(config, app.cmdArgs).Return(errors.New(""))
+
+		res, err := app.runServer(context.Background(), config)
+		assert.Error(t, err)
+		assert.Nil(t, res)
+	})
+
+	t.Run("GetResult error", func(t *testing.T) {
+		_, mockSrv, app := newMockApp(t)
+		ctx := newUniqueCtx(t)
+
+		mockSrv.EXPECT().Start(config, app.cmdArgs).Return(nil)
+		mockSrv.EXPECT().GetResult(ctx).Return(nil, errors.New(""))
+		mockSrv.EXPECT().Stop(gomock.Any()).Return(nil)
+
+		res, err := app.runServer(ctx, config)
+		assert.Error(t, err)
+		assert.Nil(t, res)
+	})
+}
+
+func TestApp_runMatch(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		mockConn, mockSrv, app := newMockApp(t)
+		ctx := newUniqueCtx(t)
+		config := `{"config":123}`
+		result := []byte(`{"result":345}`)
+
+		mockConn.EXPECT().GetMatchConfig(ctx).Return(config, nil)
+		mockSrv.EXPECT().Start(config, app.cmdArgs).Return(nil)
+		mockSrv.EXPECT().GetResult(ctx).Return(result, nil)
+		mockSrv.EXPECT().Stop(gomock.Any()).Return(nil)
+		mockConn.EXPECT().SendResult(gomock.Any(), result).Return(nil)
+
+		err := app.runMatch(ctx)
+		assert.NoError(t, err)
+	})
+
+	t.Run("GetMatchConfig failed", func(t *testing.T) {
+		mockConn, _, app := newMockApp(t)
+		ctx := newUniqueCtx(t)
+		mockConn.EXPECT().GetMatchConfig(ctx).Return("", errors.New(""))
+
+		err := app.runMatch(ctx)
+		assert.Error(t, err)
+	})
+
+	t.Run("runServer failed", func(t *testing.T) {
+		mockConn, mockSrv, app := newMockApp(t)
+		ctx := newUniqueCtx(t)
+		config := `{"config":123}`
+
+		mockConn.EXPECT().GetMatchConfig(ctx).Return(config, nil)
+		mockSrv.EXPECT().Start(config, app.cmdArgs).Return(errors.New(""))
+		mockConn.EXPECT().SendCancel(gomock.Any()).Return(nil)
+
+		err := app.runMatch(ctx)
+		assert.Error(t, err)
+	})
+
+	t.Run("sendResult failed", func(t *testing.T) {
+		mockConn, mockSrv, app := newMockApp(t)
+		ctx := newUniqueCtx(t)
+		config := `{"config":123}`
+		result := []byte(`{"result":345}`)
+
+		mockConn.EXPECT().GetMatchConfig(ctx).Return(config, nil)
+		mockSrv.EXPECT().Start(config, app.cmdArgs).Return(nil)
+		mockSrv.EXPECT().GetResult(ctx).Return(result, nil)
+		mockSrv.EXPECT().Stop(gomock.Any()).Return(nil)
+		mockConn.EXPECT().SendResult(gomock.Any(), result).Return(errors.New(""))
+		mockConn.EXPECT().SendCancel(gomock.Any()).Return(nil)
+
+		err := app.runMatch(ctx)
+		assert.Error(t, err)
+	})
+}
+
+func TestApp_Run(t *testing.T) {
 	t.Run("not initialized", func(t *testing.T) {
 		app := App{}
 		err := app.Run(context.Background())
 		assert.ErrorIs(t, err, ErrAppNotInitialized)
 	})
 
-	t.Run("context cancelled", func(t *testing.T) {
+	t.Run("context canceled", func(t *testing.T) {
 		_, _, app := newMockAppWithInit(t)
 
 		ctx, cancel := context.WithCancel(context.Background())
@@ -98,7 +306,7 @@ func TestApp_Run(t *testing.T) {
 		assert.ErrorIs(t, err, context.Canceled)
 	})
 
-	t.Run("successful match cycle", func(t *testing.T) {
+	t.Run("successful iterations", func(t *testing.T) {
 		mockConn, mockSrv, app := newMockAppWithInit(t)
 
 		ctx, cancel := context.WithCancel(context.Background())
@@ -110,24 +318,8 @@ func TestApp_Run(t *testing.T) {
 		mockConn.EXPECT().GetMatchConfig(ctx).Return(config, nil)
 		mockSrv.EXPECT().Start(config, app.cmdArgs).Return(nil)
 		mockSrv.EXPECT().GetResult(ctx).Return(result, nil)
-		mockSrv.EXPECT().Stop(ctx).Return(nil)
-		mockConn.EXPECT().SendResult(ctx, result).Return(nil)
-
-		mockConn.EXPECT().GetMatchConfig(ctx).
-			DoAndReturn(func(_ context.Context) (string, error) {
-				cancel()
-				return "", context.Canceled
-			})
-
-		err := app.Run(ctx)
-		assert.ErrorIs(t, err, context.Canceled)
-	})
-
-	t.Run("GetMatchConfig error skip request", func(t *testing.T) {
-		mockConn, _, app := newMockAppWithInit(t)
-
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
+		mockSrv.EXPECT().Stop(gomock.Any()).Return(nil)
+		mockConn.EXPECT().SendResult(gomock.Any(), result).Return(nil)
 
 		mockConn.EXPECT().GetMatchConfig(gomock.Any()).
 			DoAndReturn(func(_ context.Context) (string, error) {
@@ -139,68 +331,19 @@ func TestApp_Run(t *testing.T) {
 		assert.ErrorIs(t, err, context.Canceled)
 	})
 
-	t.Run("server Start error skip request", func(t *testing.T) {
-		mockConn, mockSrv, app := newMockAppWithInit(t)
+	t.Run("continue after error", func(t *testing.T) {
+		mockConn, _, app := newMockAppWithInit(t)
 
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
-		config := `{"config":123}`
-
-		mockConn.EXPECT().GetMatchConfig(gomock.Any()).Return(config, nil)
-		mockSrv.EXPECT().Start(config, app.cmdArgs).Return(errors.New("binary not found"))
-		mockConn.EXPECT().SendCancel(gomock.Any()).Do(ensureContextNotDone).Return(nil)
-		mockConn.EXPECT().GetMatchConfig(ctx).
+		mockConn.EXPECT().GetMatchConfig(gomock.Any()).
+			Return("", errors.New(""))
+		mockConn.EXPECT().GetMatchConfig(gomock.Any()).
 			DoAndReturn(func(_ context.Context) (string, error) {
 				cancel()
 				return "", context.Canceled
 			})
-
-		err := app.Run(ctx)
-		assert.ErrorIs(t, err, context.Canceled)
-	})
-
-	t.Run("server.GetResult error skip request", func(t *testing.T) {
-		mockConn, mockSrv, app := newMockAppWithInit(t)
-
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-
-		config := `{"config":123}`
-
-		mockConn.EXPECT().GetMatchConfig(gomock.Any()).Return(config, nil)
-		mockSrv.EXPECT().Start(config, app.cmdArgs).Return(nil)
-		mockSrv.EXPECT().GetResult(ctx).
-			DoAndReturn(func(_ context.Context) ([]byte, error) {
-				cancel()
-				return nil, errors.New("server crash")
-			})
-		mockSrv.EXPECT().Stop(ctx).Return(nil)
-		mockConn.EXPECT().SendCancel(gomock.Any()).Do(ensureContextNotDone).Return(nil)
-
-		err := app.Run(ctx)
-		assert.ErrorIs(t, err, context.Canceled)
-	})
-
-	t.Run("SendResult error skip request", func(t *testing.T) {
-		mockConn, mockSrv, app := newMockAppWithInit(t)
-
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-
-		config := `{"config":123}`
-		result := []byte(`{"result":345}`)
-
-		mockConn.EXPECT().GetMatchConfig(gomock.Any()).Return(config, nil)
-		mockSrv.EXPECT().Start(config, app.cmdArgs).Return(nil)
-		mockSrv.EXPECT().GetResult(ctx).Return(result, nil)
-		mockSrv.EXPECT().Stop(ctx).Return(nil)
-		mockConn.EXPECT().SendResult(ctx, result).
-			DoAndReturn(func(_ context.Context, _ []byte) error {
-				cancel()
-				return context.Canceled
-			})
-		mockConn.EXPECT().SendCancel(gomock.Any()).Do(ensureContextNotDone).Return(nil)
 
 		err := app.Run(ctx)
 		assert.ErrorIs(t, err, context.Canceled)
