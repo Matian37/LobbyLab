@@ -17,6 +17,10 @@ type BrokerConnection interface {
 
 type Server interface {
 	Start(config string, command []string) error
+
+	// After Stop returns, the server must be ready to start again.
+	// This is a required invariant.
 	Stop(ctx context.Context) error
+
 	GetResult(ctx context.Context) ([]byte, error)
 }
