@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"os"
 	"os/signal"
@@ -11,6 +12,30 @@ import (
 
 	"github.com/google/shlex"
 )
+
+func setupLogger() {
+	setupLoggerWithWriter(os.Stdout)
+}
+
+func setupLoggerWithWriter(writer io.Writer) {
+	hostname, err := os.Hostname()
+	if err != nil {
+		hostname = "unknown"
+	}
+
+	var level slog.Level
+	if err := level.UnmarshalText([]byte(os.Getenv("LOG_LEVEL"))); err != nil {
+		level = slog.LevelInfo
+	}
+
+	logger := slog.New(
+		slog.NewJSONHandler(
+			writer,
+			&slog.HandlerOptions{Level: level},
+		).WithAttrs([]slog.Attr{slog.String("hostname", hostname)}),
+	)
+	slog.SetDefault(logger)
+}
 
 func ParseArgs(args []string) ([]string, error) {
 	if len(args) != 2 {
@@ -32,6 +57,7 @@ func main() {
 }
 
 func run() error {
+	setupLogger()
 	slog.Info("starting...")
 
 	cmdArgs, err := ParseArgs(os.Args)
@@ -57,6 +83,7 @@ func run() error {
 	if err := app.Init(); err != nil {
 		return fmt.Errorf("failed to init app: %w", err)
 	}
+	slog.Info("successfuly initialized app")
 
 	errChan := make(chan error, 1)
 	go func() {

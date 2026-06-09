@@ -55,7 +55,7 @@ func (app *App) Run(ctx context.Context) error {
 		return ErrAppNotInitialized
 	}
 
-	slog.Info("app loop started", "args", app.cmdArgs)
+	slog.Info("app loop started; ready for requests", "gameServerArgs", app.cmdArgs)
 
 	for ctx.Err() == nil {
 		if err := app.runMatch(ctx); err != nil {
@@ -63,18 +63,21 @@ func (app *App) Run(ctx context.Context) error {
 				break
 			}
 			slog.Error("match execution failed", "error", err)
+		} else {
+			slog.Info("match execution successful")
 		}
-		slog.Info("match lifecycle complete, ready for next request")
 	}
 	return ctx.Err()
 }
 
 func (app *App) runMatch(ctx context.Context) error {
+	slog.Debug("waiting for match config...")
 	config, err := app.conn.GetMatchConfig(ctx)
 	if err != nil {
 		return fmt.Errorf("get match config failed: %w", err)
 	}
-	slog.Info("received game server start request", "config_len", len(config))
+	slog.Info("received match config", "configLen", len(config))
+	slog.Debug("match config", "config", config)
 
 	result, err := app.runServer(ctx, config)
 	if err != nil {
@@ -82,25 +85,28 @@ func (app *App) runMatch(ctx context.Context) error {
 		return fmt.Errorf("server execution failed: %w", err)
 	}
 
-	slog.Info("match result retrieved, sending...")
+	slog.Info("match result retrieved; sending to broker", "resultLen", len(result))
+	if slog.Default().Enabled(context.Background(), slog.LevelDebug) {
+		slog.Debug("match result", "result", string(result))
+	}
 	if err := app.sendResult(ctx, result); err != nil {
 		app.sendCancel()
-		return fmt.Errorf("failed to send match result: %w", err)
+		return fmt.Errorf("failed to send result: %w", err)
 	}
 	return nil
 }
 
 func (app *App) runServer(ctx context.Context, config string) ([]byte, error) {
-	slog.Info("starting server")
+	slog.Info("starting server...")
 	if err := app.server.Start(config, app.cmdArgs); err != nil {
 		return nil, fmt.Errorf("failed to start server: %w", err)
 	}
 	defer app.stopServer(ctx)
 
-	slog.Info("server running, waiting for result")
+	slog.Info("server started; waiting for the result...")
 	result, err := app.server.GetResult(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to retrieve match result: %w", err)
+		return nil, fmt.Errorf("failed to get match result: %w", err)
 	}
 	return result, nil
 }
@@ -118,6 +124,8 @@ func (app *App) stopServer(ctx context.Context) {
 }
 
 func (app *App) sendCancel() {
+	slog.Warn("sending match cancel...")
+
 	ctx, cancel := context.WithTimeout(context.Background(), app.sendCancelTimeout)
 	defer cancel()
 
@@ -127,6 +135,8 @@ func (app *App) sendCancel() {
 }
 
 func (app *App) sendResult(ctx context.Context, result []byte) error {
+	slog.Info("sending match result...")
+
 	timeoutCtx, cancel := context.WithTimeout(ctx, app.sendResultTimeout)
 	defer cancel()
 	return app.conn.SendResult(timeoutCtx, result)

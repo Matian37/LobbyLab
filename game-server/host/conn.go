@@ -181,7 +181,7 @@ func (c *NATSConnection) subscribeHealth() error {
 			slog.Error("failed to publish health response", "error", responseErr)
 		}
 
-		slog.Debug("pong sent successfuly...")
+		slog.Debug("pong sent successfuly")
 	})
 	if err != nil {
 		return err

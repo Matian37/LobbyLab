@@ -1,6 +1,10 @@
 package main
 
 import (
+	"bytes"
+	"encoding/json"
+	"log/slog"
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -57,4 +61,26 @@ func TestParseArgs_InputNotModified(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, []string{"./x"}, result)
 	assert.Equal(t, []string{"/", "./x"}, original, "input slice must not be modified")
+}
+
+func TestSetupLogger(t *testing.T) {
+	originalLogger := slog.Default()
+	defer slog.SetDefault(originalLogger)
+
+	var buf bytes.Buffer
+	setupLoggerWithWriter(&buf)
+
+	slog.Info("test message", "extra_key", "extra_val")
+
+	var parsed map[string]any
+	err := json.Unmarshal(buf.Bytes(), &parsed)
+	require.NoError(t, err)
+
+	expectedHostname, err := os.Hostname()
+	if err != nil {
+		expectedHostname = "unknown"
+	}
+	assert.Equal(t, expectedHostname, parsed["hostname"])
+	assert.Equal(t, "test message", parsed["msg"])
+	assert.Equal(t, "extra_val", parsed["extra_key"])
 }
