@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"server/internal/domain"
 	"time"
@@ -47,41 +48,69 @@ func (app *App) Run(ctx context.Context) error {
 
 	slog.Info("app loop started", "args", app.cmdArgs)
 
-	// TODO: prevent logging context errors like Canceled, DeadlineExceeded...
-	// TODO: handle SendCancel errors and server.Stop?
-	// TODO: add timeouts
 	for ctx.Err() == nil {
-		config, err := app.conn.GetMatchConfig(ctx)
-		if err != nil {
-			slog.Error("get match config failed", "error", err)
-			continue
-		}
-		slog.Info("received game server start request", "config_len", len(config))
-
-		slog.Info("starting game server")
-		if err := app.server.Start(config, app.cmdArgs); err != nil {
-			slog.Error("failed to start game server", "error", err)
-			_ = app.conn.SendCancel(context.Background())
-			continue
-		}
-
-		slog.Info("game server running, waiting for result")
-		result, err := app.server.GetResult(ctx)
-		_ = app.server.Stop(ctx)
-		if err != nil {
-			slog.Error("failed to retrieve match result", "error", err)
-			_ = app.conn.SendCancel(context.Background())
-			continue
-		}
-		slog.Info("match result retrieved, sending...")
-
-		if err := app.conn.SendResult(ctx, result); err != nil {
-			slog.Error("failed to send match result", "error", err)
-			_ = app.conn.SendCancel(context.Background())
-			continue
+		if err := app.runMatch(ctx); err != nil {
+			if errors.Is(err, context.Canceled) {
+				break
+			}
+			slog.Error("match execution failed", "error", err)
 		}
 		slog.Info("match lifecycle complete, ready for next request")
 	}
-
 	return ctx.Err()
+}
+
+func (app *App) runMatch(ctx context.Context) error {
+	config, err := app.conn.GetMatchConfig(ctx)
+	if err != nil {
+		return fmt.Errorf("get match config failed: %w", err)
+	}
+	slog.Info("received game server start request", "config_len", len(config))
+
+	result, err := app.runServer(ctx, config)
+	if err != nil {
+		app.sendCancel()
+		return fmt.Errorf("server execution failed: %w", err)
+	}
+
+	slog.Info("match result retrieved, sending...")
+	if err := app.sendResult(ctx, result); err != nil {
+		app.sendCancel()
+		return fmt.Errorf("failed to send match result: %w", err)
+	}
+	return nil
+}
+
+func (app *App) runServer(ctx context.Context, config string) ([]byte, error) {
+	slog.Info("starting server")
+	if err := app.server.Start(config, app.cmdArgs); err != nil {
+		return nil, fmt.Errorf("failed to start server: %w", err)
+	}
+	defer app.stopServer(ctx)
+
+	slog.Info("server running, waiting for result")
+	result, err := app.server.GetResult(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to retrieve match result: %w", err)
+	}
+	return result, nil
+}
+
+func (app *App) stopServer(ctx context.Context) {
+	err := app.server.Stop(ctx)
+
+	// Stop errors are only logged since failure to stop does not affect server reuse.
+	if err != nil && !errors.Is(err, context.Canceled) {
+		slog.Error("failed to stop server", "error", err)
+	}
+}
+
+func (app *App) sendCancel() {
+	if err := app.conn.SendCancel(context.Background()); err != nil {
+		slog.Error("send match cancel failed", "error", err)
+	}
+}
+
+func (app *App) sendResult(ctx context.Context, result []byte) error {
+	return app.conn.SendResult(ctx, result)
 }
