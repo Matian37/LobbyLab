@@ -279,7 +279,7 @@ func TestNATSConnection_GetMatchConfig(t *testing.T) {
 		assert.ErrorIs(t, err, ErrConnectionClosed)
 	})
 
-	t.Run("context cancelled", func(t *testing.T) {
+	t.Run("context canceled", func(t *testing.T) {
 		addr := newNATSServer(t)
 
 		c := NewConnection(addr, "a")
@@ -341,7 +341,7 @@ func TestNATSConnection_SendCancel(t *testing.T) {
 		assert.ErrorIs(t, err, ErrConnectionClosed)
 	})
 
-	t.Run("context cancelled", func(t *testing.T) {
+	t.Run("context canceled", func(t *testing.T) {
 		addr := newNATSServer(t)
 
 		c := NewConnection(addr, "a")
@@ -399,7 +399,7 @@ func TestNATSConnection_SendResult(t *testing.T) {
 		assert.ErrorIs(t, err, ErrConnectionClosed)
 	})
 
-	t.Run("context cancelled", func(t *testing.T) {
+	t.Run("context canceled", func(t *testing.T) {
 		addr := newNATSServer(t)
 
 		c := NewConnection(addr, "a")
