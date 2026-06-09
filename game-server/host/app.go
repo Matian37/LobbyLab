@@ -19,22 +19,31 @@ type App struct {
 	server      domain.Server
 	cmdArgs     []string
 	initialized bool
+
+	initTimeout       time.Duration
+	serverStopTimeout time.Duration
+	sendResultTimeout time.Duration
+	sendCancelTimeout time.Duration
 }
 
 func NewApp(brokerURI string, containerID string, cmdArgs []string) *App {
 	return &App{
-		conn:    NewConnection(brokerURI, containerID),
-		server:  &GameServer{},
-		cmdArgs: cmdArgs,
+		conn:              NewConnection(brokerURI, containerID),
+		server:            &GameServer{},
+		cmdArgs:           cmdArgs,
+		initTimeout:       5 * time.Second,
+		serverStopTimeout: 5 * time.Second,
+		sendResultTimeout: 15 * time.Second,
+		sendCancelTimeout: 5 * time.Second,
 	}
 }
 
-func (app *App) Init(timeout time.Duration) error {
+func (app *App) Init() error {
 	if app.initialized {
 		return ErrAppAlreadyInitialized
 	}
 
-	if err := app.conn.Open(timeout); err != nil {
+	if err := app.conn.Open(app.initTimeout); err != nil {
 		return err
 	}
 	app.initialized = true
@@ -97,7 +106,10 @@ func (app *App) runServer(ctx context.Context, config string) ([]byte, error) {
 }
 
 func (app *App) stopServer(ctx context.Context) {
-	err := app.server.Stop(ctx)
+	timeoutCtx, cancel := context.WithTimeout(ctx, app.serverStopTimeout)
+	defer cancel()
+
+	err := app.server.Stop(timeoutCtx)
 
 	// Stop errors are only logged since failure to stop does not affect server reuse.
 	if err != nil && !errors.Is(err, context.Canceled) {
@@ -106,11 +118,16 @@ func (app *App) stopServer(ctx context.Context) {
 }
 
 func (app *App) sendCancel() {
-	if err := app.conn.SendCancel(context.Background()); err != nil {
+	ctx, cancel := context.WithTimeout(context.Background(), app.sendCancelTimeout)
+	defer cancel()
+
+	if err := app.conn.SendCancel(ctx); err != nil {
 		slog.Error("send match cancel failed", "error", err)
 	}
 }
 
 func (app *App) sendResult(ctx context.Context, result []byte) error {
-	return app.conn.SendResult(ctx, result)
+	timeoutCtx, cancel := context.WithTimeout(ctx, app.sendResultTimeout)
+	defer cancel()
+	return app.conn.SendResult(timeoutCtx, result)
 }

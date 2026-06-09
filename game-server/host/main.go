@@ -8,7 +8,6 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 
 	"github.com/google/shlex"
 )
@@ -55,7 +54,7 @@ func run() error {
 
 	app := NewApp(natsURI, containerID, cmdArgs)
 
-	if err := app.Init(1 * time.Second); err != nil {
+	if err := app.Init(); err != nil {
 		return fmt.Errorf("failed to init app: %w", err)
 	}
 
