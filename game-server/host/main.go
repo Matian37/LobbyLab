@@ -72,6 +72,7 @@ func run() error {
 	case <-signalCtx.Done():
 		slog.Info("stopping...")
 		cancel()
+		<-errChan
 		return nil
 	}
 }
