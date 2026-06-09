@@ -1,15 +1,24 @@
-#!/bin/ash
+#!/bin/sh
 
-set -eu
+trap 'exit 0' TERM
 
-cleanup() {
-  echo "SIGTERM received, cleaning up..."
-  # shutdown logic here
-  exit 0
-}
+match_result=""
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --match-result)
+            match_result="$2"
+            shift 2
+            ;;
+        *)
+            shift
+            ;;
+    esac
+done
 
-trap 'cleanup' TERM
+if [ -z "$match_result" ]; then
+    echo "error: --match-result flag is required" >&2
+    exit 1
+fi
 
-echo "Running (pid $$)"
-
-sleep 15
+sleep 3
+printf '{}' > "$match_result"
