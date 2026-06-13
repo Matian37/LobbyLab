@@ -1,13 +1,11 @@
 import postgres from "postgres";
 import { handleError } from "./error_handler";
-//const sql = postgres(process.env.DATABASE_URL);
+let DATABASE_URL = process.env.DATABASE_URL;
+if(process.env.VITEST)
+    DATABASE_URL = 'postgresql://postgres:123@localhost:5432/postgres';
 
-//TODELETE
-const DATABASE_URL = 'postgresql://postgres:123@localhost:5432/postgres';
 const sql = postgres(DATABASE_URL);
-
-
-console.debug(process.env.DATABASE_URL + "<-- moj link do bazy");
+console.debug(DATABASE_URL + "<-- moj link do bazy");
 
 export async function findUserByLogin(login){
     const q = await sql`
