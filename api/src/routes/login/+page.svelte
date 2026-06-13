@@ -9,6 +9,7 @@
     }
 
     async function submit(){
+        console.log("kliklemmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm");
         let data = {login: login, password: password};
         const response = await fetch('/api/login', {
             method: 'POST',
@@ -17,10 +18,11 @@
             },
             body: JSON.stringify(data)
         });
+        console.log("wrocilo mi info");
 
         const sukces = await response.json();
         if(sukces.sukces){
-            console.debug("poprawnie zalogowano");
+            console.log("poprawnie zalogowano");
             updateData({token: sukces.msg, login: login});
             tekstBledu = "";
             changePage('/')
@@ -32,11 +34,11 @@
 </script>
 
 <button onclick={()=>changePage('/')}>Powrót</button>
-Login <input bind:value={login}/>
-Password <input bind:value={password} type="password"/>
-<button onclick={()=>submit()}>Submit</button>
+Login <input bind:value={login} data-testid="login-input"/>
+Password <input bind:value={password} type="password" data-testid="password-input"/>
+<button onclick={()=>submit()} data-testid="login-apply" >Submit</button>
 
-{tekstBledu}
+<p data-testid="error-text">{tekstBledu}</p>
 
 <style>
 

@@ -11,8 +11,8 @@ export async function POST({request}){
         return json({sukces: false});
     }
     const login = response[0].login;
-        
-    if(!addToWaiting(login))
+    
+    if(!(await addToWaiting(login)))
     {
         handleError(1);
         return json({sukces: false});
@@ -29,11 +29,7 @@ export async function DELETE({request}){
         return json({sukces: false});
     }
     const login = response[0].login;
-    if(!deleteFromWaiting(login)) 
-    {
-        handleError(2);
-        return json({sukces: false});
-    }
+    await deleteFromWaiting(login);
     return json({sukces: true});
 }
 

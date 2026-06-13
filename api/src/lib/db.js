@@ -1,6 +1,13 @@
 import postgres from "postgres";
+import { handleError } from "./error_handler";
+//const sql = postgres(process.env.DATABASE_URL);
 
-const sql = postgres(process.env.DATABASE_URL);
+//TODELETE
+const DATABASE_URL = 'postgresql://postgres:123@localhost:5432/postgres';
+const sql = postgres(DATABASE_URL);
+
+
+console.debug(process.env.DATABASE_URL + "<-- moj link do bazy");
 
 export async function findUserByLogin(login){
     const q = await sql`
@@ -11,8 +18,8 @@ export async function findUserByLogin(login){
 
 export async function addUser(login, password){
     try{
-        await sql`
-            INSERT INTO users (login, password) VALUES(${login}, ${password})
+        const result = await sql`
+            INSERT INTO users (login, password) VALUES(${login}, ${password}) RETURNING *
         `
         return true;
     }
@@ -70,6 +77,7 @@ export async function setSession(token, login){
         return true;
     }
     catch (err){
+        console.debug(err);
         handleError(-1, err);
         return false;
     }
@@ -101,4 +109,27 @@ async function deleteOldSessions(){
     `
 }
 
+export async function healthCheck(){
+    try{
+        await sql`SELECT 1`;
+        return true;
+    }
+    catch(err){
+        handleError("ERROR " + err);
+        return false;
+    }
+}
+
 setInterval(deleteOldSessions, 1000 * 60 * 60 * 24);
+
+export async function truncateEverything(){
+    await sql`
+        TRUNCATE TABLE users RESTART IDENTITY CASCADE;
+    `
+    await sql`
+        TRUNCATE TABLE waiting RESTART IDENTITY CASCADE;
+    `
+    await sql`
+        TRUNCATE TABLE sessions RESTART IDENTITY CASCADE;
+    `
+}

@@ -29,17 +29,13 @@ export async function POST({request})
 export async function DELETE({request}){
     const {token} = await request.json();
 
-    if(!(await deleteSession(token)))
-    {
-        handleError(4);
-        return json({sukces: false});
-    }
+    await deleteSession(token);
     return json({sukces: true});
 }
 
 export async function GET({url}){
     const token = url.searchParams.get('token');
     
-    if((await tokenExists(token)).length == 0) return json({sukces: true});
-    return json({sukces: false});
+    if((await tokenExists(token)).length == 0) return json({sukces: false});
+    return json({sukces: true});
 }

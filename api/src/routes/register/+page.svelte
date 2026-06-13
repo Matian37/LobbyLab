@@ -8,9 +8,9 @@
     }
 
     async function submit(){
-        if(password.length < 3)
+        if(password.length < 3 || password.length > 64)
         {
-            errorText = 'Haslo musi miec co najmniej 3 znaki';
+            errorText = 'Haslo musi miec co najmniej 3 znaki i co najwyżej 64';
             return;
         }
         let data = {login: login, password: password};
@@ -34,10 +34,10 @@
 </script>
 
 <button onclick={()=>changePage('/')}>Powrót</button>
-Login <input bind:value={login}/>
-Password <input bind:value={password} type="password"/>
-<button onclick={()=>submit()}> Submit </button>
-{errorText}
+Login <input bind:value={login} data-testid="login-input"/>
+Password <input bind:value={password} type="password" data-testid="password-input"/>
+<button onclick={()=>submit()} data-testid='register-apply'> Submit </button>
+<p data-testid="error-text">{errorText}</p>
 <style>
 
 </style>

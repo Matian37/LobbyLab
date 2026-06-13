@@ -1,9 +1,10 @@
 <script>
     import { goto } from "$app/navigation";
     import { getData, resetData } from "$lib/user_data";
-    let title = $state('');
+    let title = $state('Zaloguj sie');
     let buttonText = $state('Play');
     let user = false;
+
     LoadUser();
     async function LoadUser(){
         let data = await getData();
@@ -11,11 +12,11 @@
         else{
             user = {login: data.login, token: data.token};
             title = data.login;
-            if(await isInWaitingList(data.token)) buttonText = 'Stop';
         } 
     }
 
-    function changePage(path) {
+    export function changePage(path) {
+        console.log("KLIKKKK");
         goto(path);
     }
 
@@ -54,17 +55,17 @@
     }
 </script>
 
-<button onclick={() => changePage("/login")}>
+<button onclick={() => changePage("/login")} data-testid="login-page">
     Login
 </button>
 <button onclick={() => changePage("/register")}>
     Register
 </button>
-<button onclick={() => logout()}>
+<button onclick={() => logout()} data-testid='logout'>
     Log out
 </button>
 <button onclick={()=> play()}>
     {buttonText}
 </button>
 
-<h1>{title}</h1>
+<h1 data-testid='title'>{title}</h1>
