@@ -176,9 +176,8 @@ func (c *NATSConnection) subscribeHealth() error {
 	sub, err := c.conn.Subscribe(healthSubject, func(msg *nats.Msg) {
 		slog.Debug("received ping, sending pong...")
 
-		responseErr := c.conn.Publish(healthSubject+"."+c.containerID, []byte{})
-		if responseErr != nil {
-			slog.Error("failed to publish health response", "error", responseErr)
+		if err := msg.Respond([]byte(c.containerID)); err != nil {
+			slog.Error("failed to send health response", "error", err)
 		}
 
 		slog.Debug("pong sent successfuly")
@@ -191,6 +190,5 @@ func (c *NATSConnection) subscribeHealth() error {
 	}
 	c.healthSub = sub
 
-	// it doesnt make sense to store more than one ping msg
 	return nil
 }

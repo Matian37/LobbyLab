@@ -27,13 +27,10 @@
 ## NATS subjects
 
 - `workers.health`
-  - Type: pub/sub
+  - Type: request/reply
   - Direction: server manager -> workers
-  - Purpose: health check ping. Every worker subscribes to this subject.
-- `workers.health.<container_id>`
-  - Type: pub/sub
-  - Direction: worker -> server manager
-  - Purpose: health check pong. A worker replies on its container-specific subject.
+  - Purpose: health check ping. Server manager sends a ping request to all
+    workers. Each worker replies with its container ID.
 - `workers.assign.<container_id>`
   - Type: request/reply
   - Direction: server manager -> worker
