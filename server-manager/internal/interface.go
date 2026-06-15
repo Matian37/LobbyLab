@@ -2,7 +2,6 @@ package internal
 
 import (
 	"context"
-	"time"
 
 	"github.com/moby/moby/api/types/network"
 )
@@ -10,26 +9,38 @@ import (
 type DockerClient interface {
 	Init(config *EnvConfig) error
 	CreateWorkerContainer(ctx context.Context) (string, error)
-	IsContainerOK(ctx context.Context, id string) (bool, error)
+	// TODO: make it concurrent
 	RestartContainer(ctx context.Context, id string) error
 	KillContainer(ctx context.Context, id string) error
-	GetPorts(ctx context.Context, containerID string) (network.PortMap, error)
+	GetGamePorts(ctx context.Context, containerID string) (network.PortMap, error)
+	IsContainerStarted(ctx context.Context, containerID string) (bool, error)
 	Close() error
 }
 
 type BrokerConnection interface {
-	Open(timeout time.Duration, config *EnvConfig) error
-	SendPing(ctx context.Context) error
-	GetPong(ctx context.Context) (string, time.Time, error)
+	Open(ctx context.Context, config *EnvConfig) error
 	AssignJob(ctx context.Context, workerID string, config string) error
+	SendPing() (Responders, error)
+	GetResult(ctx context.Context) (Message, error)
+	GetFinish(ctx context.Context) (string, error)
 	Close() error
 }
 
 type WorkerManager interface {
 	Init(ctx context.Context, config *EnvConfig, workerCount int) error
-	WaitForFreeWorker(ctx context.Context)
-	AssignMatch(ctx context.Context, config string) (network.Port, error)
-	Monitor(ctx context.Context)
-	SaveResults(ctx context.Context)
-	Close(ctx context.Context)
+	WaitForFreeWorker(ctx context.Context) error
+	AssignMatch(ctx context.Context, matchID int, config string) (network.PortMap, error)
+	HealthLoop(ctx context.Context) error
+	Close(ctx context.Context) error
+}
+
+type DatabaseConnection interface {
+	Init(ctx context.Context, config *EnvConfig) error
+	SaveMatchResult(ctx context.Context, success bool, result string) error
+	Close() error
+}
+
+type Message interface {
+	Data() []byte
+	Ack() error
 }
