@@ -16,6 +16,7 @@ type parsedConfig struct {
 	WorkerCount int      `env:"GAME_SERVER_COUNT,required"`
 	ExposePorts []string `env:"GAME_SERVER_EXPOSE_PORTS,required,notEmpty"`
 	BrokerURI   string   `env:"NATS_URI,required,notEmpty"`
+	PublicHost  string   `env:"PUBLIC_HOST,required,notEmpty"`
 }
 
 func parsePorts(config *parsedConfig) (map[network.Port]struct{}, error) {
@@ -50,8 +51,9 @@ func ReadConfig() (*internal.EnvConfig, error) {
 
 	return &internal.EnvConfig{
 		Image:       config.Image,
+		Workercount: config.WorkerCount,
 		ExposePorts: ports,
 		BrokerURI:   config.BrokerURI,
-		Workercount: config.WorkerCount,
+		PublicHost:  config.PublicHost,
 	}, nil
 }

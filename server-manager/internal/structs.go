@@ -11,6 +11,7 @@ type EnvConfig struct {
 	Workercount int
 	ExposePorts map[network.Port]struct{}
 	BrokerURI   string
+	PublicHost  string
 }
 
 type Result struct {
