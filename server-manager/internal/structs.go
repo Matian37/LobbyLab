@@ -18,3 +18,8 @@ type Result struct {
 	Success bool            `json:"success"`
 	Details json.RawMessage `json:"details"`
 }
+
+type ServerInfo struct {
+	Host    string
+	PortMap network.PortMap
+}

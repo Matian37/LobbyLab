@@ -7,9 +7,6 @@ import (
 	"log/slog"
 	"server-manager/internal"
 	"sync"
-	"time"
-
-	"github.com/moby/moby/api/types/network"
 )
 
 const (
@@ -63,12 +60,11 @@ type WorkerManager struct {
 	brokerConn internal.BrokerConnection
 	dbConn     internal.DatabaseConnection
 
-	workers []*WorkerInfo
-
+	workers          []*WorkerInfo
 	workerFreeNotify chan struct{}
 
-	PongTimeout    time.Duration
-	MaxPingRetries int
+	maxPingRetries int
+	publicHost     string
 
 	initialized bool
 	closed      bool
@@ -82,8 +78,7 @@ func NewWorkerManager() *WorkerManager {
 	return &WorkerManager{
 		dockerConn:     NewDockerClient(),
 		brokerConn:     NewNATSConnection(),
-		PongTimeout:    3 * time.Second,
-		MaxPingRetries: 3,
+		maxPingRetries: 3,
 	}
 }
 
@@ -168,7 +163,7 @@ func (wm *WorkerManager) AssignMatch(
 	ctx context.Context,
 	matchID int,
 	config string,
-) (network.PortMap, error) {
+) (*internal.ServerInfo, error) {
 	wm.mu.Lock()
 	defer wm.mu.Unlock()
 
@@ -195,7 +190,7 @@ func (wm *WorkerManager) AssignMatch(
 	}
 	worker.SetOccupied(matchID)
 
-	return portMap, nil
+	return &internal.ServerInfo{Host: wm.publicHost, PortMap: portMap}, nil
 }
 
 func (wm *WorkerManager) HealthLoop(ctx context.Context) error {
@@ -359,7 +354,7 @@ func (wm *WorkerManager) healthCheck(ctx context.Context) error {
 		}
 
 		worker.failCount += 1
-		if worker.failCount <= wm.MaxPingRetries {
+		if worker.failCount <= wm.maxPingRetries {
 			continue
 		}
 

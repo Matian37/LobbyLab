@@ -29,7 +29,7 @@ type BrokerConnection interface {
 type WorkerManager interface {
 	Init(ctx context.Context, config *EnvConfig, workerCount int) error
 	WaitForFreeWorker(ctx context.Context) error
-	AssignMatch(ctx context.Context, matchID int, config string) (network.PortMap, error)
+	AssignMatch(ctx context.Context, matchID int, config string) (*ServerInfo, error)
 	HealthLoop(ctx context.Context) error
 	Close(ctx context.Context) error
 }
