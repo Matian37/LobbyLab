@@ -27,7 +27,7 @@ func (m *Matchmaker) StartMatchmaking(ctx context.Context) error {
 	}
 	m.Db = dbObj
 
-	m.Db.StartListening()
+	m.Db.StartListening(ctx)
 
 	return nil
 }
@@ -37,27 +37,22 @@ func (m *Matchmaker) CreateMatches(ctx context.Context, users []internal.User) e
 		return fmt.Errorf("Not enough users")
 	}
 
-	var errors int
 	for i := 0; i < len(users); i += m.PlayersPerRoom {
-		var match_users []internal.User
+		var matchUsers []internal.User
 		for j := 0; j < m.PlayersPerRoom; j++ {
-			match_users = append(match_users, users[i+j])
+			matchUsers = append(matchUsers, users[i+j])
 		}
-		config := internal.NewMatchConfig(match_users)
+		config := internal.NewMatchConfig(matchUsers)
 
 		socket, err := m.WorkerManager.AssignMatch(ctx, config)
 		if err != nil {
-			errors++
 			fmt.Println(err)
 		}
-		err = m.Db.AddMatch(ctx, match_users, socket)
+		err = m.Db.AddMatch(ctx, matchUsers, socket)
 		if err != nil {
-			errors++
+			fmt.Printf("error while creating %dth match", i)
 		}
 	}
 
-	if errors > 0 {
-		return fmt.Errorf("%d errors when creating matches", errors)
-	}
 	return nil
 }

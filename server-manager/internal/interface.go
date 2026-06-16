@@ -40,7 +40,7 @@ type Matchmaker interface {
 }
 
 type DB interface {
-	StartListening() error
+	StartListening(ctx context.Context) error
 	GetList(ctx context.Context) (error, []User)
 	AddMatch(ctx context.Context, users []User, socket Socket) error
 }
