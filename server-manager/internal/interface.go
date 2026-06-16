@@ -28,8 +28,19 @@ type BrokerConnection interface {
 type WorkerManager interface {
 	Init(ctx context.Context, config *EnvConfig, workerCount int) error
 	WaitForFreeWorker(ctx context.Context)
-	AssignMatch(ctx context.Context, config string) (network.Port, error)
+	AssignMatch(ctx context.Context, config *MatchConfig) (Socket, error)
 	Monitor(ctx context.Context)
 	SaveResults(ctx context.Context)
 	Close(ctx context.Context)
+}
+
+type Matchmaker interface {
+	StartMatchmaking(ctx context.Context) error
+	CreateMatches(ctx context.Context, users []User) error
+}
+
+type DB interface {
+	StartListening() error
+	GetList(ctx context.Context) (error, []User)
+	AddMatch(ctx context.Context, users []User, socket Socket) error
 }
