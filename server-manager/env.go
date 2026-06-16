@@ -12,10 +12,10 @@ import (
 var ErrWorkerCountNotPositive = errors.New("worker count not positive")
 
 type parsedConfig struct {
-	Image       string   `env:"WORKER_IMAGE,required,notEmpty"`
-	ExposePorts []string `env:"EXPOSE_PORTS,required,notEmpty"`
-	BrokerURI   string   `env:"BROKER_URI,required,notEmpty"`
-	WorkerCount int      `env:"WORKER_COUNT,required"`
+	Image       string   `env:"GAME_SERVER_IMAGE,required,notEmpty"`
+	WorkerCount int      `env:"GAME_SERVER_COUNT,required"`
+	ExposePorts []string `env:"GAME_SERVER_EXPOSE_PORTS,required,notEmpty"`
+	BrokerURI   string   `env:"NATS_URI,required,notEmpty"`
 }
 
 func parsePorts(config *parsedConfig) (map[network.Port]struct{}, error) {

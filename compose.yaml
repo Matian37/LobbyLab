@@ -49,12 +49,17 @@ services:
         condition: service_healthy
 
   server-manager:
-    image: golang:1.26-alpine
+    build:
+      context: ./server-manager
+      dockerfile: Dockerfile
     environment:
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       NATS_URI: ${NATS_URI}
+      GAME_SERVER_IMAGE: "game-server:latest"
+      GAME_SERVER_COUNT: 2
+      GAME_SERVER_EXPOSE_PORTS: "7777/udp,7777/tcp"
     networks:
       - db-net
       - nats-net
@@ -67,7 +72,7 @@ services:
 networks:
   db-net:
     driver: bridge
-    #internal: true
+    internal: true
   nats-net:
     driver: bridge
     internal: true
