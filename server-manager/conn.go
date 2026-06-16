@@ -60,14 +60,12 @@ func (nc *NATSConnection) Open(ctx context.Context, config *internal.EnvConfig) 
 
 	conn, err := nats.Connect(config.BrokerURI, nats.Timeout(nc.openTimeout))
 	if err != nil {
-		nc.Close()
 		return err
 	}
 	nc.conn = conn
 
 	js, err := jetstream.New(nc.conn)
 	if err != nil {
-		nc.Close()
 		return err
 	}
 	nc.js = &js
@@ -85,7 +83,6 @@ func (nc *NATSConnection) Open(ctx context.Context, config *internal.EnvConfig) 
 		},
 	)
 	if err != nil {
-		nc.Close()
 		return err
 	}
 
@@ -93,14 +90,12 @@ func (nc *NATSConnection) Open(ctx context.Context, config *internal.EnvConfig) 
 		DeliverPolicy: jetstream.DeliverAllPolicy,
 	})
 	if err != nil {
-		nc.Close()
 		return err
 	}
 	nc.resultConsumer = consumer
 
 	sub, err := nc.conn.SubscribeSync(finishSubject)
 	if err != nil {
-		nc.Close()
 		return err
 	}
 	nc.finishSub = sub

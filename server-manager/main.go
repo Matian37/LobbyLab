@@ -24,8 +24,8 @@ func run() error {
 	defer stop()
 
 	wm := NewWorkerManager()
-
 	if err = wm.Init(ctx, config, config.Workercount); err != nil {
+		wm.Close(ctx)
 		return err
 	}
 	defer wm.Close(ctx)
