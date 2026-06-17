@@ -162,18 +162,13 @@ func (nc *NATSConnection) GetResult(ctx context.Context) (internal.Message, erro
 	return msg, nil
 }
 
+// NOTE: function doesn't guarantee the message is from a valid worker
 func (nc *NATSConnection) GetFinish(ctx context.Context) (string, error) {
 	msg, err := nc.finishSub.NextMsgWithContext(ctx)
 	if err != nil {
 		return "", err
 	}
-
-	workerID, err := getWorkerID(msg.Subject)
-	if err != nil {
-		return "", err
-	}
-
-	return workerID, nil
+	return string(msg.Data), nil
 }
 
 func (nc *NATSConnection) Close() error {
@@ -186,20 +181,4 @@ func (nc *NATSConnection) Close() error {
 	}
 	nc.closed = true
 	return nc.conn.Drain()
-}
-
-// Extracts worker id from health subject
-// Example: if subject is "workers.health.1234", return "1234"
-func getWorkerID(subject string) (string, error) {
-	lastDot := 0
-	for i := len(subject) - 1; i >= 0; i-- {
-		if subject[i] == '.' {
-			lastDot = i
-			break
-		}
-	}
-	if lastDot == 0 || lastDot == len(subject)-1 {
-		return "", errors.New("failed to get worker id from subject")
-	}
-	return subject[lastDot+1:], nil
 }
