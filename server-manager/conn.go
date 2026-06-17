@@ -155,6 +155,13 @@ func (nc *NATSConnection) SendPing() (internal.Responders, error) {
 }
 
 func (nc *NATSConnection) GetResult(ctx context.Context) (internal.Message, error) {
+	if !nc.opened {
+		return nil, ErrConnNotOpen
+	}
+	if nc.closed {
+		return nil, ErrConnClosed
+	}
+
 	msg, err := nc.resultConsumer.Next(jetstream.FetchContext(ctx))
 	if err != nil {
 		return nil, err
@@ -164,6 +171,13 @@ func (nc *NATSConnection) GetResult(ctx context.Context) (internal.Message, erro
 
 // NOTE: function doesn't guarantee the message is from a valid worker
 func (nc *NATSConnection) GetFinish(ctx context.Context) (string, error) {
+	if !nc.opened {
+		return "", ErrConnNotOpen
+	}
+	if nc.closed {
+		return "", ErrConnClosed
+	}
+
 	msg, err := nc.finishSub.NextMsgWithContext(ctx)
 	if err != nil {
 		return "", err
