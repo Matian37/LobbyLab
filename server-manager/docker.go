@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log/slog"
 	"server-manager/internal"
+	"time"
 
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/api/types/network"
@@ -22,17 +23,25 @@ type DockerClient struct {
 	client *client.Client
 	config *internal.EnvConfig
 
-	restartTimeout int // in seconds
+	createTimeout           time.Duration
+	killTimeout             time.Duration
+	restartTimeout          time.Duration
+	inspectTimeout          time.Duration
+	containerRestartTimeout int // in seconds
 
 	initialized bool
 	closed      bool
 }
 
 func NewDockerClient() *DockerClient {
-	return &DockerClient{restartTimeout: 5}
+	return &DockerClient{
+		createTimeout:           5 * time.Second,
+		restartTimeout:          40 * time.Second,
+		killTimeout:             5 * time.Second,
+		inspectTimeout:          5 * time.Second,
+		containerRestartTimeout: 30,
+	}
 }
-
-// TODO: timeouts?
 
 func (dc *DockerClient) Init(config *internal.EnvConfig) error {
 	if dc.initialized {
@@ -59,7 +68,10 @@ func (dc *DockerClient) CreateWorkerContainer(ctx context.Context) (string, erro
 		return "", ErrClientClosed
 	}
 
-	res, err := dc.client.ContainerCreate(ctx,
+	timeoutCtx, cancel := context.WithTimeout(ctx, dc.createTimeout)
+	defer cancel()
+
+	res, err := dc.client.ContainerCreate(timeoutCtx,
 		client.ContainerCreateOptions{
 			Image: dc.config.Image,
 			HostConfig: &container.HostConfig{
@@ -90,10 +102,13 @@ func (dc *DockerClient) RestartContainer(ctx context.Context, id string) error {
 		return ErrClientClosed
 	}
 
+	timeoutCtx, cancel := context.WithTimeout(ctx, dc.restartTimeout)
+	defer cancel()
+
 	_, err := dc.client.ContainerRestart(
-		ctx,
+		timeoutCtx,
 		id,
-		client.ContainerRestartOptions{Timeout: &dc.restartTimeout},
+		client.ContainerRestartOptions{Timeout: &dc.containerRestartTimeout},
 	)
 	if err != nil {
 		return err
@@ -109,7 +124,10 @@ func (dc *DockerClient) KillContainer(ctx context.Context, id string) error {
 		return ErrClientClosed
 	}
 
-	_, err := dc.client.ContainerKill(ctx, id, client.ContainerKillOptions{})
+	timeoutCtx, cancel := context.WithTimeout(ctx, dc.killTimeout)
+	defer cancel()
+
+	_, err := dc.client.ContainerKill(timeoutCtx, id, client.ContainerKillOptions{})
 	if err != nil {
 		return err
 	}
@@ -124,7 +142,10 @@ func (dc *DockerClient) GetGamePorts(ctx context.Context, containerID string) (n
 		return nil, ErrClientClosed
 	}
 
-	portMap, err := dc.getPorts(ctx, containerID)
+	timeoutCtx, cancel := context.WithTimeout(ctx, dc.inspectTimeout)
+	defer cancel()
+
+	portMap, err := dc.getPorts(timeoutCtx, containerID)
 	if err != nil {
 		return nil, err
 	}
@@ -150,7 +171,10 @@ func (dc *DockerClient) IsContainerStarted(ctx context.Context, containerID stri
 		return false, ErrClientClosed
 	}
 
-	res, err := dc.client.ContainerInspect(ctx, containerID, client.ContainerInspectOptions{})
+	timeoutCtx, cancel := context.WithTimeout(ctx, dc.inspectTimeout)
+	defer cancel()
+
+	res, err := dc.client.ContainerInspect(timeoutCtx, containerID, client.ContainerInspectOptions{})
 	if err != nil {
 		return false, err
 	}
