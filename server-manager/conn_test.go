@@ -66,13 +66,13 @@ func TestNATSConnection_Open(t *testing.T) {
 	t.Run("closed", func(t *testing.T) {
 		conn := NATSConnection{closed: true}
 		err := conn.Open(context.Background(), &internal.EnvConfig{})
-		assert.ErrorIs(t, err, ErrConnCannotBeReopened)
+		assert.ErrorIs(t, err, ErrNATSConnCannotBeReopened)
 	})
 
 	t.Run("already open", func(t *testing.T) {
 		conn := NATSConnection{opened: true}
 		err := conn.Open(context.Background(), &internal.EnvConfig{})
-		assert.ErrorIs(t, err, ErrConnAlreadyOpen)
+		assert.ErrorIs(t, err, ErrNATSConnAlreadyOpen)
 	})
 
 	t.Run("connection failure", func(t *testing.T) {
@@ -122,13 +122,13 @@ func TestNATSConnection_AssignJob(t *testing.T) {
 	t.Run("not open", func(t *testing.T) {
 		conn := NATSConnection{}
 		err := conn.AssignJob(context.Background(), "", "")
-		assert.ErrorIs(t, err, ErrConnNotOpen)
+		assert.ErrorIs(t, err, ErrNATSConnNotOpen)
 	})
 
 	t.Run("closed", func(t *testing.T) {
 		conn := NATSConnection{opened: true, closed: true}
 		err := conn.AssignJob(context.Background(), "", "")
-		assert.ErrorIs(t, err, ErrConnClosed)
+		assert.ErrorIs(t, err, ErrNATSConnClosed)
 	})
 
 	t.Run("timeout", func(t *testing.T) {
@@ -201,13 +201,13 @@ func TestNATSConnection_SendPing(t *testing.T) {
 	t.Run("not open", func(t *testing.T) {
 		conn := NATSConnection{}
 		_, err := conn.SendPing()
-		assert.ErrorIs(t, err, ErrConnNotOpen)
+		assert.ErrorIs(t, err, ErrNATSConnNotOpen)
 	})
 
 	t.Run("closed", func(t *testing.T) {
 		conn := NATSConnection{opened: true, closed: true}
 		_, err := conn.SendPing()
-		assert.ErrorIs(t, err, ErrConnClosed)
+		assert.ErrorIs(t, err, ErrNATSConnClosed)
 	})
 
 	t.Run("success", func(t *testing.T) {
@@ -242,13 +242,13 @@ func TestNATSConnection_GetResult(t *testing.T) {
 	t.Run("not open", func(t *testing.T) {
 		conn := NATSConnection{}
 		_, err := conn.GetResult(context.Background())
-		assert.ErrorIs(t, err, ErrConnNotOpen)
+		assert.ErrorIs(t, err, ErrNATSConnNotOpen)
 	})
 
 	t.Run("closed", func(t *testing.T) {
 		conn := NATSConnection{opened: true, closed: true}
 		_, err := conn.GetResult(context.Background())
-		assert.ErrorIs(t, err, ErrConnClosed)
+		assert.ErrorIs(t, err, ErrNATSConnClosed)
 	})
 
 	t.Run("context canceled", func(t *testing.T) {
@@ -293,13 +293,13 @@ func TestNATSConnection_GetFinish(t *testing.T) {
 	t.Run("not open", func(t *testing.T) {
 		conn := NATSConnection{}
 		_, err := conn.GetFinish(context.Background())
-		assert.ErrorIs(t, err, ErrConnNotOpen)
+		assert.ErrorIs(t, err, ErrNATSConnNotOpen)
 	})
 
 	t.Run("closed", func(t *testing.T) {
 		conn := NATSConnection{opened: true, closed: true}
 		_, err := conn.GetFinish(context.Background())
-		assert.ErrorIs(t, err, ErrConnClosed)
+		assert.ErrorIs(t, err, ErrNATSConnClosed)
 	})
 
 	t.Run("context canceled", func(t *testing.T) {
@@ -342,13 +342,13 @@ func TestNATSConnection_Close(t *testing.T) {
 	t.Run("not open", func(t *testing.T) {
 		conn := NATSConnection{}
 		err := conn.Close()
-		assert.ErrorIs(t, err, ErrConnNotOpen)
+		assert.ErrorIs(t, err, ErrNATSConnNotOpen)
 	})
 
 	t.Run("already closed", func(t *testing.T) {
 		conn := NATSConnection{opened: true, closed: true}
 		err := conn.Close()
-		assert.ErrorIs(t, err, ErrConnAlreadyClosed)
+		assert.ErrorIs(t, err, ErrNATSConnAlreadyClosed)
 	})
 
 	t.Run("success", func(t *testing.T) {

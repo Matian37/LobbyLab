@@ -20,11 +20,11 @@ const (
 const pongBufferSize = 4096
 
 var (
-	ErrConnCannotBeReopened = errors.New("connection cannot be reopened")
-	ErrConnNotOpen          = errors.New("connection not open")
-	ErrConnClosed           = errors.New("connection closed")
-	ErrConnAlreadyOpen      = errors.New("connection already open")
-	ErrConnAlreadyClosed    = errors.New("connection already closed")
+	ErrNATSConnCannotBeReopened = errors.New("connection cannot be reopened")
+	ErrNATSConnNotOpen          = errors.New("connection not open")
+	ErrNATSConnClosed           = errors.New("connection closed")
+	ErrNATSConnAlreadyOpen      = errors.New("connection already open")
+	ErrNATSConnAlreadyClosed    = errors.New("connection already closed")
 )
 
 type NATSConnection struct {
@@ -52,10 +52,10 @@ func NewNATSConnection() *NATSConnection {
 
 func (nc *NATSConnection) Open(ctx context.Context, config *internal.EnvConfig) error {
 	if nc.closed {
-		return ErrConnCannotBeReopened
+		return ErrNATSConnCannotBeReopened
 	}
 	if nc.opened {
-		return ErrConnAlreadyOpen
+		return ErrNATSConnAlreadyOpen
 	}
 
 	conn, err := nats.Connect(config.BrokerURI, nats.Timeout(nc.openTimeout))
@@ -106,10 +106,10 @@ func (nc *NATSConnection) Open(ctx context.Context, config *internal.EnvConfig) 
 
 func (nc *NATSConnection) AssignJob(ctx context.Context, workerID string, config string) error {
 	if !nc.opened {
-		return ErrConnNotOpen
+		return ErrNATSConnNotOpen
 	}
 	if nc.closed {
-		return ErrConnClosed
+		return ErrNATSConnClosed
 	}
 
 	timeoutCtx, stop := context.WithTimeout(ctx, nc.assignJobTimeout)
@@ -126,10 +126,10 @@ func (nc *NATSConnection) AssignJob(ctx context.Context, workerID string, config
 
 func (nc *NATSConnection) SendPing() (internal.Responders, error) {
 	if !nc.opened {
-		return nil, ErrConnNotOpen
+		return nil, ErrNATSConnNotOpen
 	}
 	if nc.closed {
-		return nil, ErrConnClosed
+		return nil, ErrNATSConnClosed
 	}
 
 	inbox := nc.conn.NewInbox()
@@ -156,10 +156,10 @@ func (nc *NATSConnection) SendPing() (internal.Responders, error) {
 
 func (nc *NATSConnection) GetResult(ctx context.Context) (internal.Message, error) {
 	if !nc.opened {
-		return nil, ErrConnNotOpen
+		return nil, ErrNATSConnNotOpen
 	}
 	if nc.closed {
-		return nil, ErrConnClosed
+		return nil, ErrNATSConnClosed
 	}
 
 	msg, err := nc.resultConsumer.Next(jetstream.FetchContext(ctx))
@@ -172,10 +172,10 @@ func (nc *NATSConnection) GetResult(ctx context.Context) (internal.Message, erro
 // NOTE: function doesn't guarantee the message is from a valid worker
 func (nc *NATSConnection) GetFinish(ctx context.Context) (string, error) {
 	if !nc.opened {
-		return "", ErrConnNotOpen
+		return "", ErrNATSConnNotOpen
 	}
 	if nc.closed {
-		return "", ErrConnClosed
+		return "", ErrNATSConnClosed
 	}
 
 	msg, err := nc.finishSub.NextMsgWithContext(ctx)
@@ -188,10 +188,10 @@ func (nc *NATSConnection) GetFinish(ctx context.Context) (string, error) {
 func (nc *NATSConnection) Close() error {
 	// c.conn == nil allows partialy opened NATSConn to be closed
 	if !nc.opened && nc.conn == nil {
-		return ErrConnNotOpen
+		return ErrNATSConnNotOpen
 	}
 	if nc.closed {
-		return ErrConnAlreadyClosed
+		return ErrNATSConnAlreadyClosed
 	}
 	nc.closed = true
 	return nc.conn.Drain()

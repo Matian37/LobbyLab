@@ -13,10 +13,10 @@ import (
 )
 
 var (
-	ErrImageEnvNotFound = errors.New("game server image env not found")
-	ErrConnNotInit      = errors.New("connection not initialized")
-	ErrConnAlreadyInit  = errors.New("connection already initialized")
-	ErrConnClosed       = errors.New("connection closed")
+	ErrImageEnvNotFound      = errors.New("game server image env not found")
+	ErrDockerConnNotInit     = errors.New("connection not initialized")
+	ErrDockerConnAlreadyInit = errors.New("connection already initialized")
+	ErrDockerConnClosed      = errors.New("connection closed")
 )
 
 type DockerConnection struct {
@@ -45,7 +45,7 @@ func NewDockerConnection() *DockerConnection {
 
 func (dc *DockerConnection) Init(config *internal.EnvConfig) error {
 	if dc.initialized {
-		return ErrConnAlreadyInit
+		return ErrDockerConnAlreadyInit
 	}
 
 	client, err := client.New(client.FromEnv)
@@ -62,10 +62,10 @@ func (dc *DockerConnection) Init(config *internal.EnvConfig) error {
 
 func (dc *DockerConnection) CreateWorkerContainer(ctx context.Context) (string, error) {
 	if !dc.initialized {
-		return "", ErrConnNotInit
+		return "", ErrDockerConnNotInit
 	}
 	if dc.closed {
-		return "", ErrConnClosed
+		return "", ErrDockerConnClosed
 	}
 
 	timeoutCtx, cancel := context.WithTimeout(ctx, dc.createTimeout)
@@ -96,10 +96,10 @@ func (dc *DockerConnection) CreateWorkerContainer(ctx context.Context) (string, 
 
 func (dc *DockerConnection) RestartContainer(ctx context.Context, id string) error {
 	if !dc.initialized {
-		return ErrConnNotInit
+		return ErrDockerConnNotInit
 	}
 	if dc.closed {
-		return ErrConnClosed
+		return ErrDockerConnClosed
 	}
 
 	timeoutCtx, cancel := context.WithTimeout(ctx, dc.restartTimeout)
@@ -118,10 +118,10 @@ func (dc *DockerConnection) RestartContainer(ctx context.Context, id string) err
 
 func (dc *DockerConnection) KillContainer(ctx context.Context, id string) error {
 	if !dc.initialized {
-		return ErrConnNotInit
+		return ErrDockerConnNotInit
 	}
 	if dc.closed {
-		return ErrConnClosed
+		return ErrDockerConnClosed
 	}
 
 	timeoutCtx, cancel := context.WithTimeout(ctx, dc.killTimeout)
@@ -136,10 +136,10 @@ func (dc *DockerConnection) KillContainer(ctx context.Context, id string) error 
 
 func (dc *DockerConnection) GetGamePorts(ctx context.Context, containerID string) (network.PortMap, error) {
 	if !dc.initialized {
-		return nil, ErrConnNotInit
+		return nil, ErrDockerConnNotInit
 	}
 	if dc.closed {
-		return nil, ErrConnClosed
+		return nil, ErrDockerConnClosed
 	}
 
 	portMap, err := dc.getPorts(ctx, containerID)
@@ -151,10 +151,10 @@ func (dc *DockerConnection) GetGamePorts(ctx context.Context, containerID string
 
 func (dc *DockerConnection) IsContainerStarted(ctx context.Context, containerID string) (bool, error) {
 	if !dc.initialized {
-		return false, ErrConnNotInit
+		return false, ErrDockerConnNotInit
 	}
 	if dc.closed {
-		return false, ErrConnClosed
+		return false, ErrDockerConnClosed
 	}
 
 	timeoutCtx, cancel := context.WithTimeout(ctx, dc.inspectTimeout)
