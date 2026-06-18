@@ -56,7 +56,7 @@ func (wi *WorkerInfo) SetOccupied(matchID int) {
 }
 
 type WorkerManager struct {
-	dockerConn internal.DockerClient
+	dockerConn internal.DockerConnection
 	brokerConn internal.BrokerConnection
 	dbConn     internal.DatabaseConnection
 
@@ -76,7 +76,7 @@ type WorkerManager struct {
 
 func NewWorkerManager() *WorkerManager {
 	return &WorkerManager{
-		dockerConn:     NewDockerClient(),
+		dockerConn:     NewDockerConnection(),
 		brokerConn:     NewNATSConnection(),
 		maxPingRetries: 3,
 	}

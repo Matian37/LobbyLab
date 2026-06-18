@@ -6,7 +6,7 @@ import (
 	"github.com/moby/moby/api/types/network"
 )
 
-type DockerClient interface {
+type DockerConnection interface {
 	Init(config *EnvConfig) error
 	CreateWorkerContainer(ctx context.Context) (string, error)
 	// TODO: make it concurrent

@@ -13,13 +13,13 @@ import (
 )
 
 var (
-	ErrImageEnvNotFound  = errors.New("game server image env not found")
-	ErrClientNotInit     = errors.New("client not initialized")
-	ErrClientAlreadyInit = errors.New("client already initialized")
-	ErrClientClosed      = errors.New("client closed")
+	ErrImageEnvNotFound = errors.New("game server image env not found")
+	ErrConnNotInit      = errors.New("connection not initialized")
+	ErrConnAlreadyInit  = errors.New("connection already initialized")
+	ErrConnClosed       = errors.New("connection closed")
 )
 
-type DockerClient struct {
+type DockerConnection struct {
 	client *client.Client
 	config *internal.EnvConfig
 
@@ -33,8 +33,8 @@ type DockerClient struct {
 	closed      bool
 }
 
-func NewDockerClient() *DockerClient {
-	return &DockerClient{
+func NewDockerConnection() *DockerConnection {
+	return &DockerConnection{
 		createTimeout:           5 * time.Second,
 		restartTimeout:          40 * time.Second,
 		killTimeout:             5 * time.Second,
@@ -43,29 +43,29 @@ func NewDockerClient() *DockerClient {
 	}
 }
 
-func (dc *DockerClient) Init(config *internal.EnvConfig) error {
+func (dc *DockerConnection) Init(config *internal.EnvConfig) error {
 	if dc.initialized {
-		return ErrClientAlreadyInit
+		return ErrConnAlreadyInit
 	}
 
 	client, err := client.New(client.FromEnv)
 	if err != nil {
 		return err
 	}
-
 	dc.client = client
+
 	dc.config = config
 	dc.initialized = true
 
 	return nil
 }
 
-func (dc *DockerClient) CreateWorkerContainer(ctx context.Context) (string, error) {
+func (dc *DockerConnection) CreateWorkerContainer(ctx context.Context) (string, error) {
 	if !dc.initialized {
-		return "", ErrClientNotInit
+		return "", ErrConnNotInit
 	}
 	if dc.closed {
-		return "", ErrClientClosed
+		return "", ErrConnClosed
 	}
 
 	timeoutCtx, cancel := context.WithTimeout(ctx, dc.createTimeout)
@@ -94,12 +94,12 @@ func (dc *DockerClient) CreateWorkerContainer(ctx context.Context) (string, erro
 	return res.ID, nil
 }
 
-func (dc *DockerClient) RestartContainer(ctx context.Context, id string) error {
+func (dc *DockerConnection) RestartContainer(ctx context.Context, id string) error {
 	if !dc.initialized {
-		return ErrClientNotInit
+		return ErrConnNotInit
 	}
 	if dc.closed {
-		return ErrClientClosed
+		return ErrConnClosed
 	}
 
 	timeoutCtx, cancel := context.WithTimeout(ctx, dc.restartTimeout)
@@ -116,12 +116,12 @@ func (dc *DockerClient) RestartContainer(ctx context.Context, id string) error {
 	return nil
 }
 
-func (dc *DockerClient) KillContainer(ctx context.Context, id string) error {
+func (dc *DockerConnection) KillContainer(ctx context.Context, id string) error {
 	if !dc.initialized {
-		return ErrClientNotInit
+		return ErrConnNotInit
 	}
 	if dc.closed {
-		return ErrClientClosed
+		return ErrConnClosed
 	}
 
 	timeoutCtx, cancel := context.WithTimeout(ctx, dc.killTimeout)
@@ -134,12 +134,12 @@ func (dc *DockerClient) KillContainer(ctx context.Context, id string) error {
 	return nil
 }
 
-func (dc *DockerClient) GetGamePorts(ctx context.Context, containerID string) (network.PortMap, error) {
+func (dc *DockerConnection) GetGamePorts(ctx context.Context, containerID string) (network.PortMap, error) {
 	if !dc.initialized {
-		return nil, ErrClientNotInit
+		return nil, ErrConnNotInit
 	}
 	if dc.closed {
-		return nil, ErrClientClosed
+		return nil, ErrConnClosed
 	}
 
 	portMap, err := dc.getPorts(ctx, containerID)
@@ -149,12 +149,12 @@ func (dc *DockerClient) GetGamePorts(ctx context.Context, containerID string) (n
 	return dc.filterPorts(portMap, containerID), nil
 }
 
-func (dc *DockerClient) IsContainerStarted(ctx context.Context, containerID string) (bool, error) {
+func (dc *DockerConnection) IsContainerStarted(ctx context.Context, containerID string) (bool, error) {
 	if !dc.initialized {
-		return false, ErrClientNotInit
+		return false, ErrConnNotInit
 	}
 	if dc.closed {
-		return false, ErrClientClosed
+		return false, ErrConnClosed
 	}
 
 	timeoutCtx, cancel := context.WithTimeout(ctx, dc.inspectTimeout)
@@ -169,7 +169,7 @@ func (dc *DockerClient) IsContainerStarted(ctx context.Context, containerID stri
 	return status == container.StateRunning || status == container.StateExited, nil
 }
 
-func (dc *DockerClient) Close() error {
+func (dc *DockerConnection) Close() error {
 	return dc.client.Close()
 }
 
@@ -183,7 +183,7 @@ func genPortMap(ports map[network.Port]struct{}) network.PortMap {
 }
 
 // filter ports to only include client ports from config
-func (dc *DockerClient) filterPorts(portMap network.PortMap, containerID string) network.PortMap {
+func (dc *DockerConnection) filterPorts(portMap network.PortMap, containerID string) network.PortMap {
 	for port, bindings := range portMap {
 		if _, ok := dc.config.ClientPorts[port]; !ok {
 			delete(portMap, port)
@@ -193,7 +193,7 @@ func (dc *DockerClient) filterPorts(portMap network.PortMap, containerID string)
 	return portMap
 }
 
-func (dc *DockerClient) getPorts(ctx context.Context, containerID string) (network.PortMap, error) {
+func (dc *DockerConnection) getPorts(ctx context.Context, containerID string) (network.PortMap, error) {
 	timeoutCtx, cancel := context.WithTimeout(ctx, dc.inspectTimeout)
 	defer cancel()
 
