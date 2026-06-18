@@ -23,8 +23,8 @@ type parsedConfig struct {
 	PublicHost  string   `env:"PUBLIC_HOST,required,notEmpty"`
 }
 
-func parsePorts(ports []string) (map[network.Port]struct{}, error) {
-	parsedPorts := make(map[network.Port]struct{})
+func parsePorts(ports []string) (network.PortSet, error) {
+	parsedPorts := make(network.PortSet)
 
 	for _, portString := range ports {
 		port, err := network.ParsePort(portString)

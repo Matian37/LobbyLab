@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"server-manager/internal"
 	"time"
@@ -23,11 +24,11 @@ type DockerConnection struct {
 	client *client.Client
 	config *internal.EnvConfig
 
-	createTimeout           time.Duration
-	killTimeout             time.Duration
-	restartTimeout          time.Duration
-	inspectTimeout          time.Duration
-	containerRestartTimeout int // in seconds
+	createTimeout        time.Duration
+	killTimeout          time.Duration
+	restartTimeout       time.Duration
+	inspectTimeout       time.Duration
+	containerStopTimeout int // in seconds
 
 	initialized bool
 	closed      bool
@@ -35,15 +36,18 @@ type DockerConnection struct {
 
 func NewDockerConnection() *DockerConnection {
 	return &DockerConnection{
-		createTimeout:           5 * time.Second,
-		restartTimeout:          40 * time.Second,
-		killTimeout:             5 * time.Second,
-		inspectTimeout:          5 * time.Second,
-		containerRestartTimeout: 30,
+		createTimeout:        5 * time.Second,
+		restartTimeout:       40 * time.Second,
+		killTimeout:          5 * time.Second,
+		inspectTimeout:       5 * time.Second,
+		containerStopTimeout: 5,
 	}
 }
 
 func (dc *DockerConnection) Init(config *internal.EnvConfig) error {
+	if dc.closed {
+		return ErrDockerConnClosed
+	}
 	if dc.initialized {
 		return ErrDockerConnAlreadyInit
 	}
@@ -68,27 +72,23 @@ func (dc *DockerConnection) CreateWorkerContainer(ctx context.Context) (string, 
 		return "", ErrDockerConnClosed
 	}
 
+	portMap := genPortMap(dc.config.ExposePorts)
+
 	timeoutCtx, cancel := context.WithTimeout(ctx, dc.createTimeout)
 	defer cancel()
 
-	res, err := dc.client.ContainerCreate(timeoutCtx,
-		client.ContainerCreateOptions{
-			Image: dc.config.Image,
-			HostConfig: &container.HostConfig{
-				PortBindings: genPortMap(dc.config.ExposePorts),
-				RestartPolicy: container.RestartPolicy{
-					Name:              container.RestartPolicyDisabled,
-					MaximumRetryCount: 0,
-				},
-			},
-		},
-	)
+	res, err := dc.client.ContainerCreate(timeoutCtx, dc.containerCreateOptions(portMap))
 	if err != nil {
 		return "", err
 	}
 
 	if len(res.Warnings) != 0 {
 		slog.Warn("container creation warnings", "id", res.ID, "warnings", res.Warnings)
+	}
+
+	_, err = dc.client.ContainerStart(timeoutCtx, res.ID, client.ContainerStartOptions{})
+	if err != nil {
+		return "", err
 	}
 
 	return res.ID, nil
@@ -108,7 +108,7 @@ func (dc *DockerConnection) RestartContainer(ctx context.Context, id string) err
 	_, err := dc.client.ContainerRestart(
 		timeoutCtx,
 		id,
-		client.ContainerRestartOptions{Timeout: &dc.containerRestartTimeout},
+		client.ContainerRestartOptions{Timeout: &dc.containerStopTimeout},
 	)
 	if err != nil {
 		return err
@@ -146,9 +146,10 @@ func (dc *DockerConnection) GetGamePorts(ctx context.Context, containerID string
 	if err != nil {
 		return nil, err
 	}
-	return dc.filterPorts(portMap, containerID), nil
+	return dc.filterPorts(portMap), nil
 }
 
+// TODO: make it tell actual state of container rather than if it started
 func (dc *DockerConnection) IsContainerStarted(ctx context.Context, containerID string) (bool, error) {
 	if !dc.initialized {
 		return false, ErrDockerConnNotInit
@@ -170,11 +171,19 @@ func (dc *DockerConnection) IsContainerStarted(ctx context.Context, containerID 
 }
 
 func (dc *DockerConnection) Close() error {
-	return dc.client.Close()
+	if !dc.initialized {
+		return ErrDockerConnNotInit
+	}
+	if dc.closed {
+		return ErrDockerConnClosed
+	}
+	err := dc.client.Close()
+	dc.closed = true
+	return err
 }
 
 // generates mapping of given ports to unspecified host bindings
-func genPortMap(ports map[network.Port]struct{}) network.PortMap {
+func genPortMap(ports network.PortSet) network.PortMap {
 	portBindings := network.PortMap{}
 	for port := range ports {
 		portBindings[port] = []network.PortBinding{{}}
@@ -183,12 +192,15 @@ func genPortMap(ports map[network.Port]struct{}) network.PortMap {
 }
 
 // filter ports to only include client ports from config
-func (dc *DockerConnection) filterPorts(portMap network.PortMap, containerID string) network.PortMap {
+func (dc *DockerConnection) filterPorts(portMap network.PortMap) network.PortMap {
 	for port, bindings := range portMap {
 		if _, ok := dc.config.ClientPorts[port]; !ok {
 			delete(portMap, port)
+		} else if len(bindings) == 0 {
+			panic(fmt.Sprintf("port %s has no bindings", port))
+		} else {
+			portMap[port] = bindings[0:1]
 		}
-		portMap[port] = bindings[0:1]
 	}
 	return portMap
 }
@@ -202,4 +214,18 @@ func (dc *DockerConnection) getPorts(ctx context.Context, containerID string) (n
 		return nil, err
 	}
 	return res.Container.NetworkSettings.Ports, nil
+}
+
+// NOTE: portMap must have unspecified host ports
+func (dc *DockerConnection) containerCreateOptions(portMap network.PortMap) client.ContainerCreateOptions {
+	return client.ContainerCreateOptions{
+		Image: dc.config.Image,
+		HostConfig: &container.HostConfig{
+			PortBindings: portMap,
+			RestartPolicy: container.RestartPolicy{
+				Name:              container.RestartPolicyDisabled,
+				MaximumRetryCount: 0,
+			},
+		},
+	}
 }

@@ -9,8 +9,8 @@ import (
 type EnvConfig struct {
 	Image       string
 	Workercount int
-	ExposePorts map[network.Port]struct{}
-	ClientPorts map[network.Port]struct{}
+	ExposePorts network.PortSet
+	ClientPorts network.PortSet
 	BrokerURI   string
 	PublicHost  string
 }
