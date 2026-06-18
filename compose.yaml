@@ -6,7 +6,8 @@ services:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     healthcheck:
-      test: ["CMD", "pg_isready", "-U", "${POSTGRES_USER}", "-d", "${POSTGRES_DB}"]
+      test:
+        ["CMD", "pg_isready", "-U", "${POSTGRES_USER}", "-d", "${POSTGRES_DB}"]
       interval: 5s
       retries: 10
       timeout: 2s
@@ -32,7 +33,7 @@ services:
       start_period: 5s
 
   api:
-    build: 
+    build:
       context: ./api
       dockerfile: Dockerfile
     environment:
@@ -59,7 +60,8 @@ services:
       NATS_URI: ${NATS_URI}
       GAME_SERVER_IMAGE: "game-server:latest"
       GAME_SERVER_COUNT: 2
-      GAME_SERVER_EXPOSE_PORTS: "7777/udp,7777/tcp"
+      GAME_SERVER_EXPOSE_PORTS: "7777/udp,7777/tcp,8080"
+      GAME_SERVER_CLIENT_PORTS: "7777/udp,7777/tcp"
       PUBLIC_HOST: ${PUBLIC_HOST}
     networks:
       - db-net
@@ -77,4 +79,3 @@ networks:
   nats-net:
     driver: bridge
     internal: true
-

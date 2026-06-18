@@ -142,25 +142,11 @@ func (dc *DockerClient) GetGamePorts(ctx context.Context, containerID string) (n
 		return nil, ErrClientClosed
 	}
 
-	timeoutCtx, cancel := context.WithTimeout(ctx, dc.inspectTimeout)
-	defer cancel()
-
-	portMap, err := dc.getPorts(timeoutCtx, containerID)
+	portMap, err := dc.getPorts(ctx, containerID)
 	if err != nil {
 		return nil, err
 	}
-
-	for port, bindings := range portMap {
-		if _, ok := dc.config.ExposePorts[port]; !ok {
-			delete(portMap, port)
-		}
-		if len(bindings) != 1 {
-			slog.Warn("container has multiple host bindings; using arbitrary", "id", containerID)
-			portMap[port] = bindings[0:1]
-		}
-	}
-
-	return portMap, nil
+	return dc.filterPorts(portMap, containerID), nil
 }
 
 func (dc *DockerClient) IsContainerStarted(ctx context.Context, containerID string) (bool, error) {
@@ -196,8 +182,22 @@ func genPortMap(ports map[network.Port]struct{}) network.PortMap {
 	return portBindings
 }
 
+// filter ports to only include client ports from config
+func (dc *DockerClient) filterPorts(portMap network.PortMap, containerID string) network.PortMap {
+	for port, bindings := range portMap {
+		if _, ok := dc.config.ClientPorts[port]; !ok {
+			delete(portMap, port)
+		}
+		portMap[port] = bindings[0:1]
+	}
+	return portMap
+}
+
 func (dc *DockerClient) getPorts(ctx context.Context, containerID string) (network.PortMap, error) {
-	res, err := dc.client.ContainerInspect(ctx, containerID, client.ContainerInspectOptions{})
+	timeoutCtx, cancel := context.WithTimeout(ctx, dc.inspectTimeout)
+	defer cancel()
+
+	res, err := dc.client.ContainerInspect(timeoutCtx, containerID, client.ContainerInspectOptions{})
 	if err != nil {
 		return nil, err
 	}
