@@ -209,6 +209,10 @@ func TestDockerConnection_CreateWorkerContainer(t *testing.T) {
 		require.NoError(t, err)
 		assert.NotEmpty(t, id)
 
+		t.Cleanup(func() {
+			dc.client.ContainerRemove(context.Background(), id, client.ContainerRemoveOptions{Force: true})
+		})
+
 		info := inspectContainer(t, dc, id)
 		require.NotNil(t, info.Container.State)
 		assert.True(t, info.Container.State.Running)
