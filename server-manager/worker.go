@@ -82,7 +82,7 @@ func NewWorkerManager() *WorkerManager {
 	}
 }
 
-// spawn workers
+// initializes connections and spawns workers
 func (wm *WorkerManager) Init(
 	ctx context.Context,
 	config *internal.EnvConfig,
@@ -99,22 +99,18 @@ func (wm *WorkerManager) Init(
 	}
 
 	if err := wm.dbConn.Init(ctx, config); err != nil {
-		wm.Close(ctx)
 		return err
 	}
 	if err := wm.brokerConn.Open(ctx, config); err != nil {
-		wm.Close(ctx)
 		return err
 	}
 	if err := wm.dockerConn.Init(config); err != nil {
-		wm.Close(ctx)
 		return err
 	}
 
 	for i := 0; i < workerCount; i++ {
-		id, err := wm.dockerConn.CreateWorkerContainer(ctx)
+		id, err := wm.dockerConn.SpawnContainer(ctx)
 		if err != nil {
-			wm.Close(ctx)
 			return err
 		}
 		wm.workers = append(wm.workers, NewWorkerInfo(id))

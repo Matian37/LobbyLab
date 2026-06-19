@@ -8,7 +8,7 @@ import (
 
 type DockerConnection interface {
 	Init(config *EnvConfig) error
-	CreateWorkerContainer(ctx context.Context) (string, error)
+	SpawnContainer(ctx context.Context) (string, error)
 	// TODO: make it concurrent
 	RestartContainer(ctx context.Context, id string) error
 	KillContainer(ctx context.Context, id string) error

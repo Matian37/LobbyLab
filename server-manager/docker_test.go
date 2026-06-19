@@ -167,16 +167,16 @@ func TestDockerConnection_containerCreateOptions(t *testing.T) {
 	assert.Equal(t, opts.HostConfig.PortBindings, portMap)
 }
 
-func TestDockerConnection_CreateWorkerContainer(t *testing.T) {
+func TestDockerConnection_SpawnContainer(t *testing.T) {
 	t.Run("not init", func(t *testing.T) {
 		dc := DockerConnection{}
-		_, err := dc.CreateWorkerContainer(context.Background())
+		_, err := dc.SpawnContainer(context.Background())
 		assert.ErrorIs(t, err, ErrDockerConnNotInit)
 	})
 
 	t.Run("closed", func(t *testing.T) {
 		dc := DockerConnection{initialized: true, closed: true}
-		_, err := dc.CreateWorkerContainer(context.Background())
+		_, err := dc.SpawnContainer(context.Background())
 		assert.ErrorIs(t, err, ErrDockerConnClosed)
 	})
 
@@ -185,7 +185,7 @@ func TestDockerConnection_CreateWorkerContainer(t *testing.T) {
 		dc.createTimeout = 0
 
 		start := time.Now()
-		_, err := dc.CreateWorkerContainer(context.Background())
+		_, err := dc.SpawnContainer(context.Background())
 		elapsed := time.Since(start)
 
 		assert.ErrorIs(t, err, context.DeadlineExceeded)
@@ -198,14 +198,14 @@ func TestDockerConnection_CreateWorkerContainer(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		cancel()
 
-		_, err := dc.CreateWorkerContainer(ctx)
+		_, err := dc.SpawnContainer(ctx)
 		assert.ErrorIs(t, err, context.Canceled)
 	})
 
 	t.Run("success", func(t *testing.T) {
 		dc := newTestConn(t)
 
-		id, err := dc.CreateWorkerContainer(context.Background())
+		id, err := dc.SpawnContainer(context.Background())
 		require.NoError(t, err)
 		assert.NotEmpty(t, id)
 

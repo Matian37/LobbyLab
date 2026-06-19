@@ -64,7 +64,7 @@ func (dc *DockerConnection) Init(config *internal.EnvConfig) error {
 	return nil
 }
 
-func (dc *DockerConnection) CreateWorkerContainer(ctx context.Context) (string, error) {
+func (dc *DockerConnection) SpawnContainer(ctx context.Context) (string, error) {
 	if !dc.initialized {
 		return "", ErrDockerConnNotInit
 	}
