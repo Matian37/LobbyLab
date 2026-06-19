@@ -12,6 +12,7 @@ import (
 var (
 	ErrWorkerCountNotPositive = errors.New("worker count not positive")
 	ErrClientPortsNotSubset   = errors.New("client ports must be a subset of expose ports")
+	ErrInvalidPortString      = errors.New("invalid port string")
 )
 
 type parsedConfig struct {
@@ -29,7 +30,7 @@ func parsePorts(ports []string) (network.PortSet, error) {
 	for _, portString := range ports {
 		port, err := network.ParsePort(portString)
 		if err != nil {
-			return nil, fmt.Errorf("invalid port: %w", err)
+			return nil, fmt.Errorf("%w: %w", ErrInvalidPortString, err)
 		}
 		parsedPorts[port] = struct{}{}
 	}
