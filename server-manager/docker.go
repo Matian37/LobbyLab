@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"errors"
-	"fmt"
 	"log/slog"
 	"server-manager/internal"
 	"time"
@@ -134,7 +133,7 @@ func (dc *DockerConnection) KillContainer(ctx context.Context, id string) error 
 	return nil
 }
 
-func (dc *DockerConnection) GetGamePorts(ctx context.Context, containerID string) (network.PortMap, error) {
+func (dc *DockerConnection) GetClientPortMap(ctx context.Context, containerID string) (internal.NamedPortMap, error) {
 	if !dc.initialized {
 		return nil, ErrDockerConnNotInit
 	}
@@ -146,7 +145,7 @@ func (dc *DockerConnection) GetGamePorts(ctx context.Context, containerID string
 	if err != nil {
 		return nil, err
 	}
-	return dc.filterPorts(portMap), nil
+	return dc.genClientPortMap(portMap, containerID), nil
 }
 
 // TODO: make it tell actual state of container rather than if it started
@@ -184,25 +183,28 @@ func (dc *DockerConnection) Close() error {
 
 // generates mapping of given ports to unspecified host bindings
 func genPortMap(ports network.PortSet) network.PortMap {
-	portBindings := network.PortMap{}
+	portBindings := make(network.PortMap)
 	for port := range ports {
 		portBindings[port] = []network.PortBinding{{}}
 	}
 	return portBindings
 }
 
-// filter ports to only include client ports from config
-func (dc *DockerConnection) filterPorts(portMap network.PortMap) network.PortMap {
-	for port, bindings := range portMap {
-		if _, ok := dc.config.ClientPorts[port]; !ok {
-			delete(portMap, port)
-		} else if len(bindings) == 0 {
-			panic(fmt.Sprintf("port %s has no bindings", port))
+// Generate a map of external ports to their names for client connections.
+func (dc *DockerConnection) genClientPortMap(portMap network.PortMap, containerID string) internal.NamedPortMap {
+	res := make(internal.NamedPortMap)
+	for port := range dc.config.ClientPorts {
+		if _, ok := portMap[port.Port]; ok {
+			res[port.Name] = port.Port
 		} else {
-			portMap[port] = bindings[0:1]
+			slog.Warn("client port not present in container",
+				"id", containerID,
+				"portName", port.Name,
+				"portString", port.Port.String(),
+			)
 		}
 	}
-	return portMap
+	return res
 }
 
 func (dc *DockerConnection) getPorts(ctx context.Context, containerID string) (network.PortMap, error) {

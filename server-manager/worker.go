@@ -159,7 +159,7 @@ func (wm *WorkerManager) AssignMatch(
 	ctx context.Context,
 	matchID int,
 	config string,
-) (*internal.ServerInfo, error) {
+) (*internal.ServerEndpoints, error) {
 	wm.mu.Lock()
 	defer wm.mu.Unlock()
 
@@ -175,7 +175,7 @@ func (wm *WorkerManager) AssignMatch(
 		return nil, err
 	}
 
-	portMap, err := wm.dockerConn.GetGamePorts(ctx, worker.id)
+	portMap, err := wm.dockerConn.GetClientPortMap(ctx, worker.id)
 	if err != nil {
 		return nil, err
 	}
@@ -186,7 +186,7 @@ func (wm *WorkerManager) AssignMatch(
 	}
 	worker.SetOccupied(matchID)
 
-	return &internal.ServerInfo{Host: wm.publicHost, PortMap: portMap}, nil
+	return &internal.ServerEndpoints{Host: wm.publicHost, Ports: portMap}, nil
 }
 
 func (wm *WorkerManager) HealthLoop(ctx context.Context) error {

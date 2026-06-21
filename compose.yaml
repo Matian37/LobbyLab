@@ -61,7 +61,7 @@ services:
       GAME_SERVER_IMAGE: "game-server:latest"
       GAME_SERVER_COUNT: 2
       GAME_SERVER_EXPOSE_PORTS: "7777/udp,7777/tcp,8080"
-      GAME_SERVER_CLIENT_PORTS: "7777/udp,7777/tcp"
+      GAME_SERVER_CLIENT_PORTS: "port1:7777/udp,port2:7777/tcp"
       PUBLIC_HOST: ${PUBLIC_HOST}
     networks:
       - db-net
