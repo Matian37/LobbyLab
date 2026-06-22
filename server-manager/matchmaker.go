@@ -2,28 +2,29 @@ package main
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"server-manager/internal"
 )
 
 type Matchmaker struct {
-	Host, Port, User, Password, Name string
-	WorkerManager                    internal.WorkerManager
-	Db                               internal.DB
-	PlayersPerRoom                   int
+	WorkerManager  internal.WorkerManager
+	Db             internal.DB
+	PlayersPerRoom int
 }
 
 func NewMatchmaker(workerManager internal.WorkerManager, playersPerRoom int) *Matchmaker {
-	return &Matchmaker{
+	m := &Matchmaker{
 		WorkerManager:  workerManager,
 		PlayersPerRoom: playersPerRoom,
 	}
+
+	return m
 }
 
 func (m *Matchmaker) StartMatchmaking(ctx context.Context) error {
 	dbObj, err := NewDB(ctx, m)
 	if err != nil {
-		return nil
+		return errors.New("Error while creating DB")
 	}
 	m.Db = dbObj
 
@@ -34,23 +35,29 @@ func (m *Matchmaker) StartMatchmaking(ctx context.Context) error {
 
 func (m *Matchmaker) CreateMatches(ctx context.Context, users []internal.User) error {
 	if len(users) < m.PlayersPerRoom {
-		return fmt.Errorf("Not enough users")
+		return errors.New("Not enough users")
 	}
 
 	for i := 0; i < len(users); i += m.PlayersPerRoom {
 		var matchUsers []internal.User
 		for j := 0; j < m.PlayersPerRoom; j++ {
+			if i+j >= len(users) {
+				break
+			}
 			matchUsers = append(matchUsers, users[i+j])
+		}
+		if len(matchUsers) < m.PlayersPerRoom {
+			continue
 		}
 		config := internal.NewMatchConfig(matchUsers)
 
 		socket, err := m.WorkerManager.AssignMatch(ctx, config)
 		if err != nil {
-			fmt.Println(err)
+			return err
 		}
 		err = m.Db.AddMatch(ctx, matchUsers, socket)
 		if err != nil {
-			fmt.Printf("error while creating %dth match", i)
+			return errors.New("error while creating match")
 		}
 	}
 

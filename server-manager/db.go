@@ -14,10 +14,10 @@ import (
 type DB struct {
 	Db         *sql.DB
 	Listener   *pq.Listener
-	Matchmaker *Matchmaker
+	Matchmaker internal.Matchmaker
 }
 
-func NewDB(ctx context.Context, matchmaker *Matchmaker) (*DB, error) {
+func NewDB(ctx context.Context, matchmaker internal.Matchmaker) (*DB, error) {
 	host, port, user, password, name := os.Getenv("DBHOST"), os.Getenv("DBPORT"), os.Getenv("DBUSER"), os.Getenv("DBPASSWORD"), os.Getenv("DBNAME")
 	info := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable", host, port, user, password, name)
 
