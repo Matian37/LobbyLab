@@ -1,6 +1,10 @@
 package internal
 
-import "context"
+import (
+	"context"
+
+	"github.com/moby/moby/api/types/network"
+)
 
 type DockerConnection interface {
 	Init(config *EnvConfig) error
@@ -8,7 +12,7 @@ type DockerConnection interface {
 	// TODO: make it concurrent
 	RestartContainer(ctx context.Context, id string) error
 	KillContainer(ctx context.Context, id string) error
-	GetClientPortMap(ctx context.Context, containerID string) (NamedPortMap, error)
+	GetGamePorts(ctx context.Context, containerID string) (network.PortMap, error)
 	IsContainerStarted(ctx context.Context, containerID string) (bool, error)
 	Close() error
 }
@@ -25,7 +29,7 @@ type BrokerConnection interface {
 type WorkerManager interface {
 	Init(ctx context.Context, config *EnvConfig, workerCount int) error
 	WaitForFreeWorker(ctx context.Context) error
-	AssignMatch(ctx context.Context, matchID int, config string) (*ServerEndpoints, error)
+	AssignMatch(ctx context.Context, matchID int, config string) (*ServerInfo, error)
 	HealthLoop(ctx context.Context) error
 	Close(ctx context.Context) error
 }

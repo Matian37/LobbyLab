@@ -10,7 +10,7 @@ type EnvConfig struct {
 	Image       string
 	Workercount int
 	ExposePorts network.PortSet
-	ClientPorts NamedPortSet
+	ClientPorts network.PortSet
 	BrokerURI   string
 	PublicHost  string
 }
@@ -20,12 +20,7 @@ type Result struct {
 	Details json.RawMessage `json:"details"`
 }
 
-type ServerEndpoints struct {
-	Host  string       `json:"host"`
-	Ports NamedPortMap `json:"portNames"`
-}
-
-type NamedPort struct {
-	Name string
-	Port network.Port
+type ServerInfo struct {
+	Host    string
+	PortMap network.PortMap
 }

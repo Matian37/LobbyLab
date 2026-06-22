@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"server-manager/internal"
-	"strings"
 
 	"github.com/caarlos0/env/v11"
 	"github.com/moby/moby/api/types/network"
@@ -14,7 +13,6 @@ var (
 	ErrWorkerCountNotPositive = errors.New("worker count not positive")
 	ErrClientPortsNotSubset   = errors.New("client ports must be a subset of expose ports")
 	ErrInvalidPortString      = errors.New("invalid port string")
-	ErrPortNameMissing        = errors.New("port name missing")
 )
 
 type parsedConfig struct {
@@ -29,8 +27,8 @@ type parsedConfig struct {
 func parsePorts(ports []string) (network.PortSet, error) {
 	parsedPorts := make(network.PortSet)
 
-	for _, str := range ports {
-		port, err := network.ParsePort(str)
+	for _, portString := range ports {
+		port, err := network.ParsePort(portString)
 		if err != nil {
 			return nil, fmt.Errorf("%w: %w", ErrInvalidPortString, err)
 		}
@@ -40,27 +38,9 @@ func parsePorts(ports []string) (network.PortSet, error) {
 	return parsedPorts, nil
 }
 
-func parseNamedPorts(ports []string) (internal.NamedPortSet, error) {
-	parsedPorts := make(internal.NamedPortSet)
-
-	for _, str := range ports {
-		name, portString, found := strings.Cut(str, ":")
-		if !found {
-			return nil, fmt.Errorf("%w for port '%v'", ErrPortNameMissing, str)
-		}
-		port, err := network.ParsePort(portString)
-		if err != nil {
-			return nil, fmt.Errorf("%w: %w", ErrInvalidPortString, err)
-		}
-		parsedPorts[internal.NamedPort{Name: name, Port: port}] = struct{}{}
-	}
-
-	return parsedPorts, nil
-}
-
-func isSubset(sub internal.NamedPortSet, super network.PortSet) bool {
+func isSubset[K comparable](sub, super map[K]struct{}) bool {
 	for k := range sub {
-		if _, ok := super[k.Port]; !ok {
+		if _, ok := super[k]; !ok {
 			return false
 		}
 	}
@@ -83,7 +63,7 @@ func ReadConfig() (*internal.EnvConfig, error) {
 		return nil, err
 	}
 
-	clientPorts, err := parseNamedPorts(config.ClientPorts)
+	clientPorts, err := parsePorts(config.ClientPorts)
 	if err != nil {
 		return nil, err
 	}
