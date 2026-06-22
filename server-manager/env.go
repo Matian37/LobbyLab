@@ -11,7 +11,7 @@ import (
 
 var (
 	ErrWorkerCountNotPositive = errors.New("worker count not positive")
-	ErrClientPortsNotSubset   = errors.New("client ports must be a subset of expose ports")
+	ErrClientPortNotInExposed = errors.New("client port not in expose ports")
 	ErrInvalidPortString      = errors.New("invalid port string")
 )
 
@@ -19,7 +19,7 @@ type parsedConfig struct {
 	Image       string   `env:"GAME_SERVER_IMAGE,required,notEmpty"`
 	WorkerCount int      `env:"GAME_SERVER_COUNT,required"`
 	ExposePorts []string `env:"GAME_SERVER_EXPOSE_PORTS,required,notEmpty"`
-	ClientPorts []string `env:"GAME_SERVER_CLIENT_PORTS,required,notEmpty"`
+	ClientPort  string   `env:"GAME_SERVER_CLIENT_PORT,required,notEmpty"`
 	BrokerURI   string   `env:"NATS_URI,required,notEmpty"`
 	PublicHost  string   `env:"PUBLIC_HOST,required,notEmpty"`
 }
@@ -38,15 +38,6 @@ func parsePorts(ports []string) (network.PortSet, error) {
 	return parsedPorts, nil
 }
 
-func isSubset[K comparable](sub, super map[K]struct{}) bool {
-	for k := range sub {
-		if _, ok := super[k]; !ok {
-			return false
-		}
-	}
-	return true
-}
-
 func ReadConfig() (*internal.EnvConfig, error) {
 	config := &parsedConfig{}
 
@@ -63,20 +54,20 @@ func ReadConfig() (*internal.EnvConfig, error) {
 		return nil, err
 	}
 
-	clientPorts, err := parsePorts(config.ClientPorts)
+	clientPort, err := network.ParsePort(config.ClientPort)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%w: %w", ErrInvalidPortString, err)
 	}
 
-	if !isSubset(clientPorts, exposePorts) {
-		return nil, ErrClientPortsNotSubset
+	if _, ok := exposePorts[clientPort]; !ok {
+		return nil, ErrClientPortNotInExposed
 	}
 
 	return &internal.EnvConfig{
 		Image:       config.Image,
 		Workercount: config.WorkerCount,
 		ExposePorts: exposePorts,
-		ClientPorts: clientPorts,
+		ClientPort:  clientPort,
 		BrokerURI:   config.BrokerURI,
 		PublicHost:  config.PublicHost,
 	}, nil

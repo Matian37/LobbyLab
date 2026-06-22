@@ -10,7 +10,7 @@ type EnvConfig struct {
 	Image       string
 	Workercount int
 	ExposePorts network.PortSet
-	ClientPorts network.PortSet
+	ClientPort  network.Port
 	BrokerURI   string
 	PublicHost  string
 }
@@ -21,6 +21,5 @@ type Result struct {
 }
 
 type ServerInfo struct {
-	Host    string
-	PortMap network.PortMap
+	Host, Port string
 }

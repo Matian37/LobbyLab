@@ -18,7 +18,7 @@ func setAllEnvExcept(t *testing.T, except ...string) *internal.EnvConfig {
 		{"GAME_SERVER_IMAGE", "img:latest"},
 		{"GAME_SERVER_COUNT", "2"},
 		{"GAME_SERVER_EXPOSE_PORTS", "80,443/udp"},
-		{"GAME_SERVER_CLIENT_PORTS", "80"},
+		{"GAME_SERVER_CLIENT_PORT", "80"},
 		{"NATS_URI", "nats://localhost:4222"},
 		{"PUBLIC_HOST", "127.0.0.1"},
 	} {
@@ -41,9 +41,7 @@ func setAllEnvExcept(t *testing.T, except ...string) *internal.EnvConfig {
 			network.MustParsePort("80"):      {},
 			network.MustParsePort("443/udp"): {},
 		},
-		ClientPorts: network.PortSet{
-			network.MustParsePort("80"): {},
-		},
+		ClientPort: network.MustParsePort("80"),
 		BrokerURI:  "nats://localhost:4222",
 		PublicHost: "127.0.0.1",
 	}
@@ -73,59 +71,6 @@ func TestParsePorts(t *testing.T) {
 	})
 }
 
-func TestIsSubset(t *testing.T) {
-	type StrSet map[string]struct{}
-
-	tests := []struct {
-		name     string
-		sub      StrSet
-		super    StrSet
-		expected bool
-	}{
-		{
-			name:     "full match",
-			sub:      StrSet{"a": {}, "b": {}},
-			super:    StrSet{"a": {}, "b": {}},
-			expected: true,
-		},
-		{
-			name:     "partial match",
-			sub:      StrSet{"b": {}},
-			super:    StrSet{"a": {}, "b": {}},
-			expected: true,
-		},
-		{
-			name:     "sub additional key",
-			sub:      StrSet{"a": {}, "b": {}, "c": {}},
-			super:    StrSet{"a": {}, "b": {}},
-			expected: false,
-		},
-		{
-			name:     "empty super",
-			sub:      StrSet{"a": {}},
-			super:    StrSet{},
-			expected: false,
-		},
-		{
-			name:     "empty sub",
-			sub:      StrSet{},
-			super:    StrSet{"a": {}},
-			expected: true,
-		},
-		{
-			name:     "both empty",
-			sub:      StrSet{},
-			super:    StrSet{},
-			expected: true,
-		},
-	}
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			assert.Equal(t, isSubset(test.sub, test.super), test.expected)
-		})
-	}
-}
-
 func TestReadConfig(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		expected := setAllEnvExcept(t)
@@ -149,15 +94,15 @@ func TestReadConfig(t *testing.T) {
 			},
 			{
 				name:     "invalid client port",
-				override: "GAME_SERVER_CLIENT_PORTS",
+				override: "GAME_SERVER_CLIENT_PORT",
 				value:    "abc",
 				err:      ErrInvalidPortString,
 			},
 			{
-				name:     "client ports not subset of expose ports",
-				override: "GAME_SERVER_CLIENT_PORTS",
-				value:    "1,2,3,4,5",
-				err:      ErrClientPortsNotSubset,
+				name:     "client port not in expose ports",
+				override: "GAME_SERVER_CLIENT_PORT",
+				value:    "1",
+				err:      ErrClientPortNotInExposed,
 			},
 		}
 		for _, test := range tests {
@@ -186,7 +131,7 @@ func TestReadConfig(t *testing.T) {
 			"GAME_SERVER_IMAGE",
 			"GAME_SERVER_COUNT",
 			"GAME_SERVER_EXPOSE_PORTS",
-			"GAME_SERVER_CLIENT_PORTS",
+			"GAME_SERVER_CLIENT_PORT",
 			"NATS_URI",
 			"PUBLIC_HOST",
 		} {
@@ -203,7 +148,7 @@ func TestReadConfig(t *testing.T) {
 		for _, field := range []string{
 			"GAME_SERVER_IMAGE",
 			"GAME_SERVER_EXPOSE_PORTS",
-			"GAME_SERVER_CLIENT_PORTS",
+			"GAME_SERVER_CLIENT_PORT",
 			"NATS_URI",
 			"PUBLIC_HOST",
 		} {

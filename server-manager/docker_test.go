@@ -21,16 +21,12 @@ const (
 
 // TODO: make integration test skippable
 
-func newTestConnWithPorts(t *testing.T, exposePorts []string, clientPorts []string) *DockerConnection {
+func newTestConnWithPorts(t *testing.T, exposePorts []string, clientPort string) *DockerConnection {
 	t.Helper()
 
 	exposeSet := network.PortSet{}
 	for _, p := range exposePorts {
 		exposeSet[network.MustParsePort(p)] = struct{}{}
-	}
-	clientSet := network.PortSet{}
-	for _, p := range clientPorts {
-		clientSet[network.MustParsePort(p)] = struct{}{}
 	}
 
 	dc := NewDockerConnection()
@@ -38,7 +34,7 @@ func newTestConnWithPorts(t *testing.T, exposePorts []string, clientPorts []stri
 	err := dc.Init(&internal.EnvConfig{
 		Image:       containerImage,
 		ExposePorts: exposeSet,
-		ClientPorts: clientSet,
+		ClientPort:  network.MustParsePort(clientPort),
 	})
 	require.NoError(t, err)
 	t.Cleanup(func() { dc.Close() })
@@ -48,7 +44,7 @@ func newTestConnWithPorts(t *testing.T, exposePorts []string, clientPorts []stri
 
 func newTestConn(t *testing.T) *DockerConnection {
 	t.Helper()
-	return newTestConnWithPorts(t, nil, nil)
+	return newTestConnWithPorts(t, []string{"8080"}, "8080")
 }
 
 // NOTE: CMD is required to make container hang forever
@@ -158,7 +154,7 @@ func TestDockerConnection_containerCreateOptions(t *testing.T) {
 	exposePorts := []string{"80", "8080"}
 	portMap := network.PortMap{}
 
-	dc := newTestConnWithPorts(t, exposePorts, nil)
+	dc := newTestConnWithPorts(t, exposePorts, "8080")
 
 	opts := dc.containerCreateOptions(portMap)
 
@@ -352,7 +348,7 @@ func TestDockerConnection_getPorts(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		exposePorts := []string{"80", "400/udp", "8080/tcp"}
 
-		dc := newTestConnWithPorts(t, exposePorts, nil)
+		dc := newTestConnWithPorts(t, exposePorts, "80")
 		id := createContainer(t, dc)
 
 		startContainer(t, dc, id)
@@ -370,45 +366,16 @@ func TestDockerConnection_getPorts(t *testing.T) {
 	})
 }
 
-func TestDockerConnection_filterPorts(t *testing.T) {
-	t.Run("success", func(t *testing.T) {
-		exposePorts := network.PortMap{
-			network.MustParsePort("80"):       {{}},
-			network.MustParsePort("400/udp"):  {{}},
-			network.MustParsePort("8080/tcp"): {{}},
-			network.MustParsePort("7777/tcp"): {{}},
-		}
-		clientPorts := network.PortSet{
-			network.MustParsePort("80"):       struct{}{},
-			network.MustParsePort("400/udp"):  struct{}{},
-			network.MustParsePort("7777/tcp"): struct{}{},
-		}
-
-		dc := DockerConnection{config: &internal.EnvConfig{ClientPorts: clientPorts}}
-		res := dc.filterPorts(exposePorts)
-
-		// checks if keys of exposePorts and res are equal
-		assert.Equal(t, len(clientPorts), len(res))
-		for port, _ := range clientPorts {
-			_, ok := res[port]
-			assert.True(t, ok, "missing port %s", port)
-		}
-
-		exposePorts[network.MustParsePort("80")] = []network.PortBinding{}
-		assert.Panics(t, func() { dc.filterPorts(exposePorts) }, "expected panic when port has no bindings")
-	})
-}
-
-func TestDockerConnection_GetGamePorts(t *testing.T) {
+func TestDockerConnection_GetGamePort(t *testing.T) {
 	t.Run("not init", func(t *testing.T) {
 		dc := DockerConnection{}
-		_, err := dc.GetGamePorts(context.Background(), "id")
+		_, err := dc.GetGamePort(context.Background(), "id")
 		assert.ErrorIs(t, err, ErrDockerConnNotInit)
 	})
 
 	t.Run("closed", func(t *testing.T) {
 		dc := DockerConnection{initialized: true, closed: true}
-		_, err := dc.GetGamePorts(context.Background(), "id")
+		_, err := dc.GetGamePort(context.Background(), "id")
 		assert.ErrorIs(t, err, ErrDockerConnClosed)
 	})
 
@@ -418,20 +385,28 @@ func TestDockerConnection_GetGamePorts(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		cancel()
 
-		_, err := dc.GetGamePorts(ctx, "id")
+		_, err := dc.GetGamePort(ctx, "id")
 		assert.ErrorIs(t, err, context.Canceled)
 	})
 
 	t.Run("success", func(t *testing.T) {
-		dc := newTestConnWithPorts(t, []string{"80", "443"}, []string{"80"})
+		dc := newTestConnWithPorts(t, []string{"80", "443"}, "80")
 		id := createContainer(t, dc)
 		startContainer(t, dc, id)
 
-		ports, err := dc.GetGamePorts(context.Background(), id)
+		res, err := dc.GetGamePort(context.Background(), id)
 		require.NoError(t, err)
 
-		assert.Len(t, ports, 1)
-		assert.Contains(t, ports, network.MustParsePort("80"))
+		internalPort := network.MustParsePort("80")
+
+		info := inspectContainer(t, dc, id)
+
+		require.NotNil(t, info.Container.NetworkSettings)
+		bindings := info.Container.NetworkSettings.Ports[internalPort]
+		assert.NotEmpty(t, bindings)
+		externalPort := bindings[0].HostPort
+
+		assert.Equal(t, res, externalPort)
 	})
 }
 

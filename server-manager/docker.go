@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"errors"
-	"fmt"
 	"log/slog"
 	"server-manager/internal"
 	"time"
@@ -18,6 +17,7 @@ var (
 	ErrDockerConnNotInit     = errors.New("connection not initialized")
 	ErrDockerConnAlreadyInit = errors.New("connection already initialized")
 	ErrDockerConnClosed      = errors.New("connection closed")
+	ErrGamePortNoBinding     = errors.New("game port binding not found")
 )
 
 type DockerConnection struct {
@@ -134,19 +134,24 @@ func (dc *DockerConnection) KillContainer(ctx context.Context, id string) error 
 	return nil
 }
 
-func (dc *DockerConnection) GetGamePorts(ctx context.Context, containerID string) (network.PortMap, error) {
+func (dc *DockerConnection) GetGamePort(ctx context.Context, containerID string) (string, error) {
 	if !dc.initialized {
-		return nil, ErrDockerConnNotInit
+		return "", ErrDockerConnNotInit
 	}
 	if dc.closed {
-		return nil, ErrDockerConnClosed
+		return "", ErrDockerConnClosed
 	}
 
 	portMap, err := dc.getPorts(ctx, containerID)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
-	return dc.filterPorts(portMap), nil
+
+	bindings := portMap[dc.config.ClientPort]
+	if len(bindings) == 0 {
+		return "", ErrGamePortNoBinding
+	}
+	return bindings[0].HostPort, nil
 }
 
 // TODO: make it tell actual state of container rather than if it started
@@ -189,20 +194,6 @@ func genPortMap(ports network.PortSet) network.PortMap {
 		portBindings[port] = []network.PortBinding{{}}
 	}
 	return portBindings
-}
-
-// filter ports to only include client ports from config
-func (dc *DockerConnection) filterPorts(portMap network.PortMap) network.PortMap {
-	for port, bindings := range portMap {
-		if _, ok := dc.config.ClientPorts[port]; !ok {
-			delete(portMap, port)
-		} else if len(bindings) == 0 {
-			panic(fmt.Sprintf("port %s has no bindings", port))
-		} else {
-			portMap[port] = bindings[0:1]
-		}
-	}
-	return portMap
 }
 
 func (dc *DockerConnection) getPorts(ctx context.Context, containerID string) (network.PortMap, error) {

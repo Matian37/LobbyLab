@@ -159,34 +159,34 @@ func (wm *WorkerManager) AssignMatch(
 	ctx context.Context,
 	matchID int,
 	config string,
-) (*internal.ServerInfo, error) {
+) (internal.ServerInfo, error) {
 	wm.mu.Lock()
 	defer wm.mu.Unlock()
 
 	if !wm.initialized {
-		return nil, ErrMgrNotInit
+		return internal.ServerInfo{}, ErrMgrNotInit
 	}
 	if wm.closed {
-		return nil, ErrMgrClosed
+		return internal.ServerInfo{}, ErrMgrClosed
 	}
 
 	worker, err := wm.getFreeWorker()
 	if err != nil {
-		return nil, err
+		return internal.ServerInfo{}, err
 	}
 
-	portMap, err := wm.dockerConn.GetGamePorts(ctx, worker.id)
+	port, err := wm.dockerConn.GetGamePort(ctx, worker.id)
 	if err != nil {
-		return nil, err
+		return internal.ServerInfo{}, err
 	}
 
 	err = wm.brokerConn.AssignJob(ctx, worker.id, config)
 	if err != nil {
-		return nil, err
+		return internal.ServerInfo{}, err
 	}
 	worker.SetOccupied(matchID)
 
-	return &internal.ServerInfo{Host: wm.publicHost, PortMap: portMap}, nil
+	return internal.ServerInfo{Host: wm.publicHost, Port: port}, nil
 }
 
 func (wm *WorkerManager) HealthLoop(ctx context.Context) error {
