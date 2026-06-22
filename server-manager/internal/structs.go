@@ -17,6 +17,7 @@ type EnvConfig struct {
 
 type Result struct {
 	Success bool            `json:"success"`
+	MatchID int             `json:"matchID"`
 	Details json.RawMessage `json:"details"`
 }
 

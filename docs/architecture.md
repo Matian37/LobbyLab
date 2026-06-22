@@ -54,6 +54,7 @@ Result event payload:
 
 - `success`: `true` when the match completed and produced a result, `false`
   when the match was cancelled.
+- `matchID`: the unique identifier of the match.
 - `details`: match-specific result data. For cancellation events this is an
   empty object.
 

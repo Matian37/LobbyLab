@@ -23,15 +23,17 @@ func run() error {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	wm := NewWorkerManager()
-	if err = wm.Init(ctx, config, config.Workercount); err != nil {
+	wm := NewWorkerManager(config)
+
+	if err = wm.Init(ctx, config); err != nil {
 		wm.Close(ctx)
 		return err
 	}
 	defer wm.Close(ctx)
 
-	go wm.HealthLoop(ctx)
 	go wm.SaveLoop(ctx)
+	go wm.ResultLoop(ctx)
+	go wm.HealthLoop(ctx)
 
 	<-ctx.Done()
 

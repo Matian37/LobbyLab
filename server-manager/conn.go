@@ -124,6 +124,7 @@ func (nc *NATSConnection) AssignJob(ctx context.Context, workerID string, config
 	return err
 }
 
+// TODO: make pongTimeout as func argument
 func (nc *NATSConnection) SendPing() (internal.Responders, error) {
 	if !nc.opened {
 		return nil, ErrNATSConnNotOpen
@@ -169,6 +170,7 @@ func (nc *NATSConnection) GetResult(ctx context.Context) (internal.Message, erro
 	return msg, nil
 }
 
+// TODO: use js?
 // NOTE: function doesn't guarantee the message is from a valid worker
 func (nc *NATSConnection) GetFinish(ctx context.Context) (string, error) {
 	if !nc.opened {

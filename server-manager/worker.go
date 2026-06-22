@@ -1,32 +1,91 @@
 package main
 
+import (
+	"time"
+)
+
 type WorkerState int
 
-type WorkerInfo struct {
-	id string
+const (
+	WorkerFree WorkerState = iota
+	WorkerOccupied
+	WorkerRestarting
+)
 
-	state   WorkerState
-	matchID int // NOTE: value zero of matchID means no match is happening
+type Worker struct {
+	ID string
 
-	failCount int
+	State           WorkerState
+	stateID         int
+	stateValidUntil time.Time
+	matchID         int
+	failCount       int
+
+	maxPingRetries int
+	restartTimeout time.Duration
 }
 
-func NewWorkerInfo(id string) *WorkerInfo {
-	return &WorkerInfo{state: WorkerStarting, id: id}
+func NewWorker(id string, maxPingRetries int, restartTimeout time.Duration) *Worker {
+	return &Worker{
+		ID:             id,
+		State:          WorkerFree,
+		maxPingRetries: maxPingRetries,
+		restartTimeout: restartTimeout,
+	}
 }
 
-func (wi *WorkerInfo) SetStarting() {
-	wi.state = WorkerStarting
-	wi.failCount = 0
-	wi.matchID = 0
+func (w *Worker) SetFree() int {
+	w.State = WorkerFree
+	w.stateID++
+	w.stateValidUntil = time.Time{}
+
+	w.matchID = 0
+	w.failCount = 0
+
+	return w.stateID
 }
 
-func (wi *WorkerInfo) SetFree() {
-	wi.state = WorkerFree
-	wi.matchID = 0
+func (w *Worker) SetRestarting() int {
+	w.State = WorkerRestarting
+	w.stateID++
+	w.stateValidUntil = time.Now().Add(w.restartTimeout)
+
+	w.matchID = 0
+	w.failCount = 0
+
+	return w.stateID
 }
 
-func (wi *WorkerInfo) SetOccupied(matchID int) {
-	wi.state = WorkerOccupied
-	wi.matchID = matchID
+func (w *Worker) SetOccupied(matchID int) int {
+	w.State = WorkerOccupied
+	w.stateID++
+	w.stateValidUntil = time.Time{}
+
+	w.matchID = matchID
+	w.failCount = 0
+
+	return w.stateID
+}
+
+func (w *Worker) HandlePong(pong bool) {
+	switch w.State {
+	case WorkerRestarting:
+		if pong {
+			w.SetFree()
+		}
+	default:
+		if !pong {
+			w.failCount++
+		} else {
+			w.failCount = 0
+		}
+	}
+}
+
+func (w *Worker) isStateValid() bool {
+	return w.stateValidUntil.IsZero() || time.Now().Before(w.stateValidUntil)
+}
+
+func (w *Worker) IsHealthy() bool {
+	return w.isStateValid() && w.failCount <= w.maxPingRetries
 }

@@ -23,16 +23,18 @@ type BrokerConnection interface {
 }
 
 type WorkerManager interface {
-	Init(ctx context.Context, config *EnvConfig, workerCount int) error
+	Init(ctx context.Context, config *EnvConfig) error
+	Close(ctx context.Context) error
+	SaveLoop(ctx context.Context) error
+	ResultLoop(ctx context.Context) error
+	HealthLoop(ctx context.Context) error
 	WaitForFreeWorker(ctx context.Context) error
 	AssignMatch(ctx context.Context, matchID int, config string) (ServerInfo, error)
-	HealthLoop(ctx context.Context) error
-	Close(ctx context.Context) error
 }
 
 type DatabaseConnection interface {
 	Init(ctx context.Context, config *EnvConfig) error
-	SaveMatchResult(ctx context.Context, success bool, result string) error
+	SaveMatchResult(ctx context.Context, result Result) error
 	Close() error
 }
 

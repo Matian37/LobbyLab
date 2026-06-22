@@ -1,3 +1,3 @@
 package internal
 
-type Responders map[string]struct{}
+type Responders = map[string]struct{}
