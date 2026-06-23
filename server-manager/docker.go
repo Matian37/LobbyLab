@@ -154,27 +154,6 @@ func (dc *DockerConnection) GetGamePort(ctx context.Context, containerID string)
 	return bindings[0].HostPort, nil
 }
 
-// TODO: make it tell actual state of container rather than if it started
-func (dc *DockerConnection) IsContainerStarted(ctx context.Context, containerID string) (bool, error) {
-	if !dc.initialized {
-		return false, ErrDockerConnNotInit
-	}
-	if dc.closed {
-		return false, ErrDockerConnClosed
-	}
-
-	timeoutCtx, cancel := context.WithTimeout(ctx, dc.inspectTimeout)
-	defer cancel()
-
-	res, err := dc.client.ContainerInspect(timeoutCtx, containerID, client.ContainerInspectOptions{})
-	if err != nil {
-		return false, err
-	}
-
-	status := res.Container.State.Status
-	return status == container.StateRunning || status == container.StateExited, nil
-}
-
 func (dc *DockerConnection) Close() error {
 	if !dc.initialized {
 		return ErrDockerConnNotInit

@@ -5,11 +5,9 @@ import "context"
 type DockerConnection interface {
 	Init(config *EnvConfig) error
 	SpawnContainer(ctx context.Context) (string, error)
-	// TODO: make it concurrent
 	RestartContainer(ctx context.Context, id string) error
 	KillContainer(ctx context.Context, id string) error
 	GetGamePort(ctx context.Context, containerID string) (string, error)
-	IsContainerStarted(ctx context.Context, containerID string) (bool, error)
 	Close() error
 }
 
