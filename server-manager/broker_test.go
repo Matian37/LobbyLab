@@ -55,7 +55,7 @@ func TestNewNATSConnection(t *testing.T) {
 
 	assert.Nil(t, conn.conn)
 	assert.Nil(t, conn.js)
-	assert.Nil(t, conn.finishSub)
+	assert.Nil(t, conn.finishConsumer)
 	assert.Nil(t, conn.resultConsumer)
 
 	assert.False(t, conn.opened)
@@ -112,9 +112,7 @@ func TestNATSConnection_Open(t *testing.T) {
 		require.NotNil(t, conn.js)
 
 		require.NotNil(t, conn.resultConsumer)
-
-		require.NotNil(t, conn.finishSub)
-		assert.True(t, conn.finishSub.IsValid())
+		require.NotNil(t, conn.finishConsumer)
 	})
 }
 
@@ -329,7 +327,9 @@ func TestNATSConnection_GetFinish(t *testing.T) {
 		require.NoError(t, err)
 		t.Cleanup(func() { nc.Close() })
 
-		err = nc.Publish(finishSubject, []byte(workerID))
+		js, err := jetstream.New(nc)
+		require.NoError(t, err)
+		_, err = js.Publish(context.Background(), finishSubject, []byte(workerID))
 		require.NoError(t, err)
 
 		result, err := conn.GetFinish(context.Background())
