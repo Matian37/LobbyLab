@@ -36,6 +36,7 @@ func run() error {
 	go wm.HealthLoop(ctx)
 
 	<-ctx.Done()
+	wm.wg.Wait()
 
 	return nil
 }

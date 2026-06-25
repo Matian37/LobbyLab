@@ -50,6 +50,7 @@ type WorkerManager struct {
 	newfreeWorker  *sync.Cond
 
 	mu sync.Mutex
+	wg sync.WaitGroup
 }
 
 // TODO: add ability to customize mgr settings
@@ -120,6 +121,9 @@ func (wm *WorkerManager) Close() error {
 
 // TODO: add backoff
 func (wm *WorkerManager) SaveLoop(ctx context.Context) error {
+	wm.wg.Add(1)
+	defer wm.wg.Done()
+
 	if !wm.initialized {
 		return ErrMgrNoInit
 	}
@@ -141,6 +145,9 @@ func (wm *WorkerManager) SaveLoop(ctx context.Context) error {
 
 // TODO: add backoff
 func (wm *WorkerManager) ResultLoop(ctx context.Context) error {
+	wm.wg.Add(1)
+	defer wm.wg.Done()
+
 	if !wm.initialized {
 		return ErrMgrNoInit
 	}
@@ -162,6 +169,9 @@ func (wm *WorkerManager) ResultLoop(ctx context.Context) error {
 
 // TODO: add backoff
 func (wm *WorkerManager) HealthLoop(ctx context.Context) error {
+	wm.wg.Add(1)
+	defer wm.wg.Done()
+
 	if !wm.initialized {
 		return ErrMgrNoInit
 	}
@@ -275,6 +285,9 @@ func (wm *WorkerManager) healthCheck(ctx context.Context) error {
 }
 
 func (wm *WorkerManager) restartWorker(ctx context.Context, worker *Worker, restartStateID int, workerID string) error {
+	wm.wg.Add(1)
+	defer wm.wg.Done()
+
 	err := wm.dockerConn.RestartContainer(ctx, workerID)
 	if err != nil {
 		slog.Error("failed to restart worker", "id", workerID, "error", err)
