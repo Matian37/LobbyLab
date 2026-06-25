@@ -12,7 +12,7 @@ import (
 )
 
 // TODO: don't log ctx errors
-
+// TODO: add wg group to make sure all goroutines finish
 var (
 	ErrMgrAlreadyInit          = errors.New("manager already initialized")
 	ErrMgrAlreadyClosed        = errors.New("manager already closed")
@@ -24,6 +24,8 @@ var (
 	ErrFailedToAckResult       = errors.New("failed to ack result")
 	ErrHealthPingFailed        = errors.New("health ping failed")
 	ErrNoFreeWorker            = errors.New("free worker not found")
+	ErrWorkerRestartFailed     = errors.New("failed to restart worker")
+	ErrWorkerStateChanged      = errors.New("worker changed state during restart")
 )
 
 type WorkerManager struct {
@@ -99,13 +101,13 @@ func (wm *WorkerManager) Init(ctx context.Context, config *internal.EnvConfig) e
 }
 
 // TODO: error logging
-func (wm *WorkerManager) Close(ctx context.Context) error {
+func (wm *WorkerManager) Close() error {
 	if wm.closed {
 		return ErrMgrAlreadyClosed
 	}
 
 	for _, worker := range wm.workers {
-		_ = wm.dockerConn.KillContainer(ctx, worker.ID)
+		_ = wm.dockerConn.KillContainer(context.Background(), worker.ID)
 	}
 
 	_ = wm.dockerConn.Close()
@@ -118,6 +120,13 @@ func (wm *WorkerManager) Close(ctx context.Context) error {
 
 // TODO: add backoff
 func (wm *WorkerManager) SaveLoop(ctx context.Context) error {
+	if !wm.initialized {
+		return ErrMgrNoInit
+	}
+	if wm.closed {
+		return ErrMgrClosed
+	}
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -132,6 +141,13 @@ func (wm *WorkerManager) SaveLoop(ctx context.Context) error {
 
 // TODO: add backoff
 func (wm *WorkerManager) ResultLoop(ctx context.Context) error {
+	if !wm.initialized {
+		return ErrMgrNoInit
+	}
+	if wm.closed {
+		return ErrMgrClosed
+	}
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -146,6 +162,13 @@ func (wm *WorkerManager) ResultLoop(ctx context.Context) error {
 
 // TODO: add backoff
 func (wm *WorkerManager) HealthLoop(ctx context.Context) error {
+	if !wm.initialized {
+		return ErrMgrNoInit
+	}
+	if wm.closed {
+		return ErrMgrClosed
+	}
+
 	ticker := time.NewTicker(wm.healthCheckTick)
 	defer ticker.Stop()
 
@@ -222,7 +245,7 @@ func (wm *WorkerManager) handleResults(ctx context.Context) error {
 
 	worker := wm.getWorkerByMatchID(res.MatchID)
 	worker.SetFree()
-	wm.notifyFreeWorker()
+	wm.newfreeWorker.Signal()
 
 	return nil
 }
@@ -251,28 +274,24 @@ func (wm *WorkerManager) healthCheck(ctx context.Context) error {
 	return nil
 }
 
-func (wm *WorkerManager) restartWorker(ctx context.Context, worker *Worker, restartStateID int, workerID string) {
+func (wm *WorkerManager) restartWorker(ctx context.Context, worker *Worker, restartStateID int, workerID string) error {
 	err := wm.dockerConn.RestartContainer(ctx, workerID)
 	if err != nil {
-		slog.Error("failed to restart worker %s: %w", workerID, err)
-		return
+		slog.Error("failed to restart worker", "id", workerID, "error", err)
+		return fmt.Errorf("%w: %w", ErrWorkerRestartFailed, err)
 	}
 
 	wm.mu.Lock()
 	defer wm.mu.Unlock()
 
-	if worker == nil {
-		slog.Error("worker disappeared while being restarted", "id", workerID)
-		return
-	}
-
 	if worker.stateID != restartStateID {
-		slog.Warn("worker changed internal state; restart stopped", "id", workerID)
-		return
+		return ErrWorkerStateChanged
 	}
 
 	worker.SetFree()
-	wm.notifyFreeWorker()
+	wm.newfreeWorker.Signal()
+
+	return nil
 }
 
 func (wm *WorkerManager) getWorkerByMatchID(matchID int) *Worker {
@@ -291,8 +310,4 @@ func (wm *WorkerManager) getFreeWorker() *Worker {
 		}
 	}
 	return nil
-}
-
-func (wm *WorkerManager) notifyFreeWorker() {
-	wm.newfreeWorker.Signal()
 }

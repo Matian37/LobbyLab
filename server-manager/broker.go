@@ -124,7 +124,7 @@ func (nc *NATSConnection) AssignJob(ctx context.Context, workerID string, config
 	return err
 }
 
-// TODO: make pongTimeout as func argument
+// TODO: make pongTimeout as func argument + ctx
 func (nc *NATSConnection) SendPing() (internal.Responders, error) {
 	if !nc.opened {
 		return nil, ErrNATSConnNotOpen

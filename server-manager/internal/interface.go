@@ -1,3 +1,5 @@
+//go:generate go run go.uber.org/mock/mockgen -source=./interface.go -destination=./mocks/mocks.go -package=mocks
+
 package internal
 
 import "context"
@@ -22,7 +24,7 @@ type BrokerConnection interface {
 
 type WorkerManager interface {
 	Init(ctx context.Context, config *EnvConfig) error
-	Close(ctx context.Context) error
+	Close() error
 	SaveLoop(ctx context.Context) error
 	ResultLoop(ctx context.Context) error
 	HealthLoop(ctx context.Context) error

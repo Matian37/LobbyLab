@@ -26,10 +26,10 @@ func run() error {
 	wm := NewWorkerManager(config)
 
 	if err = wm.Init(ctx, config); err != nil {
-		wm.Close(ctx)
+		wm.Close()
 		return err
 	}
-	defer wm.Close(ctx)
+	defer wm.Close()
 
 	go wm.SaveLoop(ctx)
 	go wm.ResultLoop(ctx)
