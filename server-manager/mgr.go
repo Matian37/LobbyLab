@@ -9,10 +9,11 @@ import (
 	"server-manager/internal"
 	"sync"
 	"time"
+
+	"github.com/cenkalti/backoff/v6"
 )
 
 // TODO: don't log ctx errors
-// TODO: add wg group to make sure all goroutines finish
 var (
 	ErrMgrAlreadyInit          = errors.New("manager already initialized")
 	ErrMgrAlreadyClosed        = errors.New("manager already closed")
@@ -119,7 +120,6 @@ func (wm *WorkerManager) Close() error {
 	return nil
 }
 
-// TODO: add backoff
 func (wm *WorkerManager) SaveLoop(ctx context.Context) error {
 	wm.wg.Add(1)
 	defer wm.wg.Done()
@@ -131,19 +131,22 @@ func (wm *WorkerManager) SaveLoop(ctx context.Context) error {
 		return ErrMgrClosed
 	}
 
+	b := backoff.NewExponentialBackOff()
+
 	for {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
 		case res := <-wm.saveResultChan:
-			if err := wm.dbConn.SaveMatchResult(ctx, res); err != nil {
+			err := wm.dbConn.SaveMatchResult(ctx, res)
+			if err != nil {
 				slog.Error("failed to save result", "error", err)
 			}
+			handleBackoff(ctx, b, err)
 		}
 	}
 }
 
-// TODO: add backoff
 func (wm *WorkerManager) ResultLoop(ctx context.Context) error {
 	wm.wg.Add(1)
 	defer wm.wg.Done()
@@ -155,19 +158,22 @@ func (wm *WorkerManager) ResultLoop(ctx context.Context) error {
 		return ErrMgrClosed
 	}
 
+	b := backoff.NewExponentialBackOff()
+
 	for {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
 		default:
-			if err := wm.handleResults(ctx); err != nil {
+			err := wm.handleResults(ctx)
+			if err != nil {
 				slog.Error("result loop error", "error", err)
 			}
+			handleBackoff(ctx, b, err)
 		}
 	}
 }
 
-// TODO: add backoff
 func (wm *WorkerManager) HealthLoop(ctx context.Context) error {
 	wm.wg.Add(1)
 	defer wm.wg.Done()
@@ -323,4 +329,15 @@ func (wm *WorkerManager) getFreeWorker() *Worker {
 		}
 	}
 	return nil
+}
+
+func handleBackoff(ctx context.Context, b backoff.BackOff, err error) {
+	if err == nil {
+		b.Reset()
+		return
+	}
+	select {
+	case <-ctx.Done():
+	case <-time.After(b.NextBackOff()):
+	}
 }

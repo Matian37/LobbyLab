@@ -4,6 +4,7 @@ go 1.26.4
 
 require (
 	github.com/caarlos0/env/v11 v11.4.1
+	github.com/cenkalti/backoff/v6 v6.0.1
 	github.com/moby/moby/api v1.54.2
 	github.com/moby/moby/client v0.4.1
 	github.com/nats-io/nats-server/v2 v2.14.2

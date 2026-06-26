@@ -1,3 +1,4 @@
+//go:generate go run go.uber.org/mock/mockgen -destination=./internal/mocks/mocks_backoff.go -package=mocks github.com/cenkalti/backoff/v6 BackOff
 package main
 
 import (
@@ -624,6 +625,34 @@ func TestWorkerManager_WaitForFreeWorker(t *testing.T) {
 		case <-time.After(2 * time.Second):
 			t.Fatal("expected WaitForFreeWorker to return")
 		}
+	})
+}
+
+func Test_handleBackoff(t *testing.T) {
+	t.Run("no error", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		ctrl := gomock.NewController(t)
+		b := mocks.NewMockBackOff(ctrl)
+		b.EXPECT().Reset()
+
+		start := time.Now()
+		handleBackoff(ctx, b, nil)
+		require.Less(t, time.Since(start), 30*time.Millisecond)
+	})
+
+	t.Run("error", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		ctrl := gomock.NewController(t)
+		b := mocks.NewMockBackOff(ctrl)
+		b.EXPECT().NextBackOff().Return(0 * time.Second)
+
+		start := time.Now()
+		handleBackoff(ctx, b, errors.New(""))
+		require.Less(t, time.Since(start), 30*time.Millisecond)
 	})
 }
 
