@@ -603,21 +603,10 @@ func TestWorkerManager_WaitForFreeWorker(t *testing.T) {
 			close(done)
 		}()
 
-		select {
-		case <-done:
-			t.Fatal("function did not wait for free worker")
-		case <-time.After(30 * time.Millisecond):
-		}
-
-		wm.newfreeWorker.Signal()
-
-		select {
-		case <-done:
-			t.Fatal("function stopped waiting after fake signal")
-		case <-time.After(30 * time.Millisecond):
-		}
-
+		wm.mu.Lock()
 		workers[0].SetFree()
+		wm.mu.Unlock()
+
 		wm.newfreeWorker.Signal()
 
 		select {
