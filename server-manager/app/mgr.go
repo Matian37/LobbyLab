@@ -1,4 +1,4 @@
-package main
+package app
 
 import (
 	"context"
@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"server-manager/adapters"
 	"server-manager/internal"
 	"sync"
 	"time"
@@ -57,9 +58,9 @@ type WorkerManager struct {
 // TODO: add ability to customize mgr settings
 func NewWorkerManager(config *internal.EnvConfig) *WorkerManager {
 	return &WorkerManager{
-		dockerConn:           NewDockerConnection(),
-		brokerConn:           NewNATSConnection(),
-		dbConn:               NewDBConnection(),
+		dockerConn:           adapters.NewDockerConnection(),
+		brokerConn:           adapters.NewNATSConnection(),
+		dbConn:               adapters.NewDBConnection(),
 		config:               config,
 		healthCheckTick:      5 * time.Second,
 		resultChanSize:       8192,

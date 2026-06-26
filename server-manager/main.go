@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"log/slog"
 	"os/signal"
+	"server-manager/app"
+	"server-manager/config"
 	"syscall"
 )
 
@@ -15,7 +17,7 @@ func main() {
 }
 
 func run() error {
-	config, err := ReadConfig()
+	config, err := config.ReadConfig()
 	if err != nil {
 		return fmt.Errorf("failed to read config: %v", err)
 	}
@@ -23,7 +25,7 @@ func run() error {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	wm := NewWorkerManager(config)
+	wm := app.NewWorkerManager(config)
 
 	if err = wm.Init(ctx, config); err != nil {
 		wm.Close()
