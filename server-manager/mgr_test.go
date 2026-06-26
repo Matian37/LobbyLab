@@ -808,4 +808,48 @@ func TestWorkerManager_HealthLoop(t *testing.T) {
 	})
 }
 
+func TestWorkerManager_Run(t *testing.T) {
+	t.Run("not initialized", func(t *testing.T) {
+		wm := WorkerManager{}
+		err := wm.Run(context.Background())
+		require.ErrorIs(t, err, ErrMgrNoInit)
+	})
+
+	t.Run("closed", func(t *testing.T) {
+		wm := WorkerManager{initialized: true, closed: true}
+		wm.Close()
+		err := wm.Run(context.Background())
+		require.ErrorIs(t, err, ErrMgrClosed)
+	})
+
+	t.Run("success", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+
+		_, _, _, wm := newMockWorkerManagerWithInit(t, []*Worker{})
+
+		done := make(chan struct{})
+		closed := make(chan struct{})
+
+		go func() {
+			wm.Run(ctx)
+			close(done)
+			wm.wg.Wait()
+			close(closed)
+		}()
+
+		select {
+		case <-done:
+		case <-time.After(2 * time.Second):
+			t.Fatal("expected Run to exit after cancellation")
+		}
+
+		select {
+		case <-closed:
+		case <-time.After(2 * time.Second):
+			t.Fatal("expected waitGroup to finish")
+		}
+	})
+}
+
 // TODO: integrated tests, concurrency tests

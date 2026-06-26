@@ -29,14 +29,9 @@ func run() error {
 		wm.Close()
 		return err
 	}
-	defer wm.Close()
 
-	go wm.SaveLoop(ctx)
-	go wm.ResultLoop(ctx)
-	go wm.HealthLoop(ctx)
-
-	<-ctx.Done()
-	wm.wg.Wait()
+	wm.Run(ctx)
+	wm.Close()
 
 	return nil
 }

@@ -102,6 +102,29 @@ func (wm *WorkerManager) Init(ctx context.Context, config *internal.EnvConfig) e
 	return nil
 }
 
+func (wm *WorkerManager) Run(ctx context.Context) error {
+	if !wm.initialized {
+		return ErrMgrNoInit
+	}
+	if wm.closed {
+		return ErrMgrClosed
+	}
+
+	wm.wg.Add(3)
+
+	run := func(ctx context.Context, fn func(context.Context) error) {
+		defer wm.wg.Done()
+		fn(ctx)
+	}
+	go run(ctx, wm.SaveLoop)
+	go run(ctx, wm.ResultLoop)
+	go run(ctx, wm.HealthLoop)
+
+	<-ctx.Done()
+
+	return ctx.Err()
+}
+
 // TODO: error logging
 func (wm *WorkerManager) Close() error {
 	if wm.closed {
@@ -116,14 +139,13 @@ func (wm *WorkerManager) Close() error {
 	_ = wm.brokerConn.Close()
 	_ = wm.dbConn.Close()
 
+	wm.wg.Wait()
+
 	wm.closed = true
 	return nil
 }
 
 func (wm *WorkerManager) SaveLoop(ctx context.Context) error {
-	wm.wg.Add(1)
-	defer wm.wg.Done()
-
 	if !wm.initialized {
 		return ErrMgrNoInit
 	}
@@ -148,9 +170,6 @@ func (wm *WorkerManager) SaveLoop(ctx context.Context) error {
 }
 
 func (wm *WorkerManager) ResultLoop(ctx context.Context) error {
-	wm.wg.Add(1)
-	defer wm.wg.Done()
-
 	if !wm.initialized {
 		return ErrMgrNoInit
 	}
@@ -175,9 +194,6 @@ func (wm *WorkerManager) ResultLoop(ctx context.Context) error {
 }
 
 func (wm *WorkerManager) HealthLoop(ctx context.Context) error {
-	wm.wg.Add(1)
-	defer wm.wg.Done()
-
 	if !wm.initialized {
 		return ErrMgrNoInit
 	}
@@ -284,16 +300,18 @@ func (wm *WorkerManager) healthCheck(ctx context.Context) error {
 		}
 
 		stateID := worker.SetRestarting()
-		go wm.restartWorker(ctx, worker, stateID, worker.ID)
+
+		wm.wg.Add(1)
+		go func() {
+			defer wm.wg.Done()
+			wm.restartWorker(ctx, worker, stateID, worker.ID)
+		}()
 	}
 
 	return nil
 }
 
 func (wm *WorkerManager) restartWorker(ctx context.Context, worker *Worker, restartStateID int, workerID string) error {
-	wm.wg.Add(1)
-	defer wm.wg.Done()
-
 	err := wm.dockerConn.RestartContainer(ctx, workerID)
 	if err != nil {
 		slog.Error("failed to restart worker", "id", workerID, "error", err)

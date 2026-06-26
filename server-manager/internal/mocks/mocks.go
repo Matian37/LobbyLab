@@ -278,17 +278,17 @@ func (mr *MockWorkerManagerMockRecorder) AssignMatch(ctx, matchID, config any) *
 }
 
 // Close mocks base method.
-func (m *MockWorkerManager) Close(ctx context.Context) error {
+func (m *MockWorkerManager) Close() error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Close", ctx)
+	ret := m.ctrl.Call(m, "Close")
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // Close indicates an expected call of Close.
-func (mr *MockWorkerManagerMockRecorder) Close(ctx any) *gomock.Call {
+func (mr *MockWorkerManagerMockRecorder) Close() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Close", reflect.TypeOf((*MockWorkerManager)(nil).Close), ctx)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Close", reflect.TypeOf((*MockWorkerManager)(nil).Close))
 }
 
 // HealthLoop mocks base method.
@@ -331,6 +331,18 @@ func (m *MockWorkerManager) ResultLoop(ctx context.Context) error {
 func (mr *MockWorkerManagerMockRecorder) ResultLoop(ctx any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ResultLoop", reflect.TypeOf((*MockWorkerManager)(nil).ResultLoop), ctx)
+}
+
+// Run mocks base method.
+func (m *MockWorkerManager) Run(ctx context.Context) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "Run", ctx)
+}
+
+// Run indicates an expected call of Run.
+func (mr *MockWorkerManagerMockRecorder) Run(ctx any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Run", reflect.TypeOf((*MockWorkerManager)(nil).Run), ctx)
 }
 
 // SaveLoop mocks base method.

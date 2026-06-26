@@ -24,6 +24,7 @@ type BrokerConnection interface {
 
 type WorkerManager interface {
 	Init(ctx context.Context, config *EnvConfig) error
+	Run(ctx context.Context)
 	Close() error
 	SaveLoop(ctx context.Context) error
 	ResultLoop(ctx context.Context) error
