@@ -111,15 +111,9 @@ func (wm *WorkerManager) Run(ctx context.Context) error {
 		return ErrMgrClosed
 	}
 
-	wm.wg.Add(3)
-
-	run := func(ctx context.Context, fn func(context.Context) error) {
-		defer wm.wg.Done()
-		fn(ctx)
-	}
-	go run(ctx, wm.SaveLoop)
-	go run(ctx, wm.ResultLoop)
-	go run(ctx, wm.HealthLoop)
+	wm.wg.Go(func() { wm.SaveLoop(ctx) })
+	wm.wg.Go(func() { wm.ResultLoop(ctx) })
+	wm.wg.Go(func() { wm.HealthLoop(ctx) })
 
 	<-ctx.Done()
 
@@ -277,8 +271,11 @@ func (wm *WorkerManager) handleResults(ctx context.Context) error {
 	defer wm.mu.Unlock()
 
 	worker := wm.getWorkerByMatchID(res.MatchID)
-	worker.SetFree()
-	wm.newfreeWorker.Signal()
+
+	if worker != nil {
+		worker.SetFree()
+		wm.newfreeWorker.Signal()
+	}
 
 	return nil
 }
@@ -302,11 +299,7 @@ func (wm *WorkerManager) healthCheck(ctx context.Context) error {
 
 		stateID := worker.SetRestarting()
 
-		wm.wg.Add(1)
-		go func() {
-			defer wm.wg.Done()
-			wm.restartWorker(ctx, worker, stateID, worker.ID)
-		}()
+		wm.wg.Go(func() { wm.restartWorker(ctx, worker, stateID, worker.ID) })
 	}
 
 	return nil
