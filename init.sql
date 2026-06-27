@@ -13,8 +13,7 @@ CREATE TABLE IF NOT EXISTS users(
 
 CREATE TABLE IF NOT EXISTS results(
     match_id INT,
-    players_count INT,
-    players TEXT[]
+    details JSONB
 );
 
 CREATE TABLE IF NOT EXISTS waiting(

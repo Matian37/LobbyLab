@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"log"
 	"os"
 	"server-manager/internal"
@@ -115,8 +116,11 @@ func TestSaveMatchResults(t *testing.T) {
 	if err != nil {
 		t.Errorf("something wrong when creating db")
 	}
-
-	err = d.SaveMatchResults(ctx, users, 123)
+	details, err2 := json.Marshal(users)
+	if err2 != nil {
+		t.Errorf("%v", err2)
+	}
+	err = d.SaveMatchResults(ctx, string(details), 123)
 	if err != nil {
 		t.Errorf("%v", err)
 	}

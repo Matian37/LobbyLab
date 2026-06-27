@@ -43,5 +43,5 @@ type DB interface {
 	StartListening(ctx context.Context) error
 	GetList(ctx context.Context) (error, []User)
 	AddMatch(ctx context.Context, users []User, socket Socket) error
-	SaveMatchResults(ctx context.Context, players []User, match_id int) error
+	SaveMatchResults(ctx context.Context, details string, match_id int) error
 }
