@@ -179,21 +179,6 @@ func (mr *MockBrokerConnectionMockRecorder) Close() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Close", reflect.TypeOf((*MockBrokerConnection)(nil).Close))
 }
 
-// GetFinish mocks base method.
-func (m *MockBrokerConnection) GetFinish(ctx context.Context) (string, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetFinish", ctx)
-	ret0, _ := ret[0].(string)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// GetFinish indicates an expected call of GetFinish.
-func (mr *MockBrokerConnectionMockRecorder) GetFinish(ctx any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetFinish", reflect.TypeOf((*MockBrokerConnection)(nil).GetFinish), ctx)
-}
-
 // GetResult mocks base method.
 func (m *MockBrokerConnection) GetResult(ctx context.Context) (internal.Message, error) {
 	m.ctrl.T.Helper()

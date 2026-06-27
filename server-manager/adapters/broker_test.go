@@ -57,7 +57,6 @@ func TestNewNATSConnection(t *testing.T) {
 
 	assert.Nil(t, conn.conn)
 	assert.Nil(t, conn.js)
-	assert.Nil(t, conn.finishConsumer)
 	assert.Nil(t, conn.resultConsumer)
 
 	assert.False(t, conn.opened)
@@ -114,7 +113,6 @@ func TestNATSConnection_Open(t *testing.T) {
 		require.NotNil(t, conn.js)
 
 		require.NotNil(t, conn.resultConsumer)
-		require.NotNil(t, conn.finishConsumer)
 	})
 }
 
@@ -302,57 +300,6 @@ func TestNATSConnection_GetResult(t *testing.T) {
 		require.NoError(t, err)
 
 		assert.Equal(t, expectedData, msg.Data())
-	})
-}
-
-func TestNATSConnection_GetFinish(t *testing.T) {
-	t.Run("not open", func(t *testing.T) {
-		conn := NATSConnection{}
-		_, err := conn.GetFinish(context.Background())
-		assert.ErrorIs(t, err, ErrNATSConnNotOpen)
-	})
-
-	t.Run("closed", func(t *testing.T) {
-		conn := NATSConnection{opened: true, closed: true}
-		_, err := conn.GetFinish(context.Background())
-		assert.ErrorIs(t, err, ErrNATSConnClosed)
-	})
-
-	t.Run("context canceled", func(t *testing.T) {
-		addr := newNATSServer(t)
-
-		conn := NewNATSConnection()
-		err := conn.Open(context.Background(), &internal.EnvConfig{BrokerURI: addr})
-		require.NoError(t, err)
-
-		ctx, cancel := context.WithCancel(context.Background())
-		cancel()
-
-		_, err = conn.GetFinish(ctx)
-		assert.ErrorIs(t, err, context.Canceled)
-	})
-
-	t.Run("success", func(t *testing.T) {
-		addr := newNATSServer(t)
-
-		conn := NewNATSConnection()
-		err := conn.Open(context.Background(), &internal.EnvConfig{BrokerURI: addr})
-		require.NoError(t, err)
-
-		workerID := "worker-1"
-
-		nc, err := nats.Connect(addr)
-		require.NoError(t, err)
-		t.Cleanup(func() { nc.Close() })
-
-		js, err := jetstream.New(nc)
-		require.NoError(t, err)
-		_, err = js.Publish(context.Background(), finishSubject, []byte(workerID))
-		require.NoError(t, err)
-
-		result, err := conn.GetFinish(context.Background())
-		require.NoError(t, err)
-		assert.Equal(t, workerID, result)
 	})
 }
 

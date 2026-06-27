@@ -42,17 +42,13 @@
   - Direction: worker -> server manager
   - Purpose: durable match result event stream. Workers publish one event when
     a match finishes successfully or is cancelled.
-- `workers.finish`
-  - Type: JetStream
-  - Direction: worker -> server manager
-  - Purpose: durable finish event stream. Workers publish one event when
-    a match is finished.
 
 Result event payload:
 
 ```json
 {
   "success": true,
+  "matchID": 1234,
   "details": {}
 }
 ```

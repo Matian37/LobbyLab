@@ -14,9 +14,7 @@ const (
 	healthSubject    = "workers.health"
 	assignSubject    = "workers.assign"
 	resultSubject    = "workers.results"
-	finishSubject    = "workers.finish"
 	resultStreamName = "RESULT"
-	finishStreamName = "FINISH"
 )
 const pongBufferSize = 4096
 
@@ -32,7 +30,6 @@ type NATSConnection struct {
 	conn *nats.Conn
 	js   *jetstream.JetStream
 
-	finishConsumer jetstream.Consumer
 	resultConsumer jetstream.Consumer
 
 	openTimeout      time.Duration
@@ -93,39 +90,6 @@ func (nc *NATSConnection) Open(ctx context.Context, config *internal.EnvConfig) 
 		return err
 	}
 	nc.resultConsumer = consumer
-
-	finishStream, err := js.CreateOrUpdateStream(
-		ctx,
-		jetstream.StreamConfig{
-			Name:        finishStreamName,
-			Subjects:    []string{finishSubject},
-			Retention:   jetstream.LimitsPolicy,
-			Storage:     jetstream.MemoryStorage,
-			Replicas:    1,
-			Compression: jetstream.NoCompression,
-			MaxAge:      5 * time.Minute,
-			MaxMsgs:     -1,
-			MaxBytes:    -1,
-			Discard:     jetstream.DiscardOld,
-		},
-	)
-	if err != nil {
-		return err
-	}
-
-	// purge any leftover messages from a previous run if manager crashed
-	if err := finishStream.Purge(ctx); err != nil {
-		return err
-	}
-
-	consumer, err = finishStream.CreateConsumer(ctx, jetstream.ConsumerConfig{
-		DeliverPolicy: jetstream.DeliverAllPolicy,
-		AckPolicy:     jetstream.AckNonePolicy,
-	})
-	if err != nil {
-		return err
-	}
-	nc.finishConsumer = consumer
 
 	nc.opened = true
 	return nil
@@ -198,22 +162,6 @@ func (nc *NATSConnection) GetResult(ctx context.Context) (internal.Message, erro
 		return nil, err
 	}
 	return msg, nil
-}
-
-// NOTE: function does not validate returned worker id
-func (nc *NATSConnection) GetFinish(ctx context.Context) (string, error) {
-	if !nc.opened {
-		return "", ErrNATSConnNotOpen
-	}
-	if nc.closed {
-		return "", ErrNATSConnClosed
-	}
-
-	msg, err := nc.finishConsumer.Next(jetstream.FetchContext(ctx))
-	if err != nil {
-		return "", err
-	}
-	return string(msg.Data()), nil
 }
 
 func (nc *NATSConnection) Close() error {

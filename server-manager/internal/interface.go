@@ -20,7 +20,6 @@ type BrokerConnection interface {
 	// and returns those that respond before the timeout.
 	GetWorkersPong(ctx context.Context) (Responders, error)
 	GetResult(ctx context.Context) (Message, error)
-	GetFinish(ctx context.Context) (string, error)
 	Close() error
 }
 
