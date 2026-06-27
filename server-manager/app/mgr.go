@@ -313,6 +313,7 @@ func (wm *WorkerManager) healthCheck(ctx context.Context) error {
 }
 
 func (wm *WorkerManager) restartWorker(ctx context.Context, worker *Worker, restartStateID int, workerID string) error {
+	// TODO: make match canceled in DB
 	err := wm.dockerConn.RestartContainer(ctx, workerID)
 	if err != nil {
 		slog.Error("failed to restart worker", "id", workerID, "error", err)

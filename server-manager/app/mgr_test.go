@@ -14,8 +14,13 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/goleak"
 	"go.uber.org/mock/gomock"
 )
+
+func TestMain(m *testing.M) {
+	goleak.VerifyTestMain(m)
+}
 
 func newMockWorkerManager(
 	t *testing.T,
@@ -856,4 +861,105 @@ func TestWorkerManager_Run(t *testing.T) {
 	})
 }
 
-// TODO: integrated tests, concurrency tests
+func TestWorkerManager_LifeCycle(t *testing.T) {
+	t.Run("worker assign match", func(t *testing.T) {
+		ctx := context.Background()
+
+		workers := []*Worker{NewWorker("worker-1", 1, 1*time.Hour), NewWorker("worker-2", 1, 1*time.Hour)}
+
+		workers[0].SetOccupied(2)
+		workers[1].SetRestarting()
+
+		docker, broker, _, wm := newMockWorkerManagerWithInit(t, workers)
+		broker.EXPECT().GetWorkersPong(ctx).Return(internal.Responders{"worker-2": {}}, nil)
+		docker.EXPECT().GetGamePort(ctx, "worker-2").Return("8080/udp", nil)
+		broker.EXPECT().AssignJob(ctx, "worker-2", "{}").Return(nil)
+
+		type Result struct {
+			serverInfo internal.ServerInfo
+			err        error
+		}
+		done := make(chan Result)
+
+		go func() {
+			wm.WaitForFreeWorker(ctx)
+			serverInfo, err := wm.AssignMatch(ctx, 1, "{}")
+			done <- Result{serverInfo: serverInfo, err: err}
+		}()
+		require.NoError(t, wm.healthCheck(ctx))
+
+		select {
+		case res := <-done:
+			require.NoError(t, res.err)
+			require.NotNil(t, res.serverInfo.Port, "8080/udp")
+			require.NotNil(t, res.serverInfo.Host, wm.config.PublicHost)
+		case <-time.After(2 * time.Second):
+			t.Fatal("lifecycle did not finish")
+		}
+	})
+
+	t.Run("worker restart", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		workers := []*Worker{
+			NewWorker("worker-1", 0, 1*time.Hour),
+			NewWorker("worker-2", 0, 1*time.Hour),
+			NewWorker("worker-3", 0, -1*time.Hour),
+		}
+		workers[1].SetOccupied(1)
+
+		wg := sync.WaitGroup{}
+		blockRestart := make(chan struct{})
+
+		docker, broker, _, wm := newMockWorkerManagerWithInit(t, workers)
+
+		block := func(ctx context.Context, id string) {
+			<-blockRestart
+			wg.Done()
+		}
+		broker.EXPECT().GetWorkersPong(ctx).Return(internal.Responders{"worker-1": {}}, nil)
+		docker.EXPECT().RestartContainer(ctx, "worker-2").Do(block).Return(nil)
+		docker.EXPECT().RestartContainer(ctx, "worker-3").Do(block).Return(errors.New(""))
+
+		wg.Add(2)
+		require.NoError(t, wm.healthCheck(ctx))
+
+		require.Equal(t, WorkerRestarting, wm.workers[1].State)
+		require.Equal(t, WorkerRestarting, wm.workers[2].State)
+
+		close(blockRestart)
+		wg.Wait()
+
+		require.Equal(t, WorkerFree, wm.workers[1].State)
+		require.Equal(t, WorkerRestarting, wm.workers[2].State)
+	})
+
+	t.Run("worker match finished", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		workers := []*Worker{NewWorker("worker-1", 0, 1*time.Hour)}
+		workers[0].SetOccupied(1)
+
+		_, broker, db, wm := newMockWorkerManagerWithInit(t, workers)
+		msg := mocks.NewMockMessage(gomock.NewController(t))
+		res := internal.Result{MatchID: 1, Success: false, Details: json.RawMessage("{}")}
+		payload, err := json.Marshal(res)
+		require.NoError(t, err)
+
+		broker.EXPECT().GetResult(ctx).Return(msg, nil)
+		msg.EXPECT().Data().Return(payload)
+		msg.EXPECT().Ack().Return(nil)
+		db.EXPECT().SaveMatchResult(ctx, res).DoAndReturn(func(ctx context.Context, res internal.Result) error {
+			cancel()
+			return nil
+		})
+
+		require.NoError(t, wm.handleResults(ctx))
+		go wm.SaveLoop(ctx)
+		<-ctx.Done()
+
+		require.Equal(t, WorkerFree, wm.workers[0].State)
+	})
+}
