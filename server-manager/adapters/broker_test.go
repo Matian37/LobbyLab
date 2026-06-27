@@ -197,17 +197,33 @@ func TestNATSConnection_AssignJob(t *testing.T) {
 	})
 }
 
-func TestNATSConnection_SendPing(t *testing.T) {
+func TestNATSConnection_PingWorkers(t *testing.T) {
 	t.Run("not open", func(t *testing.T) {
 		conn := NATSConnection{}
-		_, err := conn.SendPing()
+		_, err := conn.GetWorkersPong(context.Background())
 		assert.ErrorIs(t, err, ErrNATSConnNotOpen)
 	})
 
 	t.Run("closed", func(t *testing.T) {
 		conn := NATSConnection{opened: true, closed: true}
-		_, err := conn.SendPing()
+		_, err := conn.GetWorkersPong(context.Background())
 		assert.ErrorIs(t, err, ErrNATSConnClosed)
+	})
+
+	t.Run("context canceled", func(t *testing.T) {
+		addr := newNATSServer(t)
+
+		conn := NewNATSConnection()
+		err := conn.Open(context.Background(), &internal.EnvConfig{BrokerURI: addr})
+		require.NoError(t, err)
+
+		conn.pongTimeout = 150 * time.Millisecond
+
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+
+		_, err = conn.GetWorkersPong(ctx)
+		require.ErrorIs(t, err, ctx.Err())
 	})
 
 	t.Run("success", func(t *testing.T) {
@@ -230,7 +246,7 @@ func TestNATSConnection_SendPing(t *testing.T) {
 		require.NoError(t, err)
 		nc.Flush()
 
-		responders, err := conn.SendPing()
+		responders, err := conn.GetWorkersPong(context.Background())
 		require.NoError(t, err)
 
 		_, ok := responders[workerID]

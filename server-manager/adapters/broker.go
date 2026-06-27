@@ -151,8 +151,7 @@ func (nc *NATSConnection) AssignJob(ctx context.Context, workerID string, config
 	return err
 }
 
-// TODO: make pongTimeout as func argument + ctx
-func (nc *NATSConnection) SendPing() (internal.Responders, error) {
+func (nc *NATSConnection) GetWorkersPong(ctx context.Context) (internal.Responders, error) {
 	if !nc.opened {
 		return nil, ErrNATSConnNotOpen
 	}
@@ -177,7 +176,11 @@ func (nc *NATSConnection) SendPing() (internal.Responders, error) {
 		return nil, err
 	}
 
-	time.Sleep(nc.pongTimeout)
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	case <-time.After(nc.pongTimeout):
+	}
 
 	return responders, nil
 }

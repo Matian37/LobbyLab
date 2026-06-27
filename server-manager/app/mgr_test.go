@@ -519,24 +519,28 @@ func TestWorkerManager_restartWorker(t *testing.T) {
 
 func TestWorkerManager_healthCheck(t *testing.T) {
 	t.Run("ping failed", func(t *testing.T) {
+		ctx := context.Background()
+
 		_, broker, _, wm := newMockWorkerManagerWithInit(t, []*Worker{})
 		wantErr := errors.New("ping failed")
-		broker.EXPECT().SendPing().Return(internal.Responders{}, wantErr)
+		broker.EXPECT().GetWorkersPong(ctx).Return(internal.Responders{}, wantErr)
 
-		err := wm.healthCheck(context.Background())
+		err := wm.healthCheck(ctx)
 		require.ErrorIs(t, err, ErrHealthPingFailed)
 		require.ErrorIs(t, err, wantErr)
 	})
 
 	t.Run("healthy workers skipped", func(t *testing.T) {
+		ctx := context.Background()
+
 		responders := internal.Responders{"worker-1": {}}
 		workers := []*Worker{NewWorker("worker-1", 1, 10*time.Second), NewWorker("worker-2", 1, 10*time.Second)}
 		workers[0].failCount = 1
 
 		_, broker, _, wm := newMockWorkerManagerWithInit(t, workers)
-		broker.EXPECT().SendPing().Return(responders, nil)
+		broker.EXPECT().GetWorkersPong(ctx).Return(responders, nil)
 
-		err := wm.healthCheck(context.Background())
+		err := wm.healthCheck(ctx)
 		require.NoError(t, err)
 
 		assert.Equal(t, 0, wm.workers[0].stateID)
@@ -564,7 +568,7 @@ func TestWorkerManager_healthCheck(t *testing.T) {
 		docker, broker, _, wm := newMockWorkerManagerWithInit(t, workers)
 		wantErr := errors.New("test force error")
 
-		broker.EXPECT().SendPing().Return(responders, nil)
+		broker.EXPECT().GetWorkersPong(ctx).Return(responders, nil)
 		docker.EXPECT().RestartContainer(ctx, "worker-1").Do(doneFunc).Return(wantErr)
 		docker.EXPECT().RestartContainer(ctx, "worker-2").Do(doneFunc).Return(wantErr)
 
@@ -789,7 +793,7 @@ func TestWorkerManager_HealthLoop(t *testing.T) {
 		_, broker, _, wm := newMockWorkerManagerWithInit(t, []*Worker{NewWorker("worker-1", 3, 30*time.Second)})
 		wm.healthCheckTick = 20 * time.Millisecond
 
-		broker.EXPECT().SendPing().DoAndReturn(func() (internal.Responders, error) {
+		broker.EXPECT().GetWorkersPong(ctx).DoAndReturn(func(ctx context.Context) (internal.Responders, error) {
 			cancel()
 			return internal.Responders{}, ctx.Err()
 		})

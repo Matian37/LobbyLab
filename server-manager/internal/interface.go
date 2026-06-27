@@ -16,7 +16,9 @@ type DockerConnection interface {
 type BrokerConnection interface {
 	Open(ctx context.Context, config *EnvConfig) error
 	AssignJob(ctx context.Context, workerID string, config string) error
-	SendPing() (Responders, error)
+	// GetWorkersPong broadcasts a ping to all active workers
+	// and returns those that respond before the timeout.
+	GetWorkersPong(ctx context.Context) (Responders, error)
 	GetResult(ctx context.Context) (Message, error)
 	GetFinish(ctx context.Context) (string, error)
 	Close() error

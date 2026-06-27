@@ -284,7 +284,7 @@ func (wm *WorkerManager) handleResults(ctx context.Context) error {
 }
 
 func (wm *WorkerManager) healthCheck(ctx context.Context) error {
-	responders, err := wm.brokerConn.SendPing()
+	responders, err := wm.brokerConn.GetWorkersPong(ctx)
 	if err != nil {
 		return fmt.Errorf("%w: %w", ErrHealthPingFailed, err)
 	}

@@ -209,6 +209,21 @@ func (mr *MockBrokerConnectionMockRecorder) GetResult(ctx any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetResult", reflect.TypeOf((*MockBrokerConnection)(nil).GetResult), ctx)
 }
 
+// GetWorkersPong mocks base method.
+func (m *MockBrokerConnection) GetWorkersPong(ctx context.Context) (internal.Responders, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetWorkersPong", ctx)
+	ret0, _ := ret[0].(internal.Responders)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetWorkersPong indicates an expected call of GetWorkersPong.
+func (mr *MockBrokerConnectionMockRecorder) GetWorkersPong(ctx any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetWorkersPong", reflect.TypeOf((*MockBrokerConnection)(nil).GetWorkersPong), ctx)
+}
+
 // Open mocks base method.
 func (m *MockBrokerConnection) Open(ctx context.Context, config *internal.EnvConfig) error {
 	m.ctrl.T.Helper()
@@ -221,21 +236,6 @@ func (m *MockBrokerConnection) Open(ctx context.Context, config *internal.EnvCon
 func (mr *MockBrokerConnectionMockRecorder) Open(ctx, config any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Open", reflect.TypeOf((*MockBrokerConnection)(nil).Open), ctx, config)
-}
-
-// SendPing mocks base method.
-func (m *MockBrokerConnection) SendPing() (internal.Responders, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SendPing")
-	ret0, _ := ret[0].(internal.Responders)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// SendPing indicates an expected call of SendPing.
-func (mr *MockBrokerConnectionMockRecorder) SendPing() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SendPing", reflect.TypeOf((*MockBrokerConnection)(nil).SendPing))
 }
 
 // MockWorkerManager is a mock of WorkerManager interface.
