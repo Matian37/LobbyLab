@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"server-manager/internal"
+	"sync"
 	"time"
 
 	"github.com/nats-io/nats.go"
@@ -132,8 +133,11 @@ func (nc *NATSConnection) GetWorkersPong(ctx context.Context) (internal.Responde
 	inbox := nc.conn.NewInbox()
 
 	responders := make(internal.Responders)
+	mu := sync.Mutex{}
 
 	sub, err := nc.conn.Subscribe(inbox, func(msg *nats.Msg) {
+		mu.Lock()
+		defer mu.Unlock()
 		responders[string(msg.Data)] = struct{}{}
 	})
 	if err != nil {
