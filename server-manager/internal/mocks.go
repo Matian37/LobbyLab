@@ -39,6 +39,10 @@ func (d *MockDB) AddMatch(ctx context.Context, users []User, socket Socket) erro
 	return nil
 }
 
+func (d *MockDB) SaveMatchResults(ctx context.Context, players []User, matchId int) error {
+	return nil
+}
+
 type MockMatchmaker struct{}
 
 func GetMockMatchmaker() *MockMatchmaker {

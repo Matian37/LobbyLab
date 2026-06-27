@@ -22,7 +22,7 @@ func beforeEach() {
 
 	d, _ := NewDB(context.Background(), internal.GetMockMatchmaker())
 
-	tables := []string{"waiting", "users", "matches"}
+	tables := []string{"waiting", "users", "matches", "results"}
 	for _, table := range tables {
 		_, err := d.Db.ExecContext(context.Background(), "TRUNCATE TABLE "+table+" CASCADE")
 		if err != nil {
@@ -102,5 +102,32 @@ func TestAddMatch(t *testing.T) {
 	}
 	if match_id != match_id_user {
 		t.Errorf("assigning match id to users didnt work")
+	}
+}
+
+func TestSaveMatchResults(t *testing.T) {
+	beforeEach()
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	users := []internal.User{*internal.NewUser("user1"), *internal.NewUser("user2")}
+
+	d, err := NewDB(ctx, internal.GetMockMatchmaker())
+	if err != nil {
+		t.Errorf("something wrong when creating db")
+	}
+
+	err = d.SaveMatchResults(ctx, users, 123)
+	if err != nil {
+		t.Errorf("%v", err)
+	}
+
+	var match_id int
+	err = d.Db.QueryRowContext(ctx, "SELECT match_id FROM results").Scan(&match_id)
+	if err != nil {
+		t.Errorf("couldnt make custom sql query")
+	}
+
+	if match_id != 123 {
+		t.Errorf("error in saving")
 	}
 }

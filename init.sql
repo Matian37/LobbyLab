@@ -11,6 +11,12 @@ CREATE TABLE IF NOT EXISTS users(
     match_id INT REFERENCES matches(id)
 );
 
+CREATE TABLE IF NOT EXISTS results(
+    match_id INT,
+    players_count INT,
+    players TEXT[]
+);
+
 CREATE TABLE IF NOT EXISTS waiting(
     login TEXT PRIMARY KEY
 );

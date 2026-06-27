@@ -92,3 +92,15 @@ func (d *DB) AddMatch(ctx context.Context, users []internal.User, socket interna
 	_, err = d.Db.ExecContext(ctx, "UPDATE users SET match_id = $1 WHERE login = ANY($2)", id, pq.Array(logins))
 	return err
 }
+
+func (d *DB) SaveMatchResults(ctx context.Context, players []internal.User, matchId int) error {
+	logins := make([]string, len(players))
+	for i := 0; i < len(players); i++ {
+		logins[i] = players[i].Login
+	}
+	_, err := d.Db.ExecContext(ctx, "INSERT INTO results (match_id, players_count, players) VALUES($1, $2, $3)", matchId, len(players), logins)
+	if err != nil {
+		return err
+	}
+	return nil
+}
