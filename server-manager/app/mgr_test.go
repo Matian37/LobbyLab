@@ -72,14 +72,14 @@ func TestWorkerManager_Init(t *testing.T) {
 	t.Run("already initialized", func(t *testing.T) {
 		wm := WorkerManager{initialized: true}
 
-		err := wm.Init(context.Background(), &internal.EnvConfig{})
+		err := wm.Init(context.Background())
 		require.ErrorIs(t, err, ErrMgrAlreadyInit)
 	})
 
 	t.Run("already closed", func(t *testing.T) {
 		wm := WorkerManager{closed: true}
 
-		err := wm.Init(context.Background(), &internal.EnvConfig{})
+		err := wm.Init(context.Background())
 		require.ErrorIs(t, err, ErrMgrClosed)
 	})
 
@@ -89,11 +89,9 @@ func TestWorkerManager_Init(t *testing.T) {
 		docker, _, _, wm := newMockWorkerManager(t, 1)
 		wantErr := errors.New("docker init failed")
 
-		config := &internal.EnvConfig{}
+		docker.EXPECT().Init(wm.config).Return(wantErr)
 
-		docker.EXPECT().Init(config).Return(wantErr)
-
-		err := wm.Init(ctx, config)
+		err := wm.Init(ctx)
 		require.ErrorIs(t, err, wantErr)
 		assert.False(t, wm.initialized)
 		assert.False(t, wm.closed)
@@ -103,13 +101,12 @@ func TestWorkerManager_Init(t *testing.T) {
 		ctx := context.Background()
 
 		docker, broker, _, wm := newMockWorkerManager(t, 1)
-		config := &internal.EnvConfig{}
 		wantErr := errors.New("broker open failed")
 
-		docker.EXPECT().Init(config).Return(nil)
-		broker.EXPECT().Open(ctx, config).Return(wantErr)
+		docker.EXPECT().Init(wm.config).Return(nil)
+		broker.EXPECT().Open(ctx, wm.config).Return(wantErr)
 
-		err := wm.Init(ctx, config)
+		err := wm.Init(ctx)
 		require.ErrorIs(t, err, wantErr)
 		assert.False(t, wm.initialized)
 		assert.False(t, wm.closed)
@@ -119,14 +116,13 @@ func TestWorkerManager_Init(t *testing.T) {
 		ctx := context.Background()
 
 		docker, broker, db, wm := newMockWorkerManager(t, 1)
-		config := &internal.EnvConfig{}
 		wantErr := errors.New("db init failed")
 
-		docker.EXPECT().Init(config).Return(nil)
-		broker.EXPECT().Open(ctx, config).Return(nil)
-		db.EXPECT().Init(ctx, config).Return(wantErr)
+		docker.EXPECT().Init(wm.config).Return(nil)
+		broker.EXPECT().Open(ctx, wm.config).Return(nil)
+		db.EXPECT().Init(ctx, wm.config).Return(wantErr)
 
-		err := wm.Init(ctx, config)
+		err := wm.Init(ctx)
 		require.ErrorIs(t, err, wantErr)
 		assert.False(t, wm.initialized)
 		assert.False(t, wm.closed)
@@ -137,18 +133,17 @@ func TestWorkerManager_Init(t *testing.T) {
 
 		docker, broker, db, wm := newMockWorkerManager(t, 2)
 
-		config := &internal.EnvConfig{}
 		wantErr := errors.New("spawn failed")
 
 		gomock.InOrder(
-			docker.EXPECT().Init(config).Return(nil),
-			broker.EXPECT().Open(ctx, config).Return(nil),
-			db.EXPECT().Init(ctx, config).Return(nil),
+			docker.EXPECT().Init(wm.config).Return(nil),
+			broker.EXPECT().Open(ctx, wm.config).Return(nil),
+			db.EXPECT().Init(ctx, wm.config).Return(nil),
 			docker.EXPECT().SpawnContainer(ctx).Return("worker-1", nil),
 			docker.EXPECT().SpawnContainer(ctx).Return("", wantErr),
 		)
 
-		err := wm.Init(ctx, config)
+		err := wm.Init(ctx)
 
 		require.ErrorIs(t, err, ErrFailedToSpawnWorker)
 		require.ErrorIs(t, err, wantErr)
@@ -163,17 +158,16 @@ func TestWorkerManager_Init(t *testing.T) {
 		ctx := context.Background()
 
 		docker, broker, db, wm := newMockWorkerManager(t, 2)
-		config := &internal.EnvConfig{}
 
 		gomock.InOrder(
-			docker.EXPECT().Init(config).Return(nil),
-			broker.EXPECT().Open(ctx, config).Return(nil),
-			db.EXPECT().Init(ctx, config).Return(nil),
+			docker.EXPECT().Init(wm.config).Return(nil),
+			broker.EXPECT().Open(ctx, wm.config).Return(nil),
+			db.EXPECT().Init(ctx, wm.config).Return(nil),
 			docker.EXPECT().SpawnContainer(ctx).Return("worker-1", nil),
 			docker.EXPECT().SpawnContainer(ctx).Return("worker-2", nil),
 		)
 
-		err := wm.Init(ctx, config)
+		err := wm.Init(ctx)
 		require.NoError(t, err)
 
 		assert.True(t, wm.initialized)

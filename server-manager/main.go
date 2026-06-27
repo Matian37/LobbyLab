@@ -27,7 +27,7 @@ func run() error {
 
 	wm := app.NewWorkerManager(config)
 
-	if err = wm.Init(ctx, config); err != nil {
+	if err = wm.Init(ctx); err != nil {
 		wm.Close()
 		return err
 	}

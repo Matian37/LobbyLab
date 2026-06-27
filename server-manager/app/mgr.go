@@ -70,7 +70,7 @@ func NewWorkerManager(config *internal.EnvConfig) *WorkerManager {
 	}
 }
 
-func (wm *WorkerManager) Init(ctx context.Context, config *internal.EnvConfig) error {
+func (wm *WorkerManager) Init(ctx context.Context) error {
 	if wm.closed {
 		return ErrMgrClosed
 	}
@@ -78,13 +78,13 @@ func (wm *WorkerManager) Init(ctx context.Context, config *internal.EnvConfig) e
 		return ErrMgrAlreadyInit
 	}
 
-	if err := wm.dockerConn.Init(config); err != nil {
+	if err := wm.dockerConn.Init(wm.config); err != nil {
 		return err
 	}
-	if err := wm.brokerConn.Open(ctx, config); err != nil {
+	if err := wm.brokerConn.Open(ctx, wm.config); err != nil {
 		return err
 	}
-	if err := wm.dbConn.Init(ctx, config); err != nil {
+	if err := wm.dbConn.Init(ctx, wm.config); err != nil {
 		return err
 	}
 
