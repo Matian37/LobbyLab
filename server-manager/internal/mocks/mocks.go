@@ -152,7 +152,7 @@ func (m *MockBrokerConnection) EXPECT() *MockBrokerConnectionMockRecorder {
 }
 
 // AssignJob mocks base method.
-func (m *MockBrokerConnection) AssignJob(ctx context.Context, workerID, config string) error {
+func (m *MockBrokerConnection) AssignJob(ctx context.Context, workerID string, config internal.MatchConfig) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "AssignJob", ctx, workerID, config)
 	ret0, _ := ret[0].(error)
@@ -248,18 +248,18 @@ func (m *MockWorkerManager) EXPECT() *MockWorkerManagerMockRecorder {
 }
 
 // AssignMatch mocks base method.
-func (m *MockWorkerManager) AssignMatch(ctx context.Context, matchID int, config string) (internal.ServerInfo, error) {
+func (m *MockWorkerManager) AssignMatch(ctx context.Context, config internal.MatchConfig) (internal.ServerInfo, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "AssignMatch", ctx, matchID, config)
+	ret := m.ctrl.Call(m, "AssignMatch", ctx, config)
 	ret0, _ := ret[0].(internal.ServerInfo)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // AssignMatch indicates an expected call of AssignMatch.
-func (mr *MockWorkerManagerMockRecorder) AssignMatch(ctx, matchID, config any) *gomock.Call {
+func (mr *MockWorkerManagerMockRecorder) AssignMatch(ctx, config any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AssignMatch", reflect.TypeOf((*MockWorkerManager)(nil).AssignMatch), ctx, matchID, config)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AssignMatch", reflect.TypeOf((*MockWorkerManager)(nil).AssignMatch), ctx, config)
 }
 
 // Close mocks base method.

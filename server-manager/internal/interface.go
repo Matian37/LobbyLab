@@ -15,7 +15,7 @@ type DockerConnection interface {
 
 type BrokerConnection interface {
 	Open(ctx context.Context, config *EnvConfig) error
-	AssignJob(ctx context.Context, workerID string, config string) error
+	AssignJob(ctx context.Context, workerID string, config MatchConfig) error
 	// GetWorkersPong broadcasts a ping to all active workers
 	// and returns those that respond before the timeout.
 	GetWorkersPong(ctx context.Context) (Responders, error)
@@ -31,7 +31,7 @@ type WorkerManager interface {
 	ResultLoop(ctx context.Context) error
 	HealthLoop(ctx context.Context) error
 	WaitForFreeWorker(ctx context.Context) error
-	AssignMatch(ctx context.Context, matchID int, config string) (ServerInfo, error)
+	AssignMatch(ctx context.Context, config MatchConfig) (ServerInfo, error)
 }
 
 type DatabaseConnection interface {

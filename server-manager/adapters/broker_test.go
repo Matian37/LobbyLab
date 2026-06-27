@@ -4,6 +4,7 @@ package adapters
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net"
 	"testing"
@@ -119,13 +120,13 @@ func TestNATSConnection_Open(t *testing.T) {
 func TestNATSConnection_AssignJob(t *testing.T) {
 	t.Run("not open", func(t *testing.T) {
 		conn := NATSConnection{}
-		err := conn.AssignJob(context.Background(), "", "")
+		err := conn.AssignJob(context.Background(), "", internal.MatchConfig{})
 		assert.ErrorIs(t, err, ErrNATSConnNotOpen)
 	})
 
 	t.Run("closed", func(t *testing.T) {
 		conn := NATSConnection{opened: true, closed: true}
-		err := conn.AssignJob(context.Background(), "", "")
+		err := conn.AssignJob(context.Background(), "", internal.MatchConfig{})
 		assert.ErrorIs(t, err, ErrNATSConnClosed)
 	})
 
@@ -139,7 +140,7 @@ func TestNATSConnection_AssignJob(t *testing.T) {
 		conn.assignJobTimeout = 1 * time.Millisecond
 
 		start := time.Now()
-		err = conn.AssignJob(context.Background(), "", "")
+		err = conn.AssignJob(context.Background(), "", internal.MatchConfig{})
 		elapsed := time.Since(start)
 
 		assert.ErrorIs(t, err, nats.ErrNoResponders)
@@ -156,7 +157,7 @@ func TestNATSConnection_AssignJob(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		cancel()
 
-		err = conn.AssignJob(ctx, "", "")
+		err = conn.AssignJob(ctx, "", internal.MatchConfig{})
 		assert.ErrorIs(t, err, context.Canceled)
 	})
 
@@ -168,7 +169,10 @@ func TestNATSConnection_AssignJob(t *testing.T) {
 		require.NoError(t, err)
 
 		workerID := "test-worker"
-		expectedConfig := `{"game":"test"}`
+
+		expectedConfig := internal.MatchConfig{MatchID: 1, Config: json.RawMessage(`{"game":"test"}`)}
+		expectedPayload, err := json.Marshal(expectedConfig)
+		require.NoError(t, err)
 
 		nc, err := nats.Connect(addr)
 		require.NoError(t, err)
@@ -188,7 +192,7 @@ func TestNATSConnection_AssignJob(t *testing.T) {
 
 		select {
 		case config := <-receivedConfig:
-			assert.Equal(t, expectedConfig, config)
+			assert.Equal(t, string(expectedPayload), config)
 		case <-time.After(1 * time.Second):
 			assert.Fail(t, "did not receive config on worker subject")
 		}

@@ -15,6 +15,11 @@ type EnvConfig struct {
 	PublicHost  string
 }
 
+type MatchConfig struct {
+	MatchID int             `json:"matchID"`
+	Config  json.RawMessage `json:"config"`
+}
+
 type Result struct {
 	Success bool            `json:"success"`
 	MatchID int             `json:"matchID"`

@@ -226,7 +226,7 @@ func (wm *WorkerManager) WaitForFreeWorker(ctx context.Context) {
 	}
 }
 
-func (wm *WorkerManager) AssignMatch(ctx context.Context, matchID int, config string) (internal.ServerInfo, error) {
+func (wm *WorkerManager) AssignMatch(ctx context.Context, config internal.MatchConfig) (internal.ServerInfo, error) {
 	if !wm.initialized {
 		return internal.ServerInfo{}, ErrMgrNoInit
 	}
@@ -251,7 +251,7 @@ func (wm *WorkerManager) AssignMatch(ctx context.Context, matchID int, config st
 	if err != nil {
 		return internal.ServerInfo{}, err
 	}
-	worker.SetOccupied(matchID)
+	worker.SetOccupied(config.MatchID)
 
 	return internal.ServerInfo{Host: wm.config.PublicHost, Port: port}, nil
 }

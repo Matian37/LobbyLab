@@ -236,13 +236,13 @@ func TestWorkerManager_getFreeWorker(t *testing.T) {
 func TestWorkerManager_AssignMatch(t *testing.T) {
 	t.Run("not initialized", func(t *testing.T) {
 		wm := WorkerManager{}
-		_, err := wm.AssignMatch(context.Background(), 1, "{}")
+		_, err := wm.AssignMatch(context.Background(), internal.MatchConfig{})
 		require.ErrorIs(t, err, ErrMgrNoInit)
 	})
 
 	t.Run("closed", func(t *testing.T) {
 		wm := WorkerManager{initialized: true, closed: true}
-		_, err := wm.AssignMatch(context.Background(), 1, "{}")
+		_, err := wm.AssignMatch(context.Background(), internal.MatchConfig{})
 		require.ErrorIs(t, err, ErrMgrClosed)
 	})
 
@@ -251,7 +251,7 @@ func TestWorkerManager_AssignMatch(t *testing.T) {
 		workers[0].SetOccupied(1)
 		_, _, _, wm := newMockWorkerManagerWithInit(t, workers)
 
-		_, err := wm.AssignMatch(context.Background(), 2, "{}")
+		_, err := wm.AssignMatch(context.Background(), internal.MatchConfig{})
 		require.ErrorIs(t, err, ErrNoFreeWorker)
 	})
 
@@ -264,7 +264,7 @@ func TestWorkerManager_AssignMatch(t *testing.T) {
 
 		docker.EXPECT().GetGamePort(ctx, "worker-1").Return("", wantErr)
 
-		_, err := wm.AssignMatch(ctx, 1, "{}")
+		_, err := wm.AssignMatch(ctx, internal.MatchConfig{})
 		require.ErrorIs(t, err, wantErr)
 		assert.Equal(t, WorkerFree, wm.workers[0].State)
 	})
@@ -276,12 +276,14 @@ func TestWorkerManager_AssignMatch(t *testing.T) {
 		docker, broker, _, wm := newMockWorkerManagerWithInit(t, workers)
 		wantErr := errors.New("assign failed")
 
+		config := internal.MatchConfig{MatchID: 43}
+
 		gomock.InOrder(
 			docker.EXPECT().GetGamePort(ctx, "worker-1").Return("30001", nil),
-			broker.EXPECT().AssignJob(ctx, "worker-1", "{}").Return(wantErr),
+			broker.EXPECT().AssignJob(ctx, "worker-1", config).Return(wantErr),
 		)
 
-		_, err := wm.AssignMatch(ctx, 1, "{}")
+		_, err := wm.AssignMatch(ctx, config)
 		require.ErrorIs(t, err, wantErr)
 		assert.Equal(t, WorkerFree, wm.workers[0].State)
 	})
@@ -289,7 +291,7 @@ func TestWorkerManager_AssignMatch(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		ctx := context.Background()
 
-		config := `{"game":"arena"}`
+		config := internal.MatchConfig{MatchID: 42, Config: []byte("{}")}
 		workers := []*Worker{NewWorker("worker-1", 3, 30*time.Second)}
 		docker, broker, _, wm := newMockWorkerManagerWithInit(t, workers)
 
@@ -298,11 +300,11 @@ func TestWorkerManager_AssignMatch(t *testing.T) {
 			broker.EXPECT().AssignJob(ctx, "worker-1", config).Return(nil),
 		)
 
-		info, err := wm.AssignMatch(ctx, 42, config)
+		info, err := wm.AssignMatch(ctx, config)
 		require.NoError(t, err)
 		assert.Equal(t, internal.ServerInfo{Host: wm.config.PublicHost, Port: "30001"}, info)
 		assert.Equal(t, WorkerOccupied, wm.workers[0].State)
-		assert.Equal(t, 42, wm.workers[0].matchID)
+		assert.Equal(t, config.MatchID, wm.workers[0].matchID)
 	})
 }
 
@@ -860,14 +862,15 @@ func TestWorkerManager_LifeCycle(t *testing.T) {
 		ctx := context.Background()
 
 		workers := []*Worker{NewWorker("worker-1", 1, 1*time.Hour), NewWorker("worker-2", 1, 1*time.Hour)}
-
 		workers[0].SetOccupied(2)
 		workers[1].SetRestarting()
+
+		config := internal.MatchConfig{MatchID: 41}
 
 		docker, broker, _, wm := newMockWorkerManagerWithInit(t, workers)
 		broker.EXPECT().GetWorkersPong(ctx).Return(internal.Responders{"worker-2": {}}, nil)
 		docker.EXPECT().GetGamePort(ctx, "worker-2").Return("8080/udp", nil)
-		broker.EXPECT().AssignJob(ctx, "worker-2", "{}").Return(nil)
+		broker.EXPECT().AssignJob(ctx, "worker-2", config).Return(nil)
 
 		type Result struct {
 			serverInfo internal.ServerInfo
@@ -877,7 +880,7 @@ func TestWorkerManager_LifeCycle(t *testing.T) {
 
 		go func() {
 			wm.WaitForFreeWorker(ctx)
-			serverInfo, err := wm.AssignMatch(ctx, 1, "{}")
+			serverInfo, err := wm.AssignMatch(ctx, config)
 			done <- Result{serverInfo: serverInfo, err: err}
 		}()
 		require.NoError(t, wm.healthCheck(ctx))

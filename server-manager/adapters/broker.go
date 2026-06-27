@@ -2,6 +2,7 @@ package adapters
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"server-manager/internal"
 	"time"
@@ -95,7 +96,7 @@ func (nc *NATSConnection) Open(ctx context.Context, config *internal.EnvConfig) 
 	return nil
 }
 
-func (nc *NATSConnection) AssignJob(ctx context.Context, workerID string, config string) error {
+func (nc *NATSConnection) AssignJob(ctx context.Context, workerID string, config internal.MatchConfig) error {
 	if !nc.opened {
 		return ErrNATSConnNotOpen
 	}
@@ -103,13 +104,18 @@ func (nc *NATSConnection) AssignJob(ctx context.Context, workerID string, config
 		return ErrNATSConnClosed
 	}
 
+	payload, err := json.Marshal(config)
+	if err != nil {
+		return err
+	}
+
 	timeoutCtx, stop := context.WithTimeout(ctx, nc.assignJobTimeout)
 	defer stop()
 
-	_, err := nc.conn.RequestWithContext(
+	_, err = nc.conn.RequestWithContext(
 		timeoutCtx,
 		assignSubject+"."+workerID,
-		[]byte(config),
+		payload,
 	)
 
 	return err

@@ -43,6 +43,19 @@
   - Purpose: durable match result event stream. Workers publish one event when
     a match finishes successfully or is cancelled.
 
+Assign match payload:
+
+```json
+{
+  "matchID": 1234,
+  "config": {}
+}
+```
+
+- `matchID`: the unique identifier of the match.
+- `config`: match-specific config data. Used by the actual game server to start the match.
+
+
 Result event payload:
 
 ```json
