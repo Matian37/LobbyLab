@@ -1,4 +1,4 @@
-//go:generate go run go.uber.org/mock/mockgen -source=./interface.go -destination=./mocks/mocks.go -package=mocks
+//go:generate go run go.uber.org/mock/mockgen -source=./interface.go -destination=./mocks/interface.go -package=mocks
 
 package internal
 

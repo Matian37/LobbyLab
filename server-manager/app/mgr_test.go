@@ -1,4 +1,4 @@
-//go:generate go run go.uber.org/mock/mockgen -destination=./../internal/mocks/mocks_backoff.go -package=mocks github.com/cenkalti/backoff/v6 BackOff
+//go:generate go run go.uber.org/mock/mockgen -destination=./../internal/mocks/backoff.go -package=mocks github.com/cenkalti/backoff/v6 BackOff
 package app
 
 import (
