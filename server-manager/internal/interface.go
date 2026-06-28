@@ -1,42 +1,37 @@
-//go:generate go run go.uber.org/mock/mockgen -source=./interface.go -destination=./mocks/interface.go -package=mocks
-
 package internal
 
-import "context"
+import (
+	"context"
+	"time"
 
-type DockerConnection interface {
+	"github.com/moby/moby/api/types/network"
+)
+
+type DockerClient interface {
 	Init(config *EnvConfig) error
-	SpawnContainer(ctx context.Context) (string, error)
+	CreateWorkerContainer(ctx context.Context) (string, error)
+	IsContainerOK(ctx context.Context, id string) (bool, error)
 	RestartContainer(ctx context.Context, id string) error
 	KillContainer(ctx context.Context, id string) error
-	GetGamePort(ctx context.Context, containerID string) (string, error)
+	GetPorts(ctx context.Context, containerID string) (network.PortMap, error)
 	Close() error
 }
 
 type BrokerConnection interface {
-	Open(ctx context.Context, config *EnvConfig) error
-	AssignJob(ctx context.Context, workerID string, config MatchConfig) error
-	// GetWorkersPong broadcasts a ping to all active workers
-	// and returns those that respond before the timeout.
-	GetWorkersPong(ctx context.Context) (Responders, error)
-	GetResult(ctx context.Context) (Message, error)
+	Open(timeout time.Duration, config *EnvConfig) error
+	SendPing(ctx context.Context) error
+	GetPong(ctx context.Context) (string, time.Time, error)
+	AssignJob(ctx context.Context, workerID string, config string) error
 	Close() error
 }
 
 type WorkerManager interface {
-	Init(ctx context.Context, config *EnvConfig) error
-	Run(ctx context.Context)
-	Close() error
-	SaveLoop(ctx context.Context) error
-	ResultLoop(ctx context.Context) error
-	HealthLoop(ctx context.Context) error
-	WaitForFreeWorker(ctx context.Context) error
-	AssignMatch(ctx context.Context, config MatchConfig) (ServerInfo, error)
-}
-
-type Message interface {
-	Data() []byte
-	Ack() error
+	Init(ctx context.Context, config *EnvConfig, workerCount int) error
+	WaitForFreeWorker(ctx context.Context)
+	AssignMatch(ctx context.Context, config *MatchConfig) (Socket, error)
+	Monitor(ctx context.Context)
+	SaveResults(ctx context.Context)
+	Close(ctx context.Context)
 }
 
 type Matchmaker interface {
@@ -47,6 +42,6 @@ type Matchmaker interface {
 type DB interface {
 	StartListening(ctx context.Context) error
 	GetList(ctx context.Context) (error, []User)
-	AddMatch(ctx context.Context, users []User, socket ServerInfo) error
+	AddMatch(ctx context.Context, users []User, socket Socket) error
 	SaveMatchResults(ctx context.Context, details string, match_id int) error
 }

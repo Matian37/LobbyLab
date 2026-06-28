@@ -28,12 +28,12 @@ func NewUser(_login string) *User {
 	}
 }
 
-type ServerInfo struct {
+type Socket struct {
 	Host, Port string
 }
 
-func NewServerInfo(host string, port string) *ServerInfo {
-	return &ServerInfo{
+func NewSocket(host string, port string) *Socket {
+	return &Socket{
 		Host: host,
 		Port: port,
 	}
