@@ -26,6 +26,8 @@ require (
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/go-logr/logr v1.4.2 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
+	github.com/klauspost/compress v1.18.5 // indirect
+	github.com/lib/pq v1.12.3 // indirect
 	github.com/google/go-tpm v0.9.8 // indirect
 	github.com/klauspost/compress v1.18.6 // indirect
 	github.com/minio/highwayhash v1.0.4 // indirect
