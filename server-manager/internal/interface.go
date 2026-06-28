@@ -34,19 +34,13 @@ type WorkerManager interface {
 	AssignMatch(ctx context.Context, config MatchConfig) (ServerInfo, error)
 }
 
+type DatabaseConnection interface {
+	Init(ctx context.Context, config *EnvConfig) error
+	SaveMatchResult(ctx context.Context, result Result) error
+	Close() error
+}
+
 type Message interface {
 	Data() []byte
 	Ack() error
-}
-
-type Matchmaker interface {
-	StartMatchmaking(ctx context.Context) error
-	CreateMatches(ctx context.Context, users []User) error
-}
-
-type DB interface {
-	StartListening(ctx context.Context) error
-	GetList(ctx context.Context) (error, []User)
-	AddMatch(ctx context.Context, users []User, socket ServerInfo) error
-	SaveMatchResults(ctx context.Context, details string, match_id int) error
 }

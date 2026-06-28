@@ -1,7 +1,7 @@
 import postgres from "postgres";
 import { handleError } from "./error_handler";
 let DATABASE_URL = process.env.DATABASE_URL;
-if(process.env.VITEST || process.env.NODE_ENV == "development")
+if(process.env.VITEST)
     DATABASE_URL = 'postgresql://postgres:123@localhost:5432/postgres';
 
 const sql = postgres(DATABASE_URL);

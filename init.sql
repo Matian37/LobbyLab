@@ -11,11 +11,6 @@ CREATE TABLE IF NOT EXISTS users(
     match_id INT REFERENCES matches(id)
 );
 
-CREATE TABLE IF NOT EXISTS results(
-    match_id INT,
-    details JSONB
-);
-
 CREATE TABLE IF NOT EXISTS waiting(
     login TEXT PRIMARY KEY
 );
@@ -52,26 +47,3 @@ AFTER UPDATE ON users
 FOR EACH ROW
 WHEN (OLD.match_id IS NULL AND NEW.match_id IS NOT NULL)
 EXECUTE FUNCTION notify_users_match_id();
-
-CREATE OR REPLACE FUNCTION notify_waiting()
-RETURNS trigger
-LANGUAGE plpgsql AS $$
-DECLARE
-    payload TEXT;
-BEGIN
-    IF TG_OP = 'INSERT' THEN
-        payload := json_build_object(
-            'username', NEW.login
-        )::TEXT;
-    END IF;
-
-    PERFORM pg_notify('new_waiting_user', payload);
-
-    RETURN NULL;
-END;
-$$;
-
-CREATE OR REPLACE TRIGGER trg_waiting
-AFTER UPDATE ON waiting
-FOR EACH ROW
-EXECUTE FUNCTION notify_waiting();
