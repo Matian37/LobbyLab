@@ -77,7 +77,7 @@ func (d *DB) GetList(ctx context.Context) (error, []internal.User) {
 	return nil, users
 }
 
-func (d *DB) AddMatch(ctx context.Context, users []internal.User, socket internal.Socket) error {
+func (d *DB) AddMatch(ctx context.Context, users []internal.User, socket internal.ServerInfo) error {
 	var id int
 	err := d.Db.QueryRowContext(ctx, "INSERT INTO matches (host, port) VALUES ($1, $2) RETURNING id", socket.Host, socket.Port).Scan(&id)
 	if err != nil {

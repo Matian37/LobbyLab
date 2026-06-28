@@ -82,7 +82,7 @@ func TestAddMatch(t *testing.T) {
 	}
 	defer rows.Close()
 
-	err = d.AddMatch(ctx, users, *internal.NewSocket("someGameServerHost", "1234"))
+	err = d.AddMatch(ctx, users, *internal.NewServerInfo("someGameServerHost", "1234"))
 	if err != nil {
 		t.Errorf("%v", err)
 	}

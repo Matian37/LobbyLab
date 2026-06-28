@@ -14,8 +14,8 @@ func (m *MockWorkerManager) Init(ctx context.Context, config *EnvConfig, workerC
 	return nil
 }
 func (m *MockWorkerManager) WaitForFreeWorker(ctx context.Context) {}
-func (m *MockWorkerManager) AssignMatch(ctx context.Context, config *MatchConfig) (Socket, error) {
-	return *NewSocket("http://jakis/host", "2137"), nil
+func (m *MockWorkerManager) AssignMatch(ctx context.Context, config *MatchConfig) (ServerInfo, error) {
+	return *NewServerInfo("http://jakis/host", "2137"), nil
 }
 func (m *MockWorkerManager) Monitor(ctx context.Context)     {}
 func (m *MockWorkerManager) SaveResults(ctx context.Context) {}
@@ -35,7 +35,7 @@ func (d *MockDB) GetList(ctx context.Context) (error, []User) {
 	return nil, []User{}
 }
 
-func (d *MockDB) AddMatch(ctx context.Context, users []User, socket Socket) error {
+func (d *MockDB) AddMatch(ctx context.Context, users []User, socket ServerInfo) error {
 	return nil
 }
 
