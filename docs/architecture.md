@@ -27,10 +27,13 @@
 ## NATS subjects
 
 - `workers.health`
-  - Type: request/reply
+  - Type: pub/sub
   - Direction: server manager -> workers
-  - Purpose: health check ping. Server manager sends a ping request to all
-    workers. Each worker replies with its container ID.
+  - Purpose: health check ping. Every worker subscribes to this subject.
+- `workers.health.<container_id>`
+  - Type: pub/sub
+  - Direction: worker -> server manager
+  - Purpose: health check pong. A worker replies on its container-specific subject.
 - `workers.assign.<container_id>`
   - Type: request/reply
   - Direction: server manager -> worker
@@ -43,32 +46,17 @@
   - Purpose: durable match result event stream. Workers publish one event when
     a match finishes successfully or is cancelled.
 
-Assign match payload:
-
-```json
-{
-  "matchID": 1234,
-  "config": {}
-}
-```
-
-- `matchID`: the unique identifier of the match.
-- `config`: match-specific config data. Used by the actual game server to start the match.
-
-
 Result event payload:
 
 ```json
 {
   "success": true,
-  "matchID": 1234,
   "details": {}
 }
 ```
 
 - `success`: `true` when the match completed and produced a result, `false`
   when the match was cancelled.
-- `matchID`: the unique identifier of the match.
 - `details`: match-specific result data. For cancellation events this is an
   empty object.
 
