@@ -211,7 +211,7 @@ func TestIntegration_DockerConnection_SpawnContainer(t *testing.T) {
 
 		info := inspectContainer(t, dc, id)
 		require.NotNil(t, info.Container.State)
-		assert.True(t, info.Container.State.Running)
+		assert.Equal(t, info.Container.State.Status, container.StateRunning)
 		require.NotNil(t, info.Container.Config)
 		assert.Equal(t, dc.config.Image, info.Container.Config.Image)
 	})
