@@ -155,9 +155,9 @@ func TestWorker_HandlePong(t *testing.T) {
 			initStateID: 3,
 			initFails:   2,
 			pong:        true,
-			wantState:   WorkerFree,
-			wantStateID: 4,
-			wantFails:   0,
+			wantState:   WorkerRestarting,
+			wantStateID: 3,
+			wantFails:   2,
 		},
 		{
 			name:        "worker restarting with failed pong",
@@ -350,18 +350,6 @@ func TestWorker_LifeCycle(t *testing.T) {
 
 		worker.SetRestarting()
 		require.True(t, worker.IsHealthy())
-	})
-
-	t.Run("worker restart flow", func(t *testing.T) {
-		worker := NewWorker("test", 0, -1*time.Second)
-		worker.SetRestarting()
-		worker.HandlePong(true)
-
-		expected := newTestWorkerFree(2)
-		expected.restartTimeout = worker.restartTimeout
-
-		assert.Equal(t, *worker, expected)
-		assert.True(t, worker.IsHealthy())
 	})
 
 	t.Run("stateID increments monotonically", func(t *testing.T) {

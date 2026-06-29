@@ -18,7 +18,7 @@ type Worker struct {
 	State           WorkerState
 	stateID         int
 	stateValidUntil time.Time
-	matchID         int
+	matchID         int // ids must be positive numbers
 	failCount       int
 
 	maxPingRetries int
@@ -68,17 +68,16 @@ func (w *Worker) SetOccupied(matchID int) int {
 }
 
 func (w *Worker) HandlePong(pong bool) {
-	switch w.State {
-	case WorkerRestarting:
-		if pong {
-			w.SetFree()
-		}
-	default:
-		if !pong {
-			w.failCount++
-		} else {
-			w.failCount = 0
-		}
+	if w.State == WorkerRestarting {
+		// pong arrive before restartWorker changed worker's state
+		// best action is to wait for the state to be changed to free
+		return
+	}
+
+	if !pong {
+		w.failCount++
+	} else {
+		w.failCount = 0
 	}
 }
 

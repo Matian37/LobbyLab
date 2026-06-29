@@ -864,7 +864,6 @@ func TestWorkerManager_LifeCycle(t *testing.T) {
 
 		workers := []*Worker{NewWorker("worker-1", 1, 1*time.Hour), NewWorker("worker-2", 1, 1*time.Hour)}
 		workers[0].SetOccupied(2)
-		workers[1].SetRestarting()
 
 		config := internal.MatchConfig{MatchID: 41}
 
@@ -928,6 +927,7 @@ func TestWorkerManager_LifeCycle(t *testing.T) {
 
 		close(blockRestart)
 		wg.Wait()
+		wm.wg.Wait()
 
 		require.Equal(t, WorkerFree, wm.workers[1].State)
 		require.Equal(t, WorkerRestarting, wm.workers[2].State)
