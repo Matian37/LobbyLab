@@ -21,8 +21,6 @@ const (
 	containerImage        = "busybox:latest"
 )
 
-// TODO: make integration test skippable
-
 func newTestConnWithPorts(t *testing.T, exposePorts []string, clientPort string) *DockerConnection {
 	t.Helper()
 
@@ -103,7 +101,7 @@ func TestDockerConnection_New(t *testing.T) {
 	assert.Nil(t, dc.config)
 }
 
-func TestDockerConnection_Init(t *testing.T) {
+func TestIntegration_DockerConnection_Init(t *testing.T) {
 	t.Run("already init", func(t *testing.T) {
 		dc := DockerConnection{initialized: true}
 		err := dc.Init(&internal.EnvConfig{})
@@ -131,7 +129,7 @@ func TestDockerConnection_Init(t *testing.T) {
 	})
 }
 
-func TestDockerConnection_Close(t *testing.T) {
+func TestIntegration_DockerConnection_Close(t *testing.T) {
 	t.Run("not init", func(t *testing.T) {
 		dc := DockerConnection{}
 		err := dc.Close()
@@ -152,7 +150,7 @@ func TestDockerConnection_Close(t *testing.T) {
 	})
 }
 
-func TestDockerConnection_containerCreateOptions(t *testing.T) {
+func TestIntegration_DockerConnection_containerCreateOptions(t *testing.T) {
 	exposePorts := []string{"80", "8080"}
 	portMap := network.PortMap{}
 
@@ -165,7 +163,7 @@ func TestDockerConnection_containerCreateOptions(t *testing.T) {
 	assert.Equal(t, opts.HostConfig.PortBindings, portMap)
 }
 
-func TestDockerConnection_SpawnContainer(t *testing.T) {
+func TestIntegration_DockerConnection_SpawnContainer(t *testing.T) {
 	t.Run("not init", func(t *testing.T) {
 		dc := DockerConnection{}
 		_, err := dc.SpawnContainer(context.Background())
@@ -219,7 +217,7 @@ func TestDockerConnection_SpawnContainer(t *testing.T) {
 	})
 }
 
-func TestDockerConnection_RestartContainer(t *testing.T) {
+func TestIntegration_DockerConnection_RestartContainer(t *testing.T) {
 	t.Run("not init", func(t *testing.T) {
 		dc := NewDockerConnection()
 		err := dc.RestartContainer(context.Background(), "")
@@ -277,7 +275,7 @@ func TestDockerConnection_RestartContainer(t *testing.T) {
 	})
 }
 
-func TestDockerConnection_KillContainer(t *testing.T) {
+func TestIntegration_DockerConnection_KillContainer(t *testing.T) {
 	t.Run("not init", func(t *testing.T) {
 		dc := DockerConnection{}
 		err := dc.KillContainer(context.Background(), "id")
@@ -325,7 +323,7 @@ func TestDockerConnection_KillContainer(t *testing.T) {
 	})
 }
 
-func TestDockerConnection_getPorts(t *testing.T) {
+func TestIntegration_DockerConnection_getPorts(t *testing.T) {
 	t.Run("timeout", func(t *testing.T) {
 		dc := newTestConn(t)
 		dc.inspectTimeout = 0
@@ -368,7 +366,7 @@ func TestDockerConnection_getPorts(t *testing.T) {
 	})
 }
 
-func TestDockerConnection_GetGamePort(t *testing.T) {
+func TestIntegration_DockerConnection_GetGamePort(t *testing.T) {
 	t.Run("not init", func(t *testing.T) {
 		dc := DockerConnection{}
 		_, err := dc.GetGamePort(context.Background(), "id")

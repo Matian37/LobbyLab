@@ -48,7 +48,7 @@ func newNATSServerWithoutJS(t *testing.T) string {
 	return createNATSServer(t, false)
 }
 
-func TestNewNATSConnection(t *testing.T) {
+func TestIntegration_NewNATSConnection(t *testing.T) {
 	conn := NewNATSConnection()
 
 	assert.NotNil(t, conn)
@@ -64,7 +64,7 @@ func TestNewNATSConnection(t *testing.T) {
 	assert.False(t, conn.closed)
 }
 
-func TestNATSConnection_Open(t *testing.T) {
+func TestIntegration_NATSConnection_Open(t *testing.T) {
 	t.Run("closed", func(t *testing.T) {
 		conn := NATSConnection{closed: true}
 		err := conn.Open(context.Background(), &internal.EnvConfig{})
@@ -117,7 +117,7 @@ func TestNATSConnection_Open(t *testing.T) {
 	})
 }
 
-func TestNATSConnection_AssignJob(t *testing.T) {
+func TestIntegration_NATSConnection_AssignJob(t *testing.T) {
 	t.Run("not open", func(t *testing.T) {
 		conn := NATSConnection{}
 		err := conn.AssignJob(context.Background(), "", internal.MatchConfig{})
@@ -199,7 +199,7 @@ func TestNATSConnection_AssignJob(t *testing.T) {
 	})
 }
 
-func TestNATSConnection_PingWorkers(t *testing.T) {
+func TestIntegration_NATSConnection_PingWorkers(t *testing.T) {
 	t.Run("not open", func(t *testing.T) {
 		conn := NATSConnection{}
 		_, err := conn.GetWorkersPong(context.Background())
@@ -256,7 +256,7 @@ func TestNATSConnection_PingWorkers(t *testing.T) {
 	})
 }
 
-func TestNATSConnection_GetResult(t *testing.T) {
+func TestIntegration_NATSConnection_GetResult(t *testing.T) {
 	t.Run("not open", func(t *testing.T) {
 		conn := NATSConnection{}
 		_, err := conn.GetResult(context.Background())
@@ -307,7 +307,7 @@ func TestNATSConnection_GetResult(t *testing.T) {
 	})
 }
 
-func TestNATSConnection_Close(t *testing.T) {
+func TestIntegration_NATSConnection_Close(t *testing.T) {
 	t.Run("not open", func(t *testing.T) {
 		conn := NATSConnection{}
 		err := conn.Close()
