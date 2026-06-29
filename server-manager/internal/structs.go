@@ -13,6 +13,9 @@ type EnvConfig struct {
 	ClientPort  network.Port
 	BrokerURI   string
 	PublicHost  string
+
+	// must not be exposed for production use
+	TestMakeContainerDummy bool
 }
 
 type MatchConfig struct {

@@ -32,9 +32,10 @@ func newTestConnWithPorts(t *testing.T, exposePorts []string, clientPort string)
 	dc := NewDockerConnection()
 
 	err := dc.Init(&internal.EnvConfig{
-		Image:       containerImage,
-		ExposePorts: exposeSet,
-		ClientPort:  network.MustParsePort(clientPort),
+		Image:                  containerImage,
+		ExposePorts:            exposeSet,
+		ClientPort:             network.MustParsePort(clientPort),
+		TestMakeContainerDummy: true,
 	})
 	require.NoError(t, err)
 	t.Cleanup(func() { dc.Close() })
@@ -151,16 +152,32 @@ func TestIntegration_DockerConnection_Close(t *testing.T) {
 }
 
 func TestIntegration_DockerConnection_containerCreateOptions(t *testing.T) {
-	exposePorts := []string{"80", "8080"}
-	portMap := network.PortMap{}
+	t.Run("success", func(t *testing.T) {
+		dc := DockerConnection{config: &internal.EnvConfig{Image: "abc"}}
 
-	dc := newTestConnWithPorts(t, exposePorts, "8080")
+		portMap := network.PortMap{network.MustParsePort("1234"): {}}
+		opts := dc.containerCreateOptions(portMap)
 
-	opts := dc.containerCreateOptions(portMap)
+		assert.Equal(t, opts.Image, dc.config.Image)
+		assert.Nil(t, opts.Config)
 
-	assert.Equal(t, opts.Image, dc.config.Image)
-	require.NotNil(t, opts.HostConfig)
-	assert.Equal(t, opts.HostConfig.PortBindings, portMap)
+		require.NotNil(t, opts.HostConfig)
+		assert.Equal(t, opts.HostConfig.PortBindings, portMap)
+		assert.Nil(t, opts.HostConfig.Init)
+	})
+
+	t.Run("TestContainerDummy env", func(t *testing.T) {
+		exposePorts := []string{"80", "8080"}
+		portMap := network.PortMap{}
+
+		dc := newTestConnWithPorts(t, exposePorts, "8080")
+
+		opts := dc.containerCreateOptions(portMap)
+		require.NotNil(t, opts.Config)
+		assert.NotEmpty(t, opts.Config.Cmd)
+		require.NotNil(t, opts.HostConfig.Init)
+		assert.True(t, *opts.HostConfig.Init)
+	})
 }
 
 func TestIntegration_DockerConnection_SpawnContainer(t *testing.T) {

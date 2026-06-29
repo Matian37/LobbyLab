@@ -41,9 +41,10 @@ func setAllEnvExcept(t *testing.T, except ...string) *internal.EnvConfig {
 			network.MustParsePort("80"):      {},
 			network.MustParsePort("443/udp"): {},
 		},
-		ClientPort: network.MustParsePort("80"),
-		BrokerURI:  "nats://localhost:4222",
-		PublicHost: "127.0.0.1",
+		ClientPort:             network.MustParsePort("80"),
+		BrokerURI:              "nats://localhost:4222",
+		PublicHost:             "127.0.0.1",
+		TestMakeContainerDummy: false,
 	}
 }
 
