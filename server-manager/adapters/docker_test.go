@@ -153,13 +153,21 @@ func TestIntegration_DockerConnection_Close(t *testing.T) {
 
 func TestIntegration_DockerConnection_containerCreateOptions(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
-		dc := DockerConnection{config: &internal.EnvConfig{Image: "abc"}}
-
+		dc := DockerConnection{
+			config: &internal.EnvConfig{
+				Image: "abc",
+				ExposePorts: network.PortSet{
+					network.MustParsePort("1234"): {},
+				},
+			},
+		}
 		portMap := network.PortMap{network.MustParsePort("1234"): {}}
+
 		opts := dc.containerCreateOptions(portMap)
 
 		assert.Equal(t, opts.Image, dc.config.Image)
-		assert.Nil(t, opts.Config)
+		require.NotNil(t, opts.Config)
+		assert.Equal(t, dc.config.ExposePorts, opts.Config.ExposedPorts)
 
 		require.NotNil(t, opts.HostConfig)
 		assert.Equal(t, opts.HostConfig.PortBindings, portMap)
@@ -174,6 +182,7 @@ func TestIntegration_DockerConnection_containerCreateOptions(t *testing.T) {
 
 		opts := dc.containerCreateOptions(portMap)
 		require.NotNil(t, opts.Config)
+		assert.Equal(t, dc.config.ExposePorts, opts.Config.ExposedPorts)
 		assert.NotEmpty(t, opts.Config.Cmd)
 		require.NotNil(t, opts.HostConfig.Init)
 		assert.True(t, *opts.HostConfig.Init)

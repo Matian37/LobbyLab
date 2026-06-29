@@ -190,6 +190,9 @@ func (dc *DockerConnection) getPorts(ctx context.Context, containerID string) (n
 func (dc *DockerConnection) containerCreateOptions(portMap network.PortMap) client.ContainerCreateOptions {
 	options := client.ContainerCreateOptions{
 		Image: dc.config.Image,
+		Config: &container.Config{
+			ExposedPorts: dc.config.ExposePorts,
+		},
 		HostConfig: &container.HostConfig{
 			PortBindings: portMap,
 			RestartPolicy: container.RestartPolicy{
@@ -200,7 +203,7 @@ func (dc *DockerConnection) containerCreateOptions(portMap network.PortMap) clie
 	}
 
 	if dc.config.TestMakeContainerDummy {
-		options.Config = &container.Config{Cmd: []string{"sleep", "inf"}}
+		options.Config.Cmd = []string{"sleep", "inf"}
 		options.HostConfig.Init = new(bool)
 		*options.HostConfig.Init = true
 	}
