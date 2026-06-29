@@ -155,7 +155,7 @@ func (wm *WorkerManager) SaveLoop(ctx context.Context) error {
 		case <-ctx.Done():
 			return ctx.Err()
 		case res := <-wm.saveResultChan:
-			err := wm.dbConn.SaveMatchResult(ctx, res)
+			err := wm.dbConn.SaveMatchResults(ctx, string(res.Details), res.MatchID)
 			if err != nil {
 				slog.Error("failed to save result", "error", err)
 			}

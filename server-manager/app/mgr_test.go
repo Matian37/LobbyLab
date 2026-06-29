@@ -684,10 +684,11 @@ func TestWorkerManager_SaveLoop(t *testing.T) {
 		_, _, db, wm := newMockWorkerManagerWithInit(t, []*Worker{})
 		res := internal.Result{Success: true, MatchID: 42}
 
-		db.EXPECT().SaveMatchResult(ctx, res).DoAndReturn(func(context.Context, internal.Result) error {
-			cancel()
-			return ctx.Err()
-		})
+		db.EXPECT().SaveMatchResults(ctx, string(res.Details), res.MatchID).DoAndReturn(
+			func(context.Context, string, int) error {
+				cancel()
+				return ctx.Err()
+			})
 
 		done := make(chan error, 1)
 		go func() {
@@ -948,10 +949,11 @@ func TestWorkerManager_LifeCycle(t *testing.T) {
 		broker.EXPECT().GetResult(ctx).Return(msg, nil)
 		msg.EXPECT().Data().Return(payload)
 		msg.EXPECT().Ack().Return(nil)
-		db.EXPECT().SaveMatchResult(ctx, res).DoAndReturn(func(ctx context.Context, res internal.Result) error {
-			cancel()
-			return nil
-		})
+		db.EXPECT().SaveMatchResults(ctx, string(res.Details), res.MatchID).
+			DoAndReturn(func(ctx context.Context, details string, matchID int) error {
+				cancel()
+				return nil
+			})
 
 		require.NoError(t, wm.handleResults(ctx))
 		go wm.SaveLoop(ctx)

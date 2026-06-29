@@ -410,18 +410,18 @@ func (mr *MockDatabaseConnectionMockRecorder) Init(ctx, config any) *gomock.Call
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Init", reflect.TypeOf((*MockDatabaseConnection)(nil).Init), ctx, config)
 }
 
-// SaveMatchResult mocks base method.
-func (m *MockDatabaseConnection) SaveMatchResult(ctx context.Context, result internal.Result) error {
+// SaveMatchResults mocks base method.
+func (m *MockDatabaseConnection) SaveMatchResults(ctx context.Context, details string, matchID int) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SaveMatchResult", ctx, result)
+	ret := m.ctrl.Call(m, "SaveMatchResults", ctx, details, matchID)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
-// SaveMatchResult indicates an expected call of SaveMatchResult.
-func (mr *MockDatabaseConnectionMockRecorder) SaveMatchResult(ctx, result any) *gomock.Call {
+// SaveMatchResults indicates an expected call of SaveMatchResults.
+func (mr *MockDatabaseConnectionMockRecorder) SaveMatchResults(ctx, details, matchID any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SaveMatchResult", reflect.TypeOf((*MockDatabaseConnection)(nil).SaveMatchResult), ctx, result)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SaveMatchResults", reflect.TypeOf((*MockDatabaseConnection)(nil).SaveMatchResults), ctx, details, matchID)
 }
 
 // MockMessage is a mock of Message interface.

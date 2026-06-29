@@ -36,7 +36,7 @@ type WorkerManager interface {
 
 type DatabaseConnection interface {
 	Init(ctx context.Context, config *EnvConfig) error
-	SaveMatchResult(ctx context.Context, result Result) error
+	SaveMatchResults(ctx context.Context, details string, matchID int) error
 	Close() error
 }
 

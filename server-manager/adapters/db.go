@@ -11,9 +11,10 @@ func (db *DatabaseConnection) Init(ctx context.Context, config *internal.EnvConf
 	return nil
 }
 
-func (db *DatabaseConnection) SaveMatchResult(ctx context.Context, result internal.Result) error {
+func (db *DatabaseConnection) SaveMatchResults(ctx context.Context, details string, matchID int) error {
 	return nil
 }
+
 func (db *DatabaseConnection) Close() error {
 	return nil
 }

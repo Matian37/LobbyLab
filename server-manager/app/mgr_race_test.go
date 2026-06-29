@@ -123,7 +123,7 @@ func TestRace_ServerManager_LifeCycle(t *testing.T) {
 					return genPayload(test.goroutinePerFunc)
 				}
 			})
-			db.EXPECT().SaveMatchResult(gomock.Any(), gomock.Any()).AnyTimes().Return(nil)
+			db.EXPECT().SaveMatchResults(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes().Return(nil)
 
 			wg := sync.WaitGroup{}
 
