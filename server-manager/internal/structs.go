@@ -11,6 +11,10 @@ type EnvConfig struct {
 	ExposePorts []network.Port
 	BrokerURI   string
 	DatabaseURI string
+	PublicHost  string
+
+	// must not be exposed for production use
+	TestMakeContainerDummy bool
 }
 
 type MatchConfig struct {

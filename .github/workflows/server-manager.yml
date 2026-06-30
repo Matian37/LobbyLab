@@ -1,0 +1,45 @@
+name: server-manager CI
+
+on:
+  push:
+    branches: ["main"]
+    paths:
+      - "server-manager/**"
+  pull_request:
+    branches: ["main"]
+    paths:
+      - "server-manager/**"
+
+defaults:
+  run:
+    working-directory: ./server-manager
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: "1.26.4"
+          cache: true
+          cache-dependency-path: "server-manager/go.sum"
+
+      - name: Lint
+        uses: golangci/golangci-lint-action@v9
+        with:
+          working-directory: server-manager
+
+      - name: Run Unit Tests
+        run: go test -v -short ./...
+
+      - name: Run Race Tests
+        run: go test -v -race -run="^TestRace" ./...
+
+      - name: Pull Image for Integration Tests
+        run: docker pull busybox:latest
+
+      - name: Run Integration Tests
+        run: go test -v -tags=integration -run="^TestIntegration" ./...
