@@ -1,15 +1,16 @@
-package main
+package app
 
 import (
 	"context"
 	"errors"
 	"server-manager/internal"
+	mocks "server-manager/internal/mocks"
 	"testing"
 )
 
 func GetTestMatchmaker() *Matchmaker {
-	m := NewMatchmaker(&internal.MockWorkerManager{}, 2)
-	m.Db = internal.GetMockDB()
+	m := &Matchmaker{WorkerManager: &mocks.MockWorkerManager{}, PlayersPerRoom: 2, EnvConfig: internal.EnvConfig{DatabaseURI: "host=localhost port=5432 user=postgres password=123 dbname=postgres sslmode=disable"}}
+	m.Db = &mocks.MockDB{}
 	return m
 }
 
@@ -23,14 +24,14 @@ func TestCreateMatches(t *testing.T) {
 		{"not enough users", []internal.User{}, errors.New("Not enough users")},
 
 		{"exact number of users", []internal.User{
-			*internal.NewUser("user1"),
-			*internal.NewUser("user2"),
+			internal.User{Login: "user1"},
+			internal.User{Login: "user2"},
 		}, nil},
 
 		{"more than enough users", []internal.User{
-			*internal.NewUser("user3"),
-			*internal.NewUser("user4"),
-			*internal.NewUser("user5"),
+			internal.User{Login: "user3"},
+			internal.User{Login: "user4"},
+			internal.User{Login: "user5"},
 		}, nil},
 	}
 
