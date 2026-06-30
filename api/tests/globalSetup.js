@@ -1,6 +1,7 @@
 import { PostgreSqlContainer } from "@testcontainers/postgresql";
 import postgres from "postgres";
 import fs from "fs";
+import path from "path";
 
 export async function setup() {
   console.log(
@@ -22,8 +23,11 @@ export async function setup() {
   );
 
   // Execute schema init from initTest.sql
-  const initSqlUrl = new URL("./../../init.sql", import.meta.url);
-  const initSql = fs.readFileSync(initSqlUrl, "utf8");
+
+  const initSqlPath = path.resolve(process.cwd(), '../init.sql');
+  const initSql = fs.readFileSync(initSqlPath, "utf8");
+
+  process.env.DATABASE_INIT_SQL = initSql
 
   const sql = postgres(databaseUrl);
   await sql.unsafe(initSql);

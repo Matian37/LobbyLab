@@ -1,18 +1,11 @@
-import { expect, test, beforeEach, describe, beforeAll } from 'vitest';
+import { expect, test, beforeEach, describe } from 'vitest';
 import * as db from '$lib/db.js';
-import bcrypt from 'bcryptjs';
 import postgres from 'postgres';
-import fs from 'fs';
-import path from 'path';
 
 beforeEach(async () => {
     const sql = postgres(process.env.DATABASE_URL);
     await sql.unsafe('DROP SCHEMA public CASCADE; CREATE SCHEMA public;');
-
-    const initSqlPath = path.resolve(process.cwd(), '../init.sql');
-    const initSql = fs.readFileSync(initSqlPath, "utf8");
-
-    await sql.unsafe(initSql);
+    await sql.unsafe(process.env.DATABASE_INIT_SQL);
     await sql.end();
 });
 
