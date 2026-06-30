@@ -21,6 +21,10 @@ func NewDatabaseConnection() *DatabaseConnection {
 
 func (d *DatabaseConnection) Init(ctx context.Context, config *internal.EnvConfig) error {
 	db, err := sql.Open("postgres", config.DatabaseURI)
+	if err != nil {
+		return err
+	}
+
 	err = db.PingContext(ctx)
 	if err != nil {
 		return err
@@ -57,12 +61,14 @@ func (d *DatabaseConnection) StartListening(ctx context.Context) error {
 			case <-d.Listener.Notify:
 				ctxTimeout, cancelTimeout := context.WithTimeout(ctx, 10*time.Second)
 				defer cancelTimeout()
-				err2, users := d.GetList(ctxTimeout)
+				users, err2 := d.GetList(ctxTimeout)
 				if err2 != nil && len(users) > 1 {
-					d.Matchmaker.CreateMatches(ctxTimeout, users)
+					_ = d.Matchmaker.CreateMatches(ctxTimeout, users)
 				}
 			case <-time.After(90 * time.Second):
-				d.Listener.Ping()
+				_ = d.Listener.Ping()
+			case <-ctx.Done():
+				return
 			}
 		}
 	}()
@@ -70,20 +76,22 @@ func (d *DatabaseConnection) StartListening(ctx context.Context) error {
 	return nil
 }
 
-func (d *DatabaseConnection) GetList(ctx context.Context) (error, []internal.User) {
+func (d *DatabaseConnection) GetList(ctx context.Context) ([]internal.User, error) {
 	rows, err := d.Db.QueryContext(ctx, "SELECT * FROM waiting")
 	if err != nil {
-		return err, nil
+		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var users []internal.User
 	for rows.Next() {
 		var u internal.User
-		rows.Scan(&u.Login)
+		if err := rows.Scan(&u.Login); err != nil {
+			return nil, err
+		}
 		users = append(users, u)
 	}
-	return nil, users
+	return users, nil
 }
 
 func (d *DatabaseConnection) AddMatch(ctx context.Context, users []internal.User, serverInfo internal.ServerInfo, matchId int) error {

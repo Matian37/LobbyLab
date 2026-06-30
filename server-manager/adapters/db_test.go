@@ -108,7 +108,7 @@ func TestGetList(t *testing.T) {
 	if err != nil {
 		t.Errorf("%v", err)
 	}
-	err, users := d.GetList(ctx)
+	users, err := d.GetList(ctx)
 	if err != nil {
 		t.Errorf("error while getting the list - %s", err.Error())
 	}
@@ -122,7 +122,7 @@ func TestGetList(t *testing.T) {
 	}
 	defer rows.Close()
 
-	err, users = d.GetList(ctx)
+	users, err = d.GetList(ctx)
 	if err != nil {
 		t.Errorf("error while getting the list - %s", err.Error())
 	}

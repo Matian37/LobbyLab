@@ -19,18 +19,20 @@ func (m *Matchmaker) StartMatchmaking(ctx context.Context) error {
 	dbObj := &adapters.DatabaseConnection{Matchmaker: m}
 	err := dbObj.Init(ctx, &m.EnvConfig)
 	if err != nil {
-		return errors.New("Error while initializing DB")
+		return errors.New("error while initializing db")
 	}
 	m.Db = dbObj
 
-	m.Db.StartListening(ctx)
+	if err := m.Db.StartListening(ctx); err != nil {
+		return err
+	}
 
 	return nil
 }
 
 func (m *Matchmaker) CreateMatches(ctx context.Context, users []internal.User) error {
 	if len(users) < m.PlayersPerRoom {
-		return errors.New("Not enough users")
+		return errors.New("not enough users")
 	}
 
 	for i := 0; i < len(users); i += m.PlayersPerRoom {

@@ -32,7 +32,7 @@ func TestCreateMatches(t *testing.T) {
 		users    []internal.User
 		expected error
 	}{
-		{"not enough users", []internal.User{}, errors.New("Not enough users")},
+		{"not enough users", []internal.User{}, errors.New("not enough users")},
 
 		{"exact number of users", []internal.User{
 			internal.User{Login: "user1"},

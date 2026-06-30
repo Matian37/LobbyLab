@@ -39,7 +39,7 @@ type DatabaseConnection interface {
 	SaveMatchResults(ctx context.Context, details string, matchID int) error
 	Close() error
 	StartListening(ctx context.Context) error
-	GetList(ctx context.Context) (error, []User)
+	GetList(ctx context.Context) ([]User, error)
 	AddMatch(ctx context.Context, users []User, serverInfo ServerInfo, matchId int) error
 	GetNextMatchId(ctx context.Context) (int, error)
 }

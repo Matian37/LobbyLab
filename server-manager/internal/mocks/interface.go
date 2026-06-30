@@ -411,11 +411,11 @@ func (mr *MockDatabaseConnectionMockRecorder) Close() *gomock.Call {
 }
 
 // GetList mocks base method.
-func (m *MockDatabaseConnection) GetList(ctx context.Context) (error, []internal.User) {
+func (m *MockDatabaseConnection) GetList(ctx context.Context) ([]internal.User, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetList", ctx)
-	ret0, _ := ret[0].(error)
-	ret1, _ := ret[1].([]internal.User)
+	ret0, _ := ret[0].([]internal.User)
+	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
