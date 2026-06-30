@@ -28,12 +28,12 @@ func run() error {
 	wm := app.NewWorkerManager(config)
 
 	if err = wm.Init(ctx); err != nil {
-		wm.Close()
+		_ = wm.Close()
 		return err
 	}
 
-	wm.Run(ctx)
-	wm.Close()
+	_ = wm.Run(ctx)
+	_ = wm.Close()
 
 	return nil
 }

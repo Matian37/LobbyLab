@@ -18,7 +18,6 @@ const (
 	resultSubject    = "workers.results"
 	resultStreamName = "RESULT"
 )
-const pongBufferSize = 4096
 
 var (
 	ErrNATSConnCannotBeReopened = errors.New("connection cannot be reopened")
@@ -143,7 +142,7 @@ func (nc *NATSConnection) GetWorkersPong(ctx context.Context) (internal.Responde
 	if err != nil {
 		return nil, err
 	}
-	defer sub.Unsubscribe()
+	defer func() { _ = sub.Unsubscribe() }()
 
 	err = nc.conn.PublishRequest(healthSubject, inbox, nil)
 	if err != nil {

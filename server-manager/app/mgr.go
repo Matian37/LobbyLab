@@ -111,9 +111,9 @@ func (wm *WorkerManager) Run(ctx context.Context) error {
 		return ErrMgrClosed
 	}
 
-	wm.wg.Go(func() { wm.SaveLoop(ctx) })
-	wm.wg.Go(func() { wm.ResultLoop(ctx) })
-	wm.wg.Go(func() { wm.HealthLoop(ctx) })
+	wm.wg.Go(func() { _ = wm.SaveLoop(ctx) })
+	wm.wg.Go(func() { _ = wm.ResultLoop(ctx) })
+	wm.wg.Go(func() { _ = wm.HealthLoop(ctx) })
 
 	<-ctx.Done()
 
@@ -299,7 +299,7 @@ func (wm *WorkerManager) healthCheck(ctx context.Context) error {
 
 		stateID := worker.SetRestarting()
 
-		wm.wg.Go(func() { wm.restartWorker(ctx, worker, stateID, worker.ID) })
+		wm.wg.Go(func() { _ = wm.restartWorker(ctx, worker, stateID, worker.ID) })
 	}
 
 	return nil

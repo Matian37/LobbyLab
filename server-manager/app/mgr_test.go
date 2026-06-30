@@ -823,7 +823,7 @@ func TestWorkerManager_Run(t *testing.T) {
 
 	t.Run("closed", func(t *testing.T) {
 		wm := WorkerManager{initialized: true, closed: true}
-		wm.Close()
+		_ = wm.Close()
 		err := wm.Run(context.Background())
 		require.ErrorIs(t, err, ErrMgrClosed)
 	})
@@ -838,7 +838,7 @@ func TestWorkerManager_Run(t *testing.T) {
 		closed := make(chan struct{})
 
 		go func() {
-			wm.Run(ctx)
+			_ = wm.Run(ctx)
 			close(done)
 			wm.wg.Wait()
 			close(closed)
@@ -956,7 +956,7 @@ func TestWorkerManager_LifeCycle(t *testing.T) {
 			})
 
 		require.NoError(t, wm.handleResults(ctx))
-		go wm.SaveLoop(ctx)
+		go func() { _ = wm.SaveLoop(ctx) }()
 		<-ctx.Done()
 
 		require.Equal(t, WorkerFree, wm.workers[0].State)
