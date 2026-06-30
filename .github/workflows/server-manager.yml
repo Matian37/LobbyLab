@@ -25,16 +25,21 @@ jobs:
         with:
           go-version: "1.26.4"
           cache: true
-          cache-dependency-path: "**/go.sum"
+          cache-dependency-path: "server-manager/go.sum"
 
-      - name: Pull Image for Integration Tests
-        run: docker pull busybox:latest
+      - name: Lint
+        uses: golangci/golangci-lint-action@v9
+        with:
+          working-directory: server-manager
 
       - name: Run Unit Tests
         run: go test -v -short ./...
 
       - name: Run Race Tests
         run: go test -v -race -run="^TestRace" ./...
+
+      - name: Pull Image for Integration Tests
+        run: docker pull busybox:latest
 
       - name: Run Integration Tests
         run: go test -v -tags=integration -run="^TestIntegration" ./...
