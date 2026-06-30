@@ -1,40 +1,96 @@
+//go:build integration
+
 package adapters
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
-	"log"
+	"fmt"
+	"log/slog"
+	"os"
 	"server-manager/internal"
 	"server-manager/internal/mocks"
 	"testing"
 	"time"
+
+	"github.com/testcontainers/testcontainers-go/modules/postgres"
 )
 
-func beforeEach() {
-	d := DatabaseConnection{Matchmaker: &mocks.MockMatchmaker{}}
-	config := &internal.EnvConfig{DatabaseURI: "host=localhost port=5432 user=postgres password=123 dbname=postgres sslmode=disable"}
-	err := d.Init(context.Background(), config)
+var dbConnString, initSQL string
+
+func TestMain(m *testing.M) {
+	res, err := os.ReadFile("./../../init.sql")
 	if err != nil {
-		log.Fatal(err)
+		panic(fmt.Sprintf("failed to read init.sql: %v", err))
+	}
+	initSQL = string(res)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+
+	container, err := postgres.Run(ctx, "postgres:18.4-alpine")
+	if err != nil {
+		panic(fmt.Sprintf("failed to create postgres test container: %v", err))
 	}
 
-	tables := []string{"waiting", "users", "matches", "results"}
-	for _, table := range tables {
-		_, err := d.Db.ExecContext(context.Background(), "TRUNCATE TABLE "+table+" RESTART IDENTITY CASCADE")
-		if err != nil {
-			log.Fatal(err)
-		}
+	connString, err := container.ConnectionString(ctx, "sslmode=disable")
+	if err != nil {
+		panic(fmt.Sprintf("failed to get postgres connection string: %v", err))
+	}
+	dbConnString = connString
+
+	code := m.Run()
+
+	if err := container.Terminate(ctx); err != nil {
+		panic(fmt.Sprintf("failed to terminate postgres test container: %v", err))
+	}
+
+	os.Exit(code)
+}
+
+func restartSchema(ctx context.Context) error {
+	db, err := sql.Open("postgres", dbConnString)
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+
+	err = db.PingContext(ctx)
+	if err != nil {
+		return err
+	}
+
+	_, err = db.ExecContext(ctx, "DROP SCHEMA public")
+	if err != nil {
+		panic(fmt.Sprintf("failed to drop schema: %v", err))
+	}
+
+	_, err = db.ExecContext(ctx, initSQL)
+	if err != nil {
+		panic(fmt.Sprintf("failed to create schema from init.sql: %v", err))
+	}
+
+	return nil
+}
+
+func restartDB() {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	err := restartSchema(ctx)
+	if err != nil {
+		slog.Error("failed to restart schema", "error", err)
 	}
 }
 
 func TestInit(t *testing.T) {
-	beforeEach()
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	d := DatabaseConnection{Matchmaker: &mocks.MockMatchmaker{}}
 
-	d.Init(ctx, &internal.EnvConfig{DatabaseURI: "host=localhost port=5432 user=postgres password=123 dbname=postgres sslmode=disable"})
+	d.Init(ctx, &internal.EnvConfig{DatabaseURI: dbConnString})
 	rows, err := d.Db.QueryContext(ctx, "SELECT * FROM waiting")
 	if err != nil {
 		t.Errorf("blad przy custom query - %v", err)
@@ -43,13 +99,11 @@ func TestInit(t *testing.T) {
 }
 
 func TestGetList(t *testing.T) {
-	beforeEach()
-
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	d := DatabaseConnection{Matchmaker: &mocks.MockMatchmaker{}}
-	config := &internal.EnvConfig{DatabaseURI: "host=localhost port=5432 user=postgres password=123 dbname=postgres sslmode=disable"}
+	config := &internal.EnvConfig{DatabaseURI: dbConnString}
 	err := d.Init(context.Background(), config)
 	if err != nil {
 		t.Errorf("%v", err)
@@ -78,13 +132,12 @@ func TestGetList(t *testing.T) {
 }
 
 func TestAddMatch(t *testing.T) {
-	beforeEach()
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	users := []internal.User{internal.User{Login: "user1"}, internal.User{Login: "user2"}}
 
 	d := DatabaseConnection{Matchmaker: &mocks.MockMatchmaker{}}
-	config := &internal.EnvConfig{DatabaseURI: "host=localhost port=5432 user=postgres password=123 dbname=postgres sslmode=disable"}
+	config := &internal.EnvConfig{DatabaseURI: dbConnString}
 	err := d.Init(context.Background(), config)
 	if err != nil {
 		t.Errorf("%v", err)
@@ -121,13 +174,12 @@ func TestAddMatch(t *testing.T) {
 }
 
 func TestSaveMatchResults(t *testing.T) {
-	beforeEach()
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	users := []internal.User{internal.User{Login: "user1"}, internal.User{Login: "user2"}}
 
 	d := DatabaseConnection{Matchmaker: &mocks.MockMatchmaker{}}
-	config := &internal.EnvConfig{DatabaseURI: "host=localhost port=5432 user=postgres password=123 dbname=postgres sslmode=disable"}
+	config := &internal.EnvConfig{DatabaseURI: dbConnString}
 	err := d.Init(context.Background(), config)
 	if err != nil {
 		t.Errorf("something wrong when creating db")
@@ -153,12 +205,11 @@ func TestSaveMatchResults(t *testing.T) {
 }
 
 func TestClose(t *testing.T) {
-	beforeEach()
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	d := DatabaseConnection{Matchmaker: &mocks.MockMatchmaker{}}
-	d.Init(ctx, &internal.EnvConfig{DatabaseURI: "host=localhost port=5432 user=postgres password=123 dbname=postgres sslmode=disable"})
+	d.Init(ctx, &internal.EnvConfig{DatabaseURI: dbConnString})
 	rows, err := d.Db.QueryContext(ctx, "SELECT * FROM waiting")
 	if err != nil {
 		t.Errorf("%v", err)
@@ -176,12 +227,11 @@ func TestClose(t *testing.T) {
 }
 
 func TestGetNextMatchId(t *testing.T) {
-	beforeEach()
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	d := DatabaseConnection{Matchmaker: &mocks.MockMatchmaker{}}
-	err := d.Init(ctx, &internal.EnvConfig{DatabaseURI: "host=localhost port=5432 user=postgres password=123 dbname=postgres sslmode=disable"})
+	err := d.Init(ctx, &internal.EnvConfig{DatabaseURI: dbConnString})
 	if err != nil {
 		t.Errorf("%v", err)
 	}

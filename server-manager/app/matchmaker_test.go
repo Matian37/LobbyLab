@@ -6,16 +6,27 @@ import (
 	"server-manager/internal"
 	mocks "server-manager/internal/mocks"
 	"testing"
+
+	"go.uber.org/mock/gomock"
 )
 
-func GetTestMatchmaker() *Matchmaker {
-	m := &Matchmaker{WorkerManager: &mocks.MockWorkerManager{}, PlayersPerRoom: 2, EnvConfig: internal.EnvConfig{DatabaseURI: "host=localhost port=5432 user=postgres password=123 dbname=postgres sslmode=disable"}}
-	m.Db = &mocks.MockDatabaseConnection{}
-	return m
+func newMockMatchmaker(t *testing.T) (*mocks.MockWorkerManager, *mocks.MockDatabaseConnection, *Matchmaker) {
+	ctrl := gomock.NewController(t)
+
+	wm := mocks.NewMockWorkerManager(ctrl)
+	db := mocks.NewMockDatabaseConnection(ctrl)
+
+	return wm, db, &Matchmaker{
+		WorkerManager:  wm,
+		Db:             db,
+		PlayersPerRoom: 2,
+		EnvConfig: internal.EnvConfig{
+			DatabaseURI: "host=localhost port=5432 user=postgres password=123 dbname=postgres sslmode=disable",
+		},
+	}
 }
 
 func TestCreateMatches(t *testing.T) {
-	m := GetTestMatchmaker()
 	cases := []struct {
 		name     string
 		users    []internal.User
@@ -37,7 +48,18 @@ func TestCreateMatches(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
+			wm, db, m := newMockMatchmaker(t)
+
+			if len(tc.users) >= m.PlayersPerRoom {
+				gomock.InOrder(
+					db.EXPECT().GetNextMatchId(gomock.Any()).Return(1, nil),
+					wm.EXPECT().AssignMatch(gomock.Any(), gomock.Any()).Return(internal.ServerInfo{}, nil),
+					db.EXPECT().AddMatch(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil),
+				)
+			}
+
 			result := m.CreateMatches(context.Background(), tc.users)
+
 			if result == nil {
 				if tc.expected != nil {
 					t.Errorf("returned nil, should have returned error %s", tc.expected.Error())
