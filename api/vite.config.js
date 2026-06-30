@@ -8,7 +8,8 @@ export default defineConfig({
 		alias: {
 			$lib : new URL('./src/lib', import.meta.url).pathname,
 			$routes: new URL('./src/routes', import.meta.url).pathname,
-		}
+		},
+		globalSetup: './tests/globalSetup.js'
 	},
 	resolve: process.env.VITEST ? { conditions: ['browser'] } : undefined
 });

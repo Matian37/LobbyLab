@@ -1,11 +1,11 @@
 import postgres from "postgres";
 import { handleError } from "./error_handler";
+
 let DATABASE_URL = process.env.DATABASE_URL;
-if(process.env.VITEST)
+if(!DATABASE_URL && process.env.VITEST)
     DATABASE_URL = 'postgresql://postgres:123@localhost:5432/postgres';
 
 const sql = postgres(DATABASE_URL);
-console.debug(DATABASE_URL + "<-- moj link do bazy");
 
 export async function findUserByLogin(login){
     const q = await sql`
@@ -23,7 +23,7 @@ export async function addUser(login, password){
     }
     catch (err){
         handleError(-1, err);
-        return false;   
+        return false;
     }
 }
 
@@ -119,15 +119,3 @@ export async function healthCheck(){
 }
 
 setInterval(deleteOldSessions, 1000 * 60 * 60 * 24);
-
-export async function truncateEverything(){
-    await sql`
-        TRUNCATE TABLE users RESTART IDENTITY CASCADE;
-    `
-    await sql`
-        TRUNCATE TABLE waiting RESTART IDENTITY CASCADE;
-    `
-    await sql`
-        TRUNCATE TABLE sessions RESTART IDENTITY CASCADE;
-    `
-}
