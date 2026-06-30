@@ -60,7 +60,7 @@ func NewWorkerManager(config *internal.EnvConfig) *WorkerManager {
 	return &WorkerManager{
 		dockerConn:           adapters.NewDockerConnection(),
 		brokerConn:           adapters.NewNATSConnection(),
-		dbConn:               adapters.NewDBConnection(),
+		dbConn:               adapters.NewDatabaseConnection(),
 		config:               config,
 		healthCheckTick:      5 * time.Second,
 		resultChanSize:       8192,

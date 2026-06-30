@@ -13,6 +13,7 @@ type EnvConfig struct {
 	ClientPort  network.Port
 	BrokerURI   string
 	PublicHost  string
+	DatabaseURI string
 
 	// must not be exposed for production use
 	TestMakeContainerDummy bool
@@ -27,6 +28,10 @@ type Result struct {
 	Success bool            `json:"success"`
 	MatchID int             `json:"matchID"`
 	Details json.RawMessage `json:"details"`
+}
+
+type User struct {
+	Login string
 }
 
 type ServerInfo struct {

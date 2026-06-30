@@ -382,6 +382,20 @@ func (m *MockDatabaseConnection) EXPECT() *MockDatabaseConnectionMockRecorder {
 	return m.recorder
 }
 
+// AddMatch mocks base method.
+func (m *MockDatabaseConnection) AddMatch(ctx context.Context, users []internal.User, serverInfo internal.ServerInfo, matchId int) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "AddMatch", ctx, users, serverInfo, matchId)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// AddMatch indicates an expected call of AddMatch.
+func (mr *MockDatabaseConnectionMockRecorder) AddMatch(ctx, users, serverInfo, matchId any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddMatch", reflect.TypeOf((*MockDatabaseConnection)(nil).AddMatch), ctx, users, serverInfo, matchId)
+}
+
 // Close mocks base method.
 func (m *MockDatabaseConnection) Close() error {
 	m.ctrl.T.Helper()
@@ -394,6 +408,36 @@ func (m *MockDatabaseConnection) Close() error {
 func (mr *MockDatabaseConnectionMockRecorder) Close() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Close", reflect.TypeOf((*MockDatabaseConnection)(nil).Close))
+}
+
+// GetList mocks base method.
+func (m *MockDatabaseConnection) GetList(ctx context.Context) (error, []internal.User) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetList", ctx)
+	ret0, _ := ret[0].(error)
+	ret1, _ := ret[1].([]internal.User)
+	return ret0, ret1
+}
+
+// GetList indicates an expected call of GetList.
+func (mr *MockDatabaseConnectionMockRecorder) GetList(ctx any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetList", reflect.TypeOf((*MockDatabaseConnection)(nil).GetList), ctx)
+}
+
+// GetNextMatchId mocks base method.
+func (m *MockDatabaseConnection) GetNextMatchId(ctx context.Context) (int, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetNextMatchId", ctx)
+	ret0, _ := ret[0].(int)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetNextMatchId indicates an expected call of GetNextMatchId.
+func (mr *MockDatabaseConnectionMockRecorder) GetNextMatchId(ctx any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetNextMatchId", reflect.TypeOf((*MockDatabaseConnection)(nil).GetNextMatchId), ctx)
 }
 
 // Init mocks base method.
@@ -422,6 +466,20 @@ func (m *MockDatabaseConnection) SaveMatchResults(ctx context.Context, details s
 func (mr *MockDatabaseConnectionMockRecorder) SaveMatchResults(ctx, details, matchID any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SaveMatchResults", reflect.TypeOf((*MockDatabaseConnection)(nil).SaveMatchResults), ctx, details, matchID)
+}
+
+// StartListening mocks base method.
+func (m *MockDatabaseConnection) StartListening(ctx context.Context) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "StartListening", ctx)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// StartListening indicates an expected call of StartListening.
+func (mr *MockDatabaseConnectionMockRecorder) StartListening(ctx any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StartListening", reflect.TypeOf((*MockDatabaseConnection)(nil).StartListening), ctx)
 }
 
 // MockMessage is a mock of Message interface.
@@ -474,4 +532,56 @@ func (m *MockMessage) Data() []byte {
 func (mr *MockMessageMockRecorder) Data() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Data", reflect.TypeOf((*MockMessage)(nil).Data))
+}
+
+// MockMatchmaker is a mock of Matchmaker interface.
+type MockMatchmaker struct {
+	ctrl     *gomock.Controller
+	recorder *MockMatchmakerMockRecorder
+	isgomock struct{}
+}
+
+// MockMatchmakerMockRecorder is the mock recorder for MockMatchmaker.
+type MockMatchmakerMockRecorder struct {
+	mock *MockMatchmaker
+}
+
+// NewMockMatchmaker creates a new mock instance.
+func NewMockMatchmaker(ctrl *gomock.Controller) *MockMatchmaker {
+	mock := &MockMatchmaker{ctrl: ctrl}
+	mock.recorder = &MockMatchmakerMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockMatchmaker) EXPECT() *MockMatchmakerMockRecorder {
+	return m.recorder
+}
+
+// CreateMatches mocks base method.
+func (m *MockMatchmaker) CreateMatches(ctx context.Context, users []internal.User) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CreateMatches", ctx, users)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// CreateMatches indicates an expected call of CreateMatches.
+func (mr *MockMatchmakerMockRecorder) CreateMatches(ctx, users any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateMatches", reflect.TypeOf((*MockMatchmaker)(nil).CreateMatches), ctx, users)
+}
+
+// StartMatchmaking mocks base method.
+func (m *MockMatchmaker) StartMatchmaking(ctx context.Context) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "StartMatchmaking", ctx)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// StartMatchmaking indicates an expected call of StartMatchmaking.
+func (mr *MockMatchmakerMockRecorder) StartMatchmaking(ctx any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StartMatchmaking", reflect.TypeOf((*MockMatchmaker)(nil).StartMatchmaking), ctx)
 }

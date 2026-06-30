@@ -38,9 +38,18 @@ type DatabaseConnection interface {
 	Init(ctx context.Context, config *EnvConfig) error
 	SaveMatchResults(ctx context.Context, details string, matchID int) error
 	Close() error
+	StartListening(ctx context.Context) error
+	GetList(ctx context.Context) (error, []User)
+	AddMatch(ctx context.Context, users []User, serverInfo ServerInfo, matchId int) error
+	GetNextMatchId(ctx context.Context) (int, error)
 }
 
 type Message interface {
 	Data() []byte
 	Ack() error
+}
+
+type Matchmaker interface {
+	StartMatchmaking(ctx context.Context) error
+	CreateMatches(ctx context.Context, users []User) error
 }
