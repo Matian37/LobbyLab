@@ -1,9 +1,14 @@
+CREATE SEQUENCE matches_id_seq;
+
 CREATE TABLE IF NOT EXISTS matches(
-    id SERIAL PRIMARY KEY,
+    id BIGINT DEFAULT nextval('matches_id_seq') PRIMARY KEY,
     host TEXT NOT NULL,
     port INT NOT NULL,
     active BOOLEAN NOT NULL DEFAULT true
 );
+
+ALTER SEQUENCE matches_id_seq OWNED BY matches.id;
+
 
 CREATE TABLE IF NOT EXISTS users(
     login TEXT PRIMARY KEY,

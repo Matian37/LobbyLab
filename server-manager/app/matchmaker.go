@@ -1,30 +1,25 @@
-package main
+package app
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"server-manager/adapters"
 	"server-manager/internal"
 )
 
 type Matchmaker struct {
 	WorkerManager  internal.WorkerManager
-	Db             internal.DB
+	Db             internal.DatabaseConnection
 	PlayersPerRoom int
-}
-
-func NewMatchmaker(workerManager internal.WorkerManager, playersPerRoom int) *Matchmaker {
-	m := &Matchmaker{
-		WorkerManager:  workerManager,
-		PlayersPerRoom: playersPerRoom,
-	}
-
-	return m
+	EnvConfig      internal.EnvConfig
 }
 
 func (m *Matchmaker) StartMatchmaking(ctx context.Context) error {
-	dbObj, err := NewDB(ctx, m)
+	dbObj := &adapters.DatabaseConnection{Matchmaker: m}
+	err := dbObj.Init(ctx, &m.EnvConfig)
 	if err != nil {
-		return errors.New("Error while creating DB")
+		return errors.New("Error while initializing DB")
 	}
 	m.Db = dbObj
 
@@ -49,13 +44,24 @@ func (m *Matchmaker) CreateMatches(ctx context.Context, users []internal.User) e
 		if len(matchUsers) < m.PlayersPerRoom {
 			continue
 		}
-		config := internal.NewMatchConfig(matchUsers)
 
-		socket, err := m.WorkerManager.AssignMatch(ctx, config)
+		data, err := json.Marshal(struct{ Players []internal.User }{Players: users})
 		if err != nil {
 			return err
 		}
-		err = m.Db.AddMatch(ctx, matchUsers, socket)
+		matchId, err := m.Db.GetNextMatchId(ctx)
+		if err != nil {
+			return err
+		}
+		config := internal.MatchConfig{
+			Config:  data,
+			MatchID: matchId,
+		}
+		serverInfo, err := m.WorkerManager.AssignMatch(ctx, config)
+		if err != nil {
+			return err
+		}
+		err = m.Db.AddMatch(ctx, matchUsers, serverInfo, matchId)
 		if err != nil {
 			return errors.New("error while creating match")
 		}

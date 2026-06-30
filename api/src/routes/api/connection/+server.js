@@ -50,7 +50,7 @@ async function listen(login, controller){
       
     client.on("notification", (msg) => {
         if(msg.payload.username != login) return;
-        console.debug("wysylam socket serwera");
+        console.debug("wysylam server info");
         controller.equeue(`data: ${msg.payload}\n\n`);
         controller.close();
     });
