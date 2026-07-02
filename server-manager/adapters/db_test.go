@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"os"
 	"server-manager/internal"
-	"server-manager/internal/mocks"
 	"testing"
 	"time"
 
@@ -89,7 +88,7 @@ func TestIntegration_DatabaseConnection_Init(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	d := DatabaseConnection{Matchmaker: &mocks.MockMatchmaker{}}
+	d := DatabaseConnection{}
 
 	d.Init(ctx, &internal.EnvConfig{DatabaseURI: dbConnString})
 	rows, err := d.Db.QueryContext(ctx, "SELECT * FROM waiting")
@@ -105,7 +104,7 @@ func TestIntegration_DatabaseConnection_GetList(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	d := DatabaseConnection{Matchmaker: &mocks.MockMatchmaker{}}
+	d := DatabaseConnection{}
 	config := &internal.EnvConfig{DatabaseURI: dbConnString}
 	err := d.Init(context.Background(), config)
 	if err != nil {
@@ -141,7 +140,7 @@ func TestIntegration_DatabaseConnection_AddMatch(t *testing.T) {
 	defer cancel()
 	users := []internal.User{internal.User{Login: "user1"}, internal.User{Login: "user2"}}
 
-	d := DatabaseConnection{Matchmaker: &mocks.MockMatchmaker{}}
+	d := DatabaseConnection{}
 	config := &internal.EnvConfig{DatabaseURI: dbConnString}
 	err := d.Init(context.Background(), config)
 	if err != nil {
@@ -185,7 +184,7 @@ func TestIntegration_DatabaseConnection_SaveMatchResults(t *testing.T) {
 	defer cancel()
 	users := []internal.User{internal.User{Login: "user1"}, internal.User{Login: "user2"}}
 
-	d := DatabaseConnection{Matchmaker: &mocks.MockMatchmaker{}}
+	d := DatabaseConnection{}
 	config := &internal.EnvConfig{DatabaseURI: dbConnString}
 	err := d.Init(context.Background(), config)
 	if err != nil {
@@ -217,7 +216,7 @@ func TestIntegration_DatabaseConnection_Close(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	d := DatabaseConnection{Matchmaker: &mocks.MockMatchmaker{}}
+	d := DatabaseConnection{}
 	d.Init(ctx, &internal.EnvConfig{DatabaseURI: dbConnString})
 	rows, err := d.Db.QueryContext(ctx, "SELECT * FROM waiting")
 	if err != nil {
@@ -241,7 +240,7 @@ func TestIntegration_DatabaseConnection_GetNextMatchId(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	d := DatabaseConnection{Matchmaker: &mocks.MockMatchmaker{}}
+	d := DatabaseConnection{}
 	err := d.Init(ctx, &internal.EnvConfig{DatabaseURI: dbConnString})
 	if err != nil {
 		t.Errorf("%v", err)
@@ -256,5 +255,46 @@ func TestIntegration_DatabaseConnection_GetNextMatchId(t *testing.T) {
 	id, err = d.GetNextMatchId(ctx)
 	if id != 2 {
 		t.Errorf("wrong id returned - %d", id)
+	}
+}
+
+func TestListenForQueueChange(t *testing.T) {
+	restartDB()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	d := DatabaseConnection{}
+	err := d.Init(ctx, &internal.EnvConfig{DatabaseURI: dbConnString})
+	if err != nil {
+		t.Errorf("%v", err)
+	}
+
+	d.Db.QueryContext(ctx, "INSERT INTO waiting (login) VALUES ($1)", "")
+
+	done := make(chan struct{})
+	go func() {
+		d.ListenForQueueChange(context.Background())
+		done <- struct{}{}
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("function didn't finish within timeout")
+	}
+
+	ctx, cancel = context.WithTimeout(context.Background(), 2*time.Second)
+	cancel()
+
+	go func() {
+		d.ListenForQueueChange(context.Background())
+		done <- struct{}{}
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("function didn't finish within timeout")
 	}
 }

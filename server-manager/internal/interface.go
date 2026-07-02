@@ -42,6 +42,7 @@ type DatabaseConnection interface {
 	GetList(ctx context.Context) ([]User, error)
 	AddMatch(ctx context.Context, users []User, serverInfo ServerInfo, matchId int) error
 	GetNextMatchId(ctx context.Context) (int, error)
+	ListenForQueueChange(ctx context.Context) error
 }
 
 type Message interface {

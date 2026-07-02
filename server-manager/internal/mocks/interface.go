@@ -454,6 +454,20 @@ func (mr *MockDatabaseConnectionMockRecorder) Init(ctx, config any) *gomock.Call
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Init", reflect.TypeOf((*MockDatabaseConnection)(nil).Init), ctx, config)
 }
 
+// ListenForQueueChange mocks base method.
+func (m *MockDatabaseConnection) ListenForQueueChange(ctx context.Context) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListenForQueueChange", ctx)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// ListenForQueueChange indicates an expected call of ListenForQueueChange.
+func (mr *MockDatabaseConnectionMockRecorder) ListenForQueueChange(ctx any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListenForQueueChange", reflect.TypeOf((*MockDatabaseConnection)(nil).ListenForQueueChange), ctx)
+}
+
 // SaveMatchResults mocks base method.
 func (m *MockDatabaseConnection) SaveMatchResults(ctx context.Context, details string, matchID int) error {
 	m.ctrl.T.Helper()

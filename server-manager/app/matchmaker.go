@@ -4,8 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"server-manager/adapters"
 	"server-manager/internal"
+	"time"
 )
 
 type Matchmaker struct {
@@ -16,16 +16,16 @@ type Matchmaker struct {
 }
 
 func (m *Matchmaker) StartMatchmaking(ctx context.Context) error {
-	dbObj := &adapters.DatabaseConnection{Matchmaker: m}
-	err := dbObj.Init(ctx, &m.EnvConfig)
+	err := m.Db.Init(ctx, &m.EnvConfig)
 	if err != nil {
 		return errors.New("error while initializing db")
 	}
-	m.Db = dbObj
 
 	if err := m.Db.StartListening(ctx); err != nil {
 		return err
 	}
+
+	go m.listenLoop(ctx)
 
 	return nil
 }
@@ -70,4 +70,31 @@ func (m *Matchmaker) CreateMatches(ctx context.Context, users []internal.User) e
 	}
 
 	return nil
+}
+
+func (m *Matchmaker) listenLoop(ctx context.Context) {
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		default:
+		}
+
+		_ = m.Db.ListenForQueueChange(ctx)
+		if ctx.Err() != nil {
+			return
+		}
+
+		m.runMatchmaking(ctx)
+	}
+}
+
+func (m *Matchmaker) runMatchmaking(ctx context.Context) {
+	ctxTimeout, cancelTimeout := context.WithTimeout(ctx, 10*time.Second)
+	defer cancelTimeout()
+
+	users, err2 := m.Db.GetList(ctxTimeout)
+	if err2 != nil && len(users) > 1 {
+		_ = m.CreateMatches(ctxTimeout, users)
+	}
 }

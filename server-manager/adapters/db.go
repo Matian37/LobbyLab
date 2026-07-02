@@ -10,9 +10,8 @@ import (
 )
 
 type DatabaseConnection struct {
-	Db         *sql.DB
-	Listener   *pq.Listener
-	Matchmaker internal.Matchmaker
+	Db       *sql.DB
+	Listener *pq.Listener
 }
 
 func NewDatabaseConnection() *DatabaseConnection {
@@ -50,30 +49,16 @@ func (d *DatabaseConnection) Close() error {
 }
 
 func (d *DatabaseConnection) StartListening(ctx context.Context) error {
-	err := d.Listener.Listen("new_waiting_user")
-	if err != nil {
-		return err
+	return d.Listener.Listen("new_waiting_user")
+}
+
+func (d *DatabaseConnection) ListenForQueueChange(ctx context.Context) error {
+	select {
+	case <-d.Listener.Notify:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
 	}
-
-	go func() {
-		for {
-			select {
-			case <-d.Listener.Notify:
-				ctxTimeout, cancelTimeout := context.WithTimeout(ctx, 10*time.Second)
-				defer cancelTimeout()
-				users, err2 := d.GetList(ctxTimeout)
-				if err2 != nil && len(users) > 1 {
-					_ = d.Matchmaker.CreateMatches(ctxTimeout, users)
-				}
-			case <-time.After(90 * time.Second):
-				_ = d.Listener.Ping()
-			case <-ctx.Done():
-				return
-			}
-		}
-	}()
-
-	return nil
 }
 
 func (d *DatabaseConnection) GetList(ctx context.Context) ([]internal.User, error) {
