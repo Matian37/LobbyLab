@@ -84,7 +84,7 @@ func restartDB() {
 	}
 }
 
-func TestInit(t *testing.T) {
+func TestIntegration_DatabaseConnection_Init(t *testing.T) {
 	restartDB()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -100,7 +100,7 @@ func TestInit(t *testing.T) {
 	defer rows.Close()
 }
 
-func TestGetList(t *testing.T) {
+func TestIntegration_DatabaseConnection_GetList(t *testing.T) {
 	restartDB()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -135,7 +135,7 @@ func TestGetList(t *testing.T) {
 	}
 }
 
-func TestAddMatch(t *testing.T) {
+func TestIntegration_DatabaseConnection_AddMatch(t *testing.T) {
 	restartDB()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -179,7 +179,7 @@ func TestAddMatch(t *testing.T) {
 	}
 }
 
-func TestSaveMatchResults(t *testing.T) {
+func TestIntegration_DatabaseConnection_SaveMatchResults(t *testing.T) {
 	restartDB()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -212,7 +212,7 @@ func TestSaveMatchResults(t *testing.T) {
 	}
 }
 
-func TestClose(t *testing.T) {
+func TestIntegration_DatabaseConnection_Close(t *testing.T) {
 	restartDB()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -236,7 +236,7 @@ func TestClose(t *testing.T) {
 	}
 }
 
-func TestGetNextMatchId(t *testing.T) {
+func TestIntegration_DatabaseConnection_GetNextMatchId(t *testing.T) {
 	restartDB()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
