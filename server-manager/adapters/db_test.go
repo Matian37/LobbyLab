@@ -29,7 +29,7 @@ func TestMain(m *testing.M) {
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 
-	container, err := postgres.Run(ctx, "postgres:18.4-alpine")
+	container, err := postgres.Run(ctx, "postgres:18.4-alpine", postgres.BasicWaitStrategies())
 	if err != nil {
 		panic(fmt.Sprintf("failed to create postgres test container: %v", err))
 	}
