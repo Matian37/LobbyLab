@@ -85,6 +85,8 @@ func restartDB() {
 }
 
 func TestInit(t *testing.T) {
+	restartDB()
+
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -99,6 +101,8 @@ func TestInit(t *testing.T) {
 }
 
 func TestGetList(t *testing.T) {
+	restartDB()
+
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -132,6 +136,8 @@ func TestGetList(t *testing.T) {
 }
 
 func TestAddMatch(t *testing.T) {
+	restartDB()
+
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	users := []internal.User{internal.User{Login: "user1"}, internal.User{Login: "user2"}}
@@ -174,6 +180,8 @@ func TestAddMatch(t *testing.T) {
 }
 
 func TestSaveMatchResults(t *testing.T) {
+	restartDB()
+
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	users := []internal.User{internal.User{Login: "user1"}, internal.User{Login: "user2"}}
@@ -205,6 +213,8 @@ func TestSaveMatchResults(t *testing.T) {
 }
 
 func TestClose(t *testing.T) {
+	restartDB()
+
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -227,6 +237,8 @@ func TestClose(t *testing.T) {
 }
 
 func TestGetNextMatchId(t *testing.T) {
+	restartDB()
+
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
