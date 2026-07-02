@@ -7,7 +7,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"log/slog"
 	"os"
 	"server-manager/internal"
 	"server-manager/internal/mocks"
@@ -52,23 +51,23 @@ func TestMain(m *testing.M) {
 func restartSchema(ctx context.Context) error {
 	db, err := sql.Open("postgres", dbConnString)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to open database: %w", err)
 	}
 	defer db.Close()
 
-	err = db.PingContext(ctx)
-	if err != nil {
-		return err
+	if err = db.PingContext(ctx); err != nil {
+		return fmt.Errorf("failed to ping database: %w", err)
 	}
 
-	_, err = db.ExecContext(ctx, "DROP SCHEMA public")
-	if err != nil {
-		panic(fmt.Sprintf("failed to drop schema: %v", err))
+	if _, err = db.ExecContext(ctx, "DROP SCHEMA public CASCADE"); err != nil {
+		return fmt.Errorf("failed to drop schema: %w", err)
+	}
+	if _, err = db.ExecContext(ctx, "CREATE SCHEMA public"); err != nil {
+		return fmt.Errorf("failed to create schema: %w", err)
 	}
 
-	_, err = db.ExecContext(ctx, initSQL)
-	if err != nil {
-		panic(fmt.Sprintf("failed to create schema from init.sql: %v", err))
+	if _, err = db.ExecContext(ctx, initSQL); err != nil {
+		return fmt.Errorf("failed to create schema from init.sql: %w", err)
 	}
 
 	return nil
@@ -80,7 +79,7 @@ func restartDB() {
 
 	err := restartSchema(ctx)
 	if err != nil {
-		slog.Error("failed to restart schema", "error", err)
+		panic(fmt.Sprintf("failed to restart db: %v", err))
 	}
 }
 
