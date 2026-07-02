@@ -53,4 +53,5 @@ type Message interface {
 type Matchmaker interface {
 	StartMatchmaking(ctx context.Context) error
 	CreateMatches(ctx context.Context, users []User) error
+	WaitForShutdown()
 }

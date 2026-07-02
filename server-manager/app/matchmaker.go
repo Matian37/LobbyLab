@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"server-manager/internal"
+	"sync"
 	"time"
 )
 
@@ -13,6 +14,8 @@ type Matchmaker struct {
 	Db             internal.DatabaseConnection
 	PlayersPerRoom int
 	EnvConfig      internal.EnvConfig
+
+	wg sync.WaitGroup
 }
 
 func (m *Matchmaker) StartMatchmaking(ctx context.Context) error {
@@ -25,7 +28,7 @@ func (m *Matchmaker) StartMatchmaking(ctx context.Context) error {
 		return err
 	}
 
-	go m.listenLoop(ctx)
+	m.wg.Go(func() { m.listenLoop(ctx) })
 
 	return nil
 }
@@ -97,4 +100,8 @@ func (m *Matchmaker) runMatchmaking(ctx context.Context) {
 	if err2 != nil && len(users) > 1 {
 		_ = m.CreateMatches(ctxTimeout, users)
 	}
+}
+
+func (m *Matchmaker) WaitForShutdown() {
+	m.wg.Wait()
 }
