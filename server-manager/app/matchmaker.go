@@ -28,6 +28,10 @@ func (m *Matchmaker) Start(ctx context.Context) error {
 		return err
 	}
 
+	if err := m.db.StartListening(ctx); err != nil {
+		return err
+	}
+
 	m.wg.Go(func() { m.listenLoop(ctx) })
 
 	return nil
