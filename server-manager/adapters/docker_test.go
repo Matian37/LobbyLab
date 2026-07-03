@@ -31,7 +31,7 @@ func newTestConnWithPorts(t *testing.T, exposePorts []string, clientPort string)
 
 	dc := NewDockerConnection()
 
-	err := dc.Init(&internal.EnvConfig{
+	err := dc.Open(&internal.EnvConfig{
 		Image:                  containerImage,
 		ExposePorts:            exposeSet,
 		ClientPort:             network.MustParsePort(clientPort),
@@ -102,16 +102,16 @@ func TestDockerConnection_New(t *testing.T) {
 	assert.Nil(t, dc.config)
 }
 
-func TestIntegration_DockerConnection_Init(t *testing.T) {
+func TestIntegration_DockerConnection_Open(t *testing.T) {
 	t.Run("already init", func(t *testing.T) {
 		dc := DockerConnection{initialized: true}
-		err := dc.Init(&internal.EnvConfig{})
+		err := dc.Open(&internal.EnvConfig{})
 		assert.ErrorIs(t, err, ErrDockerConnAlreadyInit)
 	})
 
 	t.Run("closed", func(t *testing.T) {
 		dc := DockerConnection{initialized: true, closed: true}
-		err := dc.Init(&internal.EnvConfig{})
+		err := dc.Open(&internal.EnvConfig{})
 		assert.ErrorIs(t, err, ErrDockerConnClosed)
 	})
 
@@ -119,7 +119,7 @@ func TestIntegration_DockerConnection_Init(t *testing.T) {
 		dc := NewDockerConnection()
 		config := &internal.EnvConfig{}
 
-		err := dc.Init(config)
+		err := dc.Open(config)
 		t.Cleanup(func() { _ = dc.client.Close() })
 		require.NoError(t, err)
 

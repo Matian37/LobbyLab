@@ -15,13 +15,16 @@ type Matchmaker struct {
 	workerManager  internal.WorkerManager
 	db             internal.DatabaseConnection
 	playersPerRoom int
-	config         internal.EnvConfig
 
 	wg sync.WaitGroup
 }
 
-func (m *Matchmaker) StartMatchmaking(ctx context.Context) error {
-	if err := m.db.Init(ctx, &m.config); err != nil {
+func NewMatchmaker(workerManager internal.WorkerManager, playersPerRoom int) *Matchmaker {
+	return &Matchmaker{workerManager: workerManager, playersPerRoom: playersPerRoom}
+}
+
+func (m *Matchmaker) Start(ctx context.Context, config *internal.EnvConfig) error {
+	if err := m.db.Open(ctx, config); err != nil {
 		return err
 	}
 
@@ -34,7 +37,7 @@ func (m *Matchmaker) StartMatchmaking(ctx context.Context) error {
 	return nil
 }
 
-func (m *Matchmaker) CreateMatches(ctx context.Context, users []internal.User) error {
+func (m *Matchmaker) createMatches(ctx context.Context, users []internal.User) error {
 	if len(users) < m.playersPerRoom {
 		return ErrNotEnoughUsers
 	}
@@ -95,12 +98,12 @@ func (m *Matchmaker) runMatchmaking(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	return m.CreateMatches(ctxTimeout, users)
+	return m.createMatches(ctxTimeout, users)
 }
 
-func (m *Matchmaker) Close() {
+func (m *Matchmaker) Shutdown() {
 	if m.workerManager != nil {
-		_ = m.workerManager.Close()
+		_ = m.workerManager.Shutdown()
 	}
 	if m.db != nil {
 		_ = m.db.Close()

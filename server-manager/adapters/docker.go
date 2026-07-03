@@ -44,7 +44,7 @@ func NewDockerConnection() *DockerConnection {
 	}
 }
 
-func (dc *DockerConnection) Init(config *internal.EnvConfig) error {
+func (dc *DockerConnection) Open(config *internal.EnvConfig) error {
 	if dc.closed {
 		return ErrDockerConnClosed
 	}

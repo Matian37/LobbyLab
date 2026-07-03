@@ -68,30 +68,30 @@ func TestNewWorkerManager(t *testing.T) {
 	assert.NotNil(t, wm.dbConn)
 }
 
-func TestWorkerManager_Init(t *testing.T) {
+func TestWorkerManager_Start(t *testing.T) {
 	t.Run("already initialized", func(t *testing.T) {
 		wm := WorkerManager{initialized: true}
 
-		err := wm.Init(context.Background())
+		err := wm.Start(context.Background())
 		require.ErrorIs(t, err, ErrMgrAlreadyInit)
 	})
 
 	t.Run("already closed", func(t *testing.T) {
 		wm := WorkerManager{closed: true}
 
-		err := wm.Init(context.Background())
+		err := wm.Start(context.Background())
 		require.ErrorIs(t, err, ErrMgrClosed)
 	})
 
-	t.Run("docker init error", func(t *testing.T) {
+	t.Run("docker open error", func(t *testing.T) {
 		ctx := context.Background()
 
 		docker, _, _, wm := newMockWorkerManager(t, 1)
-		wantErr := errors.New("docker init failed")
+		wantErr := errors.New("docker open failed")
 
-		docker.EXPECT().Init(wm.config).Return(wantErr)
+		docker.EXPECT().Open(wm.config).Return(wantErr)
 
-		err := wm.Init(ctx)
+		err := wm.Start(ctx)
 		require.ErrorIs(t, err, wantErr)
 		assert.False(t, wm.initialized)
 		assert.False(t, wm.closed)
@@ -103,26 +103,26 @@ func TestWorkerManager_Init(t *testing.T) {
 		docker, broker, _, wm := newMockWorkerManager(t, 1)
 		wantErr := errors.New("broker open failed")
 
-		docker.EXPECT().Init(wm.config).Return(nil)
+		docker.EXPECT().Open(wm.config).Return(nil)
 		broker.EXPECT().Open(ctx, wm.config).Return(wantErr)
 
-		err := wm.Init(ctx)
+		err := wm.Start(ctx)
 		require.ErrorIs(t, err, wantErr)
 		assert.False(t, wm.initialized)
 		assert.False(t, wm.closed)
 	})
 
-	t.Run("db init error", func(t *testing.T) {
+	t.Run("db open error", func(t *testing.T) {
 		ctx := context.Background()
 
 		docker, broker, db, wm := newMockWorkerManager(t, 1)
-		wantErr := errors.New("db init failed")
+		wantErr := errors.New("db open failed")
 
-		docker.EXPECT().Init(wm.config).Return(nil)
+		docker.EXPECT().Open(wm.config).Return(nil)
 		broker.EXPECT().Open(ctx, wm.config).Return(nil)
-		db.EXPECT().Init(ctx, wm.config).Return(wantErr)
+		db.EXPECT().Open(ctx, wm.config).Return(wantErr)
 
-		err := wm.Init(ctx)
+		err := wm.Start(ctx)
 		require.ErrorIs(t, err, wantErr)
 		assert.False(t, wm.initialized)
 		assert.False(t, wm.closed)
@@ -136,14 +136,14 @@ func TestWorkerManager_Init(t *testing.T) {
 		wantErr := errors.New("spawn failed")
 
 		gomock.InOrder(
-			docker.EXPECT().Init(wm.config).Return(nil),
+			docker.EXPECT().Open(wm.config).Return(nil),
 			broker.EXPECT().Open(ctx, wm.config).Return(nil),
-			db.EXPECT().Init(ctx, wm.config).Return(nil),
+			db.EXPECT().Open(ctx, wm.config).Return(nil),
 			docker.EXPECT().SpawnContainer(ctx).Return("worker-1", nil),
 			docker.EXPECT().SpawnContainer(ctx).Return("", wantErr),
 		)
 
-		err := wm.Init(ctx)
+		err := wm.Start(ctx)
 
 		require.ErrorIs(t, err, ErrFailedToSpawnWorker)
 		require.ErrorIs(t, err, wantErr)
@@ -155,19 +155,20 @@ func TestWorkerManager_Init(t *testing.T) {
 	})
 
 	t.Run("success", func(t *testing.T) {
-		ctx := context.Background()
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
 
 		docker, broker, db, wm := newMockWorkerManager(t, 2)
 
 		gomock.InOrder(
-			docker.EXPECT().Init(wm.config).Return(nil),
+			docker.EXPECT().Open(wm.config).Return(nil),
 			broker.EXPECT().Open(ctx, wm.config).Return(nil),
-			db.EXPECT().Init(ctx, wm.config).Return(nil),
+			db.EXPECT().Open(ctx, wm.config).Return(nil),
 			docker.EXPECT().SpawnContainer(ctx).Return("worker-1", nil),
 			docker.EXPECT().SpawnContainer(ctx).Return("worker-2", nil),
 		)
 
-		err := wm.Init(ctx)
+		err := wm.Start(ctx)
 		require.NoError(t, err)
 
 		assert.True(t, wm.initialized)
@@ -184,14 +185,16 @@ func TestWorkerManager_Init(t *testing.T) {
 
 		require.NotNil(t, wm.saveResultChan)
 		require.NotNil(t, wm.newfreeWorker)
+
+		wm.wg.Wait()
 	})
 }
 
-func TestWorkerManager_Close(t *testing.T) {
+func TestWorkerManager_Shutdown(t *testing.T) {
 	t.Run("already closed", func(t *testing.T) {
 		wm := WorkerManager{closed: true}
 
-		err := wm.Close()
+		err := wm.Shutdown()
 		require.ErrorIs(t, err, ErrMgrAlreadyClosed)
 	})
 
@@ -206,7 +209,7 @@ func TestWorkerManager_Close(t *testing.T) {
 			db.EXPECT().Close().Return(nil),
 		)
 
-		err := wm.Close()
+		err := wm.Shutdown()
 		require.NoError(t, err)
 		assert.True(t, wm.closed)
 	})
@@ -654,7 +657,7 @@ func TestWorkerManager_SaveLoop(t *testing.T) {
 	t.Run("not initialized", func(t *testing.T) {
 		_, _, _, wm := newMockWorkerManager(t, 1)
 
-		err := wm.SaveLoop(context.Background())
+		err := wm.saveLoop(context.Background())
 		require.ErrorIs(t, err, ErrMgrNoInit)
 	})
 
@@ -663,7 +666,7 @@ func TestWorkerManager_SaveLoop(t *testing.T) {
 		wm.initialized = true
 		wm.closed = true
 
-		err := wm.SaveLoop(context.Background())
+		err := wm.saveLoop(context.Background())
 		require.ErrorIs(t, err, ErrMgrClosed)
 	})
 
@@ -672,7 +675,7 @@ func TestWorkerManager_SaveLoop(t *testing.T) {
 
 		ctx, cancel := context.WithCancel(context.Background())
 		cancel()
-		err := wm.SaveLoop(ctx)
+		err := wm.saveLoop(ctx)
 
 		require.ErrorIs(t, err, context.Canceled)
 	})
@@ -692,7 +695,7 @@ func TestWorkerManager_SaveLoop(t *testing.T) {
 
 		done := make(chan error, 1)
 		go func() {
-			done <- wm.SaveLoop(ctx)
+			done <- wm.saveLoop(ctx)
 		}()
 
 		wm.saveResultChan <- res
@@ -710,7 +713,7 @@ func TestWorkerManager_ResultLoop(t *testing.T) {
 	t.Run("not initialized", func(t *testing.T) {
 		_, _, _, wm := newMockWorkerManager(t, 1)
 
-		err := wm.ResultLoop(context.Background())
+		err := wm.resultLoop(context.Background())
 		require.ErrorIs(t, err, ErrMgrNoInit)
 	})
 
@@ -719,7 +722,7 @@ func TestWorkerManager_ResultLoop(t *testing.T) {
 		wm.initialized = true
 		wm.closed = true
 
-		err := wm.ResultLoop(context.Background())
+		err := wm.resultLoop(context.Background())
 		require.ErrorIs(t, err, ErrMgrClosed)
 	})
 
@@ -728,7 +731,7 @@ func TestWorkerManager_ResultLoop(t *testing.T) {
 
 		ctx, cancel := context.WithCancel(context.Background())
 		cancel()
-		err := wm.ResultLoop(ctx)
+		err := wm.resultLoop(ctx)
 
 		require.ErrorIs(t, err, context.Canceled)
 	})
@@ -749,7 +752,7 @@ func TestWorkerManager_ResultLoop(t *testing.T) {
 
 		done := make(chan error, 1)
 		go func() {
-			done <- wm.ResultLoop(ctx)
+			done <- wm.resultLoop(ctx)
 		}()
 
 		select {
@@ -765,7 +768,7 @@ func TestWorkerManager_HealthLoop(t *testing.T) {
 	t.Run("not initialized", func(t *testing.T) {
 		_, _, _, wm := newMockWorkerManager(t, 1)
 
-		err := wm.HealthLoop(context.Background())
+		err := wm.healthLoop(context.Background())
 		require.ErrorIs(t, err, ErrMgrNoInit)
 	})
 
@@ -774,7 +777,7 @@ func TestWorkerManager_HealthLoop(t *testing.T) {
 		wm.initialized = true
 		wm.closed = true
 
-		err := wm.HealthLoop(context.Background())
+		err := wm.healthLoop(context.Background())
 		require.ErrorIs(t, err, ErrMgrClosed)
 	})
 
@@ -783,7 +786,7 @@ func TestWorkerManager_HealthLoop(t *testing.T) {
 
 		ctx, cancel := context.WithCancel(context.Background())
 		cancel()
-		err := wm.HealthLoop(ctx)
+		err := wm.healthLoop(ctx)
 
 		require.ErrorIs(t, err, context.Canceled)
 	})
@@ -802,7 +805,7 @@ func TestWorkerManager_HealthLoop(t *testing.T) {
 
 		done := make(chan error, 1)
 		go func() {
-			done <- wm.HealthLoop(ctx)
+			done <- wm.healthLoop(ctx)
 		}()
 
 		select {
@@ -810,50 +813,6 @@ func TestWorkerManager_HealthLoop(t *testing.T) {
 			require.ErrorIs(t, err, context.Canceled)
 		case <-time.After(2 * time.Second):
 			t.Fatal("expected HealthLoop to exit after cancellation")
-		}
-	})
-}
-
-func TestWorkerManager_Run(t *testing.T) {
-	t.Run("not initialized", func(t *testing.T) {
-		wm := WorkerManager{}
-		err := wm.Run(context.Background())
-		require.ErrorIs(t, err, ErrMgrNoInit)
-	})
-
-	t.Run("closed", func(t *testing.T) {
-		wm := WorkerManager{initialized: true, closed: true}
-		_ = wm.Close()
-		err := wm.Run(context.Background())
-		require.ErrorIs(t, err, ErrMgrClosed)
-	})
-
-	t.Run("success", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(context.Background())
-		cancel()
-
-		_, _, _, wm := newMockWorkerManagerWithInit(t, []*Worker{})
-
-		done := make(chan struct{})
-		closed := make(chan struct{})
-
-		go func() {
-			_ = wm.Run(ctx)
-			close(done)
-			wm.wg.Wait()
-			close(closed)
-		}()
-
-		select {
-		case <-done:
-		case <-time.After(2 * time.Second):
-			t.Fatal("expected Run to exit after cancellation")
-		}
-
-		select {
-		case <-closed:
-		case <-time.After(2 * time.Second):
-			t.Fatal("expected waitGroup to finish")
 		}
 	})
 }
@@ -956,7 +915,7 @@ func TestWorkerManager_LifeCycle(t *testing.T) {
 			})
 
 		require.NoError(t, wm.handleResults(ctx))
-		go func() { _ = wm.SaveLoop(ctx) }()
+		go func() { _ = wm.saveLoop(ctx) }()
 		<-ctx.Done()
 
 		require.Equal(t, WorkerFree, wm.workers[0].State)

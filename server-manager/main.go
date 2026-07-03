@@ -26,14 +26,12 @@ func run() error {
 	defer stop()
 
 	wm := app.NewWorkerManager(config)
-
-	if err = wm.Init(ctx); err != nil {
-		_ = wm.Close()
+	defer func() { _ = wm.Shutdown() }()
+	if err := wm.Start(ctx); err != nil {
 		return err
 	}
 
-	_ = wm.Run(ctx)
-	_ = wm.Close()
+	<-ctx.Done()
 
 	return nil
 }

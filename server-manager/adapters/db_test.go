@@ -81,21 +81,21 @@ func restartDB() {
 	}
 }
 
-func newDBConnWithInit(t *testing.T) *DatabaseConnection {
+func newDBConnWithOpen(t *testing.T) *DatabaseConnection {
 	d := DatabaseConnection{}
-	err := d.Init(context.Background(), &internal.EnvConfig{DatabaseURI: dbConnString})
+	err := d.Open(context.Background(), &internal.EnvConfig{DatabaseURI: dbConnString})
 	require.NoError(t, err)
 	return &d
 }
 
-func TestIntegration_DatabaseConnection_Init(t *testing.T) {
+func TestIntegration_DatabaseConnection_Open(t *testing.T) {
 	restartDB()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	d := DatabaseConnection{}
-	err := d.Init(ctx, &internal.EnvConfig{DatabaseURI: dbConnString})
+	err := d.Open(ctx, &internal.EnvConfig{DatabaseURI: dbConnString})
 	require.NoError(t, err)
 
 	require.NotNil(t, d.pool)
@@ -110,7 +110,7 @@ func TestIntegration_DatabaseConnection_GetList(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	d := newDBConnWithInit(t)
+	d := newDBConnWithOpen(t)
 
 	users, err := d.GetList(ctx)
 	require.NoError(t, err)
@@ -132,7 +132,7 @@ func TestIntegration_DatabaseConnection_AddMatch(t *testing.T) {
 
 	users := []internal.User{{Login: "user1"}, {Login: "user2"}}
 
-	d := newDBConnWithInit(t)
+	d := newDBConnWithOpen(t)
 
 	_, err := d.pool.Exec(ctx, "INSERT INTO users (login, password) VALUES ('user1', 'passvvord')")
 	require.NoError(t, err)
@@ -159,7 +159,7 @@ func TestIntegration_DatabaseConnection_SaveMatchResults(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	d := newDBConnWithInit(t)
+	d := newDBConnWithOpen(t)
 
 	users := []internal.User{{Login: "user1"}, {Login: "user2"}}
 	matchDetails, err := json.Marshal(users)
@@ -180,7 +180,7 @@ func TestIntegration_DatabaseConnection_Close(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	d := newDBConnWithInit(t)
+	d := newDBConnWithOpen(t)
 
 	err := d.pool.Ping(ctx)
 	require.NoError(t, err)
@@ -197,7 +197,7 @@ func TestIntegration_DatabaseConnection_GetNextMatchId(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	d := newDBConnWithInit(t)
+	d := newDBConnWithOpen(t)
 
 	id, err := d.GetNextMatchId(ctx)
 	require.NoError(t, err)
@@ -214,7 +214,7 @@ func TestIntegration_ListenForQueueChange(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	d := newDBConnWithInit(t)
+	d := newDBConnWithOpen(t)
 
 	require.NoError(t, d.StartListening(ctx))
 

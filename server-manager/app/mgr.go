@@ -70,7 +70,7 @@ func NewWorkerManager(config *internal.EnvConfig) *WorkerManager {
 	}
 }
 
-func (wm *WorkerManager) Init(ctx context.Context) error {
+func (wm *WorkerManager) Start(ctx context.Context) error {
 	if wm.closed {
 		return ErrMgrClosed
 	}
@@ -78,13 +78,13 @@ func (wm *WorkerManager) Init(ctx context.Context) error {
 		return ErrMgrAlreadyInit
 	}
 
-	if err := wm.dockerConn.Init(wm.config); err != nil {
+	if err := wm.dockerConn.Open(wm.config); err != nil {
 		return err
 	}
 	if err := wm.brokerConn.Open(ctx, wm.config); err != nil {
 		return err
 	}
-	if err := wm.dbConn.Init(ctx, wm.config); err != nil {
+	if err := wm.dbConn.Open(ctx, wm.config); err != nil {
 		return err
 	}
 
@@ -100,28 +100,16 @@ func (wm *WorkerManager) Init(ctx context.Context) error {
 	wm.newfreeWorker = sync.NewCond(&wm.mu)
 
 	wm.initialized = true
+
+	wm.wg.Go(func() { _ = wm.saveLoop(ctx) })
+	wm.wg.Go(func() { _ = wm.resultLoop(ctx) })
+	wm.wg.Go(func() { _ = wm.healthLoop(ctx) })
+
 	return nil
 }
 
-func (wm *WorkerManager) Run(ctx context.Context) error {
-	if !wm.initialized {
-		return ErrMgrNoInit
-	}
-	if wm.closed {
-		return ErrMgrClosed
-	}
-
-	wm.wg.Go(func() { _ = wm.SaveLoop(ctx) })
-	wm.wg.Go(func() { _ = wm.ResultLoop(ctx) })
-	wm.wg.Go(func() { _ = wm.HealthLoop(ctx) })
-
-	<-ctx.Done()
-
-	return ctx.Err()
-}
-
 // TODO: error logging
-func (wm *WorkerManager) Close() error {
+func (wm *WorkerManager) Shutdown() error {
 	if wm.closed {
 		return ErrMgrAlreadyClosed
 	}
@@ -140,7 +128,7 @@ func (wm *WorkerManager) Close() error {
 	return nil
 }
 
-func (wm *WorkerManager) SaveLoop(ctx context.Context) error {
+func (wm *WorkerManager) saveLoop(ctx context.Context) error {
 	if !wm.initialized {
 		return ErrMgrNoInit
 	}
@@ -164,7 +152,7 @@ func (wm *WorkerManager) SaveLoop(ctx context.Context) error {
 	}
 }
 
-func (wm *WorkerManager) ResultLoop(ctx context.Context) error {
+func (wm *WorkerManager) resultLoop(ctx context.Context) error {
 	if !wm.initialized {
 		return ErrMgrNoInit
 	}
@@ -188,7 +176,7 @@ func (wm *WorkerManager) ResultLoop(ctx context.Context) error {
 	}
 }
 
-func (wm *WorkerManager) HealthLoop(ctx context.Context) error {
+func (wm *WorkerManager) healthLoop(ctx context.Context) error {
 	if !wm.initialized {
 		return ErrMgrNoInit
 	}

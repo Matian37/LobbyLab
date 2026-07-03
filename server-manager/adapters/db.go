@@ -17,7 +17,7 @@ func NewDatabaseConnection() *DatabaseConnection {
 	return &DatabaseConnection{}
 }
 
-func (dc *DatabaseConnection) Init(ctx context.Context, config *internal.EnvConfig) error {
+func (dc *DatabaseConnection) Open(ctx context.Context, config *internal.EnvConfig) error {
 	pool, err := pgxpool.New(ctx, config.DatabaseURI)
 	if err != nil {
 		return err

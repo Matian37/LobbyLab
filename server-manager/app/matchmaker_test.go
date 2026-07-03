@@ -18,7 +18,6 @@ func newMockMatchmaker(t *testing.T) (*mocks.MockWorkerManager, *mocks.MockDatab
 		workerManager:  wm,
 		db:             db,
 		playersPerRoom: 2,
-		config:         internal.EnvConfig{DatabaseURI: "exampleURI"},
 	}
 }
 
@@ -64,7 +63,7 @@ func TestCreateMatches(t *testing.T) {
 				)
 			}
 
-			err := m.CreateMatches(context.Background(), tc.users)
+			err := m.createMatches(context.Background(), tc.users)
 			assert.ErrorIs(t, err, tc.expected)
 		})
 	}

@@ -70,20 +70,6 @@ func (mr *MockDockerConnectionMockRecorder) GetGamePort(ctx, containerID any) *g
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetGamePort", reflect.TypeOf((*MockDockerConnection)(nil).GetGamePort), ctx, containerID)
 }
 
-// Init mocks base method.
-func (m *MockDockerConnection) Init(config *internal.EnvConfig) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Init", config)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// Init indicates an expected call of Init.
-func (mr *MockDockerConnectionMockRecorder) Init(config any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Init", reflect.TypeOf((*MockDockerConnection)(nil).Init), config)
-}
-
 // KillContainer mocks base method.
 func (m *MockDockerConnection) KillContainer(ctx context.Context, id string) error {
 	m.ctrl.T.Helper()
@@ -96,6 +82,20 @@ func (m *MockDockerConnection) KillContainer(ctx context.Context, id string) err
 func (mr *MockDockerConnectionMockRecorder) KillContainer(ctx, id any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "KillContainer", reflect.TypeOf((*MockDockerConnection)(nil).KillContainer), ctx, id)
+}
+
+// Open mocks base method.
+func (m *MockDockerConnection) Open(config *internal.EnvConfig) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Open", config)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Open indicates an expected call of Open.
+func (mr *MockDockerConnectionMockRecorder) Open(config any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Open", reflect.TypeOf((*MockDockerConnection)(nil).Open), config)
 }
 
 // RestartContainer mocks base method.
@@ -262,94 +262,38 @@ func (mr *MockWorkerManagerMockRecorder) AssignMatch(ctx, config any) *gomock.Ca
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AssignMatch", reflect.TypeOf((*MockWorkerManager)(nil).AssignMatch), ctx, config)
 }
 
-// Close mocks base method.
-func (m *MockWorkerManager) Close() error {
+// Shutdown mocks base method.
+func (m *MockWorkerManager) Shutdown() error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Close")
+	ret := m.ctrl.Call(m, "Shutdown")
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
-// Close indicates an expected call of Close.
-func (mr *MockWorkerManagerMockRecorder) Close() *gomock.Call {
+// Shutdown indicates an expected call of Shutdown.
+func (mr *MockWorkerManagerMockRecorder) Shutdown() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Close", reflect.TypeOf((*MockWorkerManager)(nil).Close))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Shutdown", reflect.TypeOf((*MockWorkerManager)(nil).Shutdown))
 }
 
-// HealthLoop mocks base method.
-func (m *MockWorkerManager) HealthLoop(ctx context.Context) error {
+// Start mocks base method.
+func (m *MockWorkerManager) Start(ctx context.Context) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "HealthLoop", ctx)
+	ret := m.ctrl.Call(m, "Start", ctx)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
-// HealthLoop indicates an expected call of HealthLoop.
-func (mr *MockWorkerManagerMockRecorder) HealthLoop(ctx any) *gomock.Call {
+// Start indicates an expected call of Start.
+func (mr *MockWorkerManagerMockRecorder) Start(ctx any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HealthLoop", reflect.TypeOf((*MockWorkerManager)(nil).HealthLoop), ctx)
-}
-
-// Init mocks base method.
-func (m *MockWorkerManager) Init(ctx context.Context, config *internal.EnvConfig) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Init", ctx, config)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// Init indicates an expected call of Init.
-func (mr *MockWorkerManagerMockRecorder) Init(ctx, config any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Init", reflect.TypeOf((*MockWorkerManager)(nil).Init), ctx, config)
-}
-
-// ResultLoop mocks base method.
-func (m *MockWorkerManager) ResultLoop(ctx context.Context) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ResultLoop", ctx)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// ResultLoop indicates an expected call of ResultLoop.
-func (mr *MockWorkerManagerMockRecorder) ResultLoop(ctx any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ResultLoop", reflect.TypeOf((*MockWorkerManager)(nil).ResultLoop), ctx)
-}
-
-// Run mocks base method.
-func (m *MockWorkerManager) Run(ctx context.Context) {
-	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "Run", ctx)
-}
-
-// Run indicates an expected call of Run.
-func (mr *MockWorkerManagerMockRecorder) Run(ctx any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Run", reflect.TypeOf((*MockWorkerManager)(nil).Run), ctx)
-}
-
-// SaveLoop mocks base method.
-func (m *MockWorkerManager) SaveLoop(ctx context.Context) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SaveLoop", ctx)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// SaveLoop indicates an expected call of SaveLoop.
-func (mr *MockWorkerManagerMockRecorder) SaveLoop(ctx any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SaveLoop", reflect.TypeOf((*MockWorkerManager)(nil).SaveLoop), ctx)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Start", reflect.TypeOf((*MockWorkerManager)(nil).Start), ctx)
 }
 
 // WaitForFreeWorker mocks base method.
-func (m *MockWorkerManager) WaitForFreeWorker(ctx context.Context) error {
+func (m *MockWorkerManager) WaitForFreeWorker(ctx context.Context) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "WaitForFreeWorker", ctx)
-	ret0, _ := ret[0].(error)
-	return ret0
+	m.ctrl.Call(m, "WaitForFreeWorker", ctx)
 }
 
 // WaitForFreeWorker indicates an expected call of WaitForFreeWorker.
@@ -440,20 +384,6 @@ func (mr *MockDatabaseConnectionMockRecorder) GetNextMatchId(ctx any) *gomock.Ca
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetNextMatchId", reflect.TypeOf((*MockDatabaseConnection)(nil).GetNextMatchId), ctx)
 }
 
-// Init mocks base method.
-func (m *MockDatabaseConnection) Init(ctx context.Context, config *internal.EnvConfig) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Init", ctx, config)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// Init indicates an expected call of Init.
-func (mr *MockDatabaseConnectionMockRecorder) Init(ctx, config any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Init", reflect.TypeOf((*MockDatabaseConnection)(nil).Init), ctx, config)
-}
-
 // ListenForQueueChange mocks base method.
 func (m *MockDatabaseConnection) ListenForQueueChange(ctx context.Context) error {
 	m.ctrl.T.Helper()
@@ -466,6 +396,20 @@ func (m *MockDatabaseConnection) ListenForQueueChange(ctx context.Context) error
 func (mr *MockDatabaseConnectionMockRecorder) ListenForQueueChange(ctx any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListenForQueueChange", reflect.TypeOf((*MockDatabaseConnection)(nil).ListenForQueueChange), ctx)
+}
+
+// Open mocks base method.
+func (m *MockDatabaseConnection) Open(ctx context.Context, config *internal.EnvConfig) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Open", ctx, config)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Open indicates an expected call of Open.
+func (mr *MockDatabaseConnectionMockRecorder) Open(ctx, config any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Open", reflect.TypeOf((*MockDatabaseConnection)(nil).Open), ctx, config)
 }
 
 // SaveMatchResults mocks base method.
@@ -572,42 +516,28 @@ func (m *MockMatchmaker) EXPECT() *MockMatchmakerMockRecorder {
 	return m.recorder
 }
 
-// Close mocks base method.
-func (m *MockMatchmaker) Close() {
+// Shutdown mocks base method.
+func (m *MockMatchmaker) Shutdown() {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "Close")
+	m.ctrl.Call(m, "Shutdown")
 }
 
-// Close indicates an expected call of Close.
-func (mr *MockMatchmakerMockRecorder) Close() *gomock.Call {
+// Shutdown indicates an expected call of Shutdown.
+func (mr *MockMatchmakerMockRecorder) Shutdown() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Close", reflect.TypeOf((*MockMatchmaker)(nil).Close))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Shutdown", reflect.TypeOf((*MockMatchmaker)(nil).Shutdown))
 }
 
-// CreateMatches mocks base method.
-func (m *MockMatchmaker) CreateMatches(ctx context.Context, users []internal.User) error {
+// Start mocks base method.
+func (m *MockMatchmaker) Start(ctx context.Context, config *internal.EnvConfig) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CreateMatches", ctx, users)
+	ret := m.ctrl.Call(m, "Start", ctx, config)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
-// CreateMatches indicates an expected call of CreateMatches.
-func (mr *MockMatchmakerMockRecorder) CreateMatches(ctx, users any) *gomock.Call {
+// Start indicates an expected call of Start.
+func (mr *MockMatchmakerMockRecorder) Start(ctx, config any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateMatches", reflect.TypeOf((*MockMatchmaker)(nil).CreateMatches), ctx, users)
-}
-
-// StartMatchmaking mocks base method.
-func (m *MockMatchmaker) StartMatchmaking(ctx context.Context) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "StartMatchmaking", ctx)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// StartMatchmaking indicates an expected call of StartMatchmaking.
-func (mr *MockMatchmakerMockRecorder) StartMatchmaking(ctx any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StartMatchmaking", reflect.TypeOf((*MockMatchmaker)(nil).StartMatchmaking), ctx)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Start", reflect.TypeOf((*MockMatchmaker)(nil).Start), ctx, config)
 }

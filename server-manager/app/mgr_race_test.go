@@ -133,7 +133,7 @@ func TestRace_ServerManager_LifeCycle(t *testing.T) {
 			saveLoopDone := make(chan struct{})
 			go func() {
 				defer close(saveLoopDone)
-				wm.SaveLoop(ctx)
+				wm.saveLoop(ctx)
 			}()
 
 			for idx := range test.goroutinePerFunc {
