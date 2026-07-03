@@ -3,7 +3,7 @@ CREATE SEQUENCE matches_id_seq;
 CREATE TABLE IF NOT EXISTS matches(
     id BIGINT PRIMARY KEY,
     host TEXT NOT NULL,
-    port INT NOT NULL,
+    port TEXT NOT NULL,
     active BOOLEAN NOT NULL DEFAULT true
 );
 
