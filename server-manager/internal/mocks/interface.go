@@ -426,20 +426,6 @@ func (mr *MockDatabaseConnectionMockRecorder) SaveMatchResults(ctx, details, mat
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SaveMatchResults", reflect.TypeOf((*MockDatabaseConnection)(nil).SaveMatchResults), ctx, details, matchID)
 }
 
-// StartListening mocks base method.
-func (m *MockDatabaseConnection) StartListening(ctx context.Context) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "StartListening", ctx)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// StartListening indicates an expected call of StartListening.
-func (mr *MockDatabaseConnectionMockRecorder) StartListening(ctx any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StartListening", reflect.TypeOf((*MockDatabaseConnection)(nil).StartListening), ctx)
-}
-
 // MockMessage is a mock of Message interface.
 type MockMessage struct {
 	ctrl     *gomock.Controller

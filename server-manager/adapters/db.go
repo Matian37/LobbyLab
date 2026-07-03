@@ -37,6 +37,13 @@ func (dc *DatabaseConnection) Open(ctx context.Context, config *internal.EnvConf
 	}
 
 	dc.listener = conn
+
+	if _, err := conn.Exec(ctx, "LISTEN new_waiting_user"); err != nil {
+		conn.Close(ctx)
+		pool.Close()
+		return err
+	}
+
 	return nil
 }
 
@@ -48,11 +55,6 @@ func (dc *DatabaseConnection) Close() error {
 		dc.pool.Close()
 	}
 	return nil
-}
-
-func (dc *DatabaseConnection) StartListening(ctx context.Context) error {
-	_, err := dc.listener.Exec(ctx, "LISTEN new_waiting_user")
-	return err
 }
 
 func (dc *DatabaseConnection) ListenForQueueChange(ctx context.Context) error {

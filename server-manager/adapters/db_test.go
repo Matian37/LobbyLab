@@ -216,8 +216,6 @@ func TestIntegration_ListenForQueueChange(t *testing.T) {
 
 	d := newDBConnWithOpen(t)
 
-	require.NoError(t, d.StartListening(ctx))
-
 	_, err := d.pool.Exec(ctx, "INSERT INTO waiting (login) VALUES ($1)", "")
 	require.NoError(t, err)
 
