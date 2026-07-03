@@ -2,16 +2,15 @@ package adapters
 
 import (
 	"context"
-	"database/sql"
 	"server-manager/internal"
-	"time"
 
-	"github.com/lib/pq"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type DatabaseConnection struct {
-	db       *sql.DB
-	listener *pq.Listener
+	pool     *pgxpool.Pool
+	listener *pgx.Conn
 }
 
 func NewDatabaseConnection() *DatabaseConnection {
@@ -19,50 +18,54 @@ func NewDatabaseConnection() *DatabaseConnection {
 }
 
 func (dc *DatabaseConnection) Init(ctx context.Context, config *internal.EnvConfig) error {
-	db, err := sql.Open("postgres", config.DatabaseURI)
+	pool, err := pgxpool.New(ctx, config.DatabaseURI)
 	if err != nil {
 		return err
 	}
 
-	if err = db.PingContext(ctx); err != nil {
+	if err = pool.Ping(ctx); err != nil {
+		pool.Close()
 		return err
 	}
 
-	dc.db = db
-	dc.listener = pq.NewListener(config.DatabaseURI, 10*time.Second, time.Minute, nil)
+	dc.pool = pool
 
+	conn, err := pgx.Connect(ctx, config.DatabaseURI)
+	if err != nil {
+		pool.Close()
+		return err
+	}
+
+	dc.listener = conn
 	return nil
 }
 
 func (dc *DatabaseConnection) Close() error {
-	if err := dc.db.Close(); err != nil {
-		return err
+	if dc.listener != nil {
+		_ = dc.listener.Close(context.Background())
 	}
-	if err := dc.listener.Close(); err != nil {
-		return err
+	if dc.pool != nil {
+		dc.pool.Close()
 	}
 	return nil
 }
 
 func (dc *DatabaseConnection) StartListening(ctx context.Context) error {
-	return dc.listener.Listen("new_waiting_user")
+	_, err := dc.listener.Exec(ctx, "LISTEN new_waiting_user")
+	return err
 }
 
 func (dc *DatabaseConnection) ListenForQueueChange(ctx context.Context) error {
-	select {
-	case <-dc.listener.Notify:
-		return nil
-	case <-ctx.Done():
-		return ctx.Err()
-	}
+	_, err := dc.listener.WaitForNotification(ctx)
+	return err
 }
 
 func (dc *DatabaseConnection) GetList(ctx context.Context) ([]internal.User, error) {
-	rows, err := dc.db.QueryContext(ctx, "SELECT * FROM waiting")
+	rows, err := dc.pool.Query(ctx, "SELECT * FROM waiting")
 	if err != nil {
 		return nil, err
 	}
-	defer func() { _ = rows.Close() }()
+	defer rows.Close()
 
 	var users []internal.User
 	for rows.Next() {
@@ -81,7 +84,7 @@ func (dc *DatabaseConnection) AddMatch(
 	serverInfo internal.ServerInfo,
 	matchId int,
 ) error {
-	_, err := dc.db.ExecContext(
+	_, err := dc.pool.Exec(
 		ctx,
 		"INSERT INTO matches (id, host, port) VALUES ($1, $2, $3)",
 		matchId,
@@ -97,17 +100,17 @@ func (dc *DatabaseConnection) AddMatch(
 		logins = append(logins, user.Login)
 	}
 
-	_, err = dc.db.ExecContext(
+	_, err = dc.pool.Exec(
 		ctx,
 		"UPDATE users SET match_id = $1 WHERE login = ANY($2)",
 		matchId,
-		pq.Array(logins),
+		logins,
 	)
 	return err
 }
 
 func (dc *DatabaseConnection) SaveMatchResults(ctx context.Context, details string, matchID int) error {
-	_, err := dc.db.ExecContext(
+	_, err := dc.pool.Exec(
 		ctx,
 		"INSERT INTO results (match_id, details) VALUES($1, $2)",
 		matchID,
@@ -118,7 +121,7 @@ func (dc *DatabaseConnection) SaveMatchResults(ctx context.Context, details stri
 
 func (dc *DatabaseConnection) GetNextMatchId(ctx context.Context) (int, error) {
 	var id int
-	err := dc.db.QueryRowContext(ctx, "SELECT nextval('matches_id_seq')").Scan(&id)
+	err := dc.pool.QueryRow(ctx, "SELECT nextval('matches_id_seq')").Scan(&id)
 	if err != nil {
 		return 0, err
 	}

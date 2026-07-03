@@ -4,7 +4,6 @@ package adapters
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -12,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/testcontainers/testcontainers-go/modules/postgres"
@@ -51,24 +51,20 @@ func TestMain(m *testing.M) {
 }
 
 func restartSchema(ctx context.Context) error {
-	db, err := sql.Open("postgres", dbConnString)
+	conn, err := pgx.Connect(ctx, dbConnString)
 	if err != nil {
 		return fmt.Errorf("failed to open database: %w", err)
 	}
-	defer db.Close()
+	defer conn.Close(ctx)
 
-	if err = db.PingContext(ctx); err != nil {
-		return fmt.Errorf("failed to ping database: %w", err)
-	}
-
-	if _, err = db.ExecContext(ctx, "DROP SCHEMA public CASCADE"); err != nil {
+	if _, err = conn.Exec(ctx, "DROP SCHEMA public CASCADE"); err != nil {
 		return fmt.Errorf("failed to drop schema: %w", err)
 	}
-	if _, err = db.ExecContext(ctx, "CREATE SCHEMA public"); err != nil {
+	if _, err = conn.Exec(ctx, "CREATE SCHEMA public"); err != nil {
 		return fmt.Errorf("failed to create schema: %w", err)
 	}
 
-	if _, err = db.ExecContext(ctx, initSQL); err != nil {
+	if _, err = conn.Exec(ctx, initSQL); err != nil {
 		return fmt.Errorf("failed to create schema from init.sql: %w", err)
 	}
 
@@ -102,8 +98,8 @@ func TestIntegration_DatabaseConnection_Init(t *testing.T) {
 	err := d.Init(ctx, &internal.EnvConfig{DatabaseURI: dbConnString})
 	require.NoError(t, err)
 
-	require.NotNil(t, d.db)
-	assert.NoError(t, d.db.PingContext(ctx))
+	require.NotNil(t, d.pool)
+	assert.NoError(t, d.pool.Ping(ctx))
 
 	assert.NotNil(t, d.listener)
 }
@@ -120,9 +116,8 @@ func TestIntegration_DatabaseConnection_GetList(t *testing.T) {
 	require.NoError(t, err)
 	require.Empty(t, users)
 
-	rows, err := d.db.QueryContext(ctx, "INSERT INTO waiting (login) VALUES ('user1')")
+	_, err = d.pool.Exec(ctx, "INSERT INTO waiting (login) VALUES ('user1')")
 	require.NoError(t, err)
-	defer rows.Close()
 
 	users, err = d.GetList(ctx)
 	require.NoError(t, err)
@@ -139,22 +134,21 @@ func TestIntegration_DatabaseConnection_AddMatch(t *testing.T) {
 
 	d := newDBConnWithInit(t)
 
-	rows, err := d.db.QueryContext(ctx, "INSERT INTO users (login, password) VALUES ('user1', 'passvvord')")
+	_, err := d.pool.Exec(ctx, "INSERT INTO users (login, password) VALUES ('user1', 'passvvord')")
 	require.NoError(t, err)
-	defer rows.Close()
 
 	err = d.AddMatch(ctx, users, internal.ServerInfo{Host: "someGameServerHost", Port: "1234/udp"}, 1)
 	require.NoError(t, err)
 
 	var matchID int
 	var host, port string
-	err = d.db.QueryRowContext(ctx, "SELECT id, host, port FROM matches").Scan(&matchID, &host, &port)
+	err = d.pool.QueryRow(ctx, "SELECT id, host, port FROM matches").Scan(&matchID, &host, &port)
 	require.NoError(t, err)
 	require.Equal(t, "someGameServerHost", host)
 	require.Equal(t, "1234/udp", port)
 
 	var userMatchID int
-	err = d.db.QueryRowContext(ctx, "SELECT match_id FROM users WHERE login='user1'").Scan(&userMatchID)
+	err = d.pool.QueryRow(ctx, "SELECT match_id FROM users WHERE login='user1'").Scan(&userMatchID)
 	require.NoError(t, err)
 	require.Equal(t, matchID, userMatchID)
 }
@@ -175,7 +169,7 @@ func TestIntegration_DatabaseConnection_SaveMatchResults(t *testing.T) {
 	require.NoError(t, err)
 
 	var matchId int
-	err = d.db.QueryRowContext(ctx, "SELECT match_id FROM results").Scan(&matchId)
+	err = d.pool.QueryRow(ctx, "SELECT match_id FROM results").Scan(&matchId)
 	require.NoError(t, err)
 	require.Equal(t, 123, matchId)
 }
@@ -188,13 +182,13 @@ func TestIntegration_DatabaseConnection_Close(t *testing.T) {
 
 	d := newDBConnWithInit(t)
 
-	err := d.db.PingContext(ctx)
+	err := d.pool.Ping(ctx)
 	require.NoError(t, err)
 
 	require.NoError(t, d.Close())
 
-	err = d.db.PingContext(ctx)
-	require.ErrorContains(t, err, "database is closed")
+	err = d.pool.Ping(ctx)
+	require.ErrorContains(t, err, "closed")
 }
 
 func TestIntegration_DatabaseConnection_GetNextMatchId(t *testing.T) {
@@ -224,7 +218,7 @@ func TestIntegration_ListenForQueueChange(t *testing.T) {
 
 	require.NoError(t, d.StartListening(ctx))
 
-	_, err := d.db.QueryContext(ctx, "INSERT INTO waiting (login) VALUES ($1)", "")
+	_, err := d.pool.Exec(ctx, "INSERT INTO waiting (login) VALUES ($1)", "")
 	require.NoError(t, err)
 
 	done := make(chan error)
