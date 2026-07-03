@@ -22,29 +22,20 @@ func (dc *DatabaseConnection) Open(ctx context.Context, config *internal.EnvConf
 	if err != nil {
 		return err
 	}
+	dc.pool = pool
 
 	if err = pool.Ping(ctx); err != nil {
-		pool.Close()
 		return err
 	}
-
-	dc.pool = pool
 
 	conn, err := pgx.Connect(ctx, config.DatabaseURI)
 	if err != nil {
-		pool.Close()
 		return err
 	}
-
 	dc.listener = conn
 
-	if _, err := conn.Exec(ctx, "LISTEN new_waiting_user"); err != nil {
-		conn.Close(ctx)
-		pool.Close()
-		return err
-	}
-
-	return nil
+	_, err = conn.Exec(ctx, "LISTEN new_waiting_user")
+	return err
 }
 
 func (dc *DatabaseConnection) Close() error {
