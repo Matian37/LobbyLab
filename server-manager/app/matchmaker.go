@@ -102,9 +102,6 @@ func (m *Matchmaker) runMatchmaking(ctx context.Context) error {
 }
 
 func (m *Matchmaker) Shutdown() {
-	if m.workerManager != nil {
-		_ = m.workerManager.Shutdown()
-	}
 	if m.db != nil {
 		_ = m.db.Close()
 	}
