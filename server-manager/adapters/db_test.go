@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
 	"github.com/testcontainers/testcontainers-go/modules/postgres"
 )
 
@@ -258,7 +259,7 @@ func TestIntegration_DatabaseConnection_GetNextMatchId(t *testing.T) {
 	}
 }
 
-func TestListenForQueueChange(t *testing.T) {
+func TestIntegration_ListenForQueueChange(t *testing.T) {
 	restartDB()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -269,8 +270,10 @@ func TestListenForQueueChange(t *testing.T) {
 	if err != nil {
 		t.Errorf("%v", err)
 	}
+	require.NoError(t, d.StartListening(ctx))
 
-	d.Db.QueryContext(ctx, "INSERT INTO waiting (login) VALUES ($1)", "")
+	_, err = d.Db.QueryContext(ctx, "INSERT INTO waiting (login) VALUES ($1)", "")
+	require.NoError(t, err)
 
 	done := make(chan struct{})
 	go func() {
@@ -288,7 +291,7 @@ func TestListenForQueueChange(t *testing.T) {
 	cancel()
 
 	go func() {
-		d.ListenForQueueChange(context.Background())
+		d.ListenForQueueChange(ctx)
 		done <- struct{}{}
 	}()
 
