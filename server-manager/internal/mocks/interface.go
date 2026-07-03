@@ -529,15 +529,15 @@ func (mr *MockMatchmakerMockRecorder) Shutdown() *gomock.Call {
 }
 
 // Start mocks base method.
-func (m *MockMatchmaker) Start(ctx context.Context, config *internal.EnvConfig) error {
+func (m *MockMatchmaker) Start(ctx context.Context) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Start", ctx, config)
+	ret := m.ctrl.Call(m, "Start", ctx)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // Start indicates an expected call of Start.
-func (mr *MockMatchmakerMockRecorder) Start(ctx, config any) *gomock.Call {
+func (mr *MockMatchmakerMockRecorder) Start(ctx any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Start", reflect.TypeOf((*MockMatchmaker)(nil).Start), ctx, config)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Start", reflect.TypeOf((*MockMatchmaker)(nil).Start), ctx)
 }

@@ -63,6 +63,7 @@ services:
       GAME_SERVER_EXPOSE_PORTS: "7777/udp,8080"
       GAME_SERVER_CLIENT_PORT: "7777/udp"
       PUBLIC_HOST: ${PUBLIC_HOST}
+      PLAYERS_PER_ROOM: 2
     networks:
       - db-net
       - nats-net

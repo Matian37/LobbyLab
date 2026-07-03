@@ -7,13 +7,14 @@ import (
 )
 
 type EnvConfig struct {
-	Image       string
-	Workercount int
-	ExposePorts network.PortSet
-	ClientPort  network.Port
-	BrokerURI   string
-	PublicHost  string
-	DatabaseURI string
+	Image          string
+	Workercount    int
+	ExposePorts    network.PortSet
+	ClientPort     network.Port
+	BrokerURI      string
+	PublicHost     string
+	DatabaseURI    string
+	PlayersPerRoom int
 
 	// must not be exposed for production use
 	TestMakeContainerDummy bool

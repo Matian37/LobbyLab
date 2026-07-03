@@ -15,9 +15,9 @@ func newMockMatchmaker(t *testing.T) (*mocks.MockWorkerManager, *mocks.MockDatab
 	wm := mocks.NewMockWorkerManager(ctrl)
 	db := mocks.NewMockDatabaseConnection(ctrl)
 	return wm, db, &Matchmaker{
-		workerManager:  wm,
-		db:             db,
-		playersPerRoom: 2,
+		workerManager: wm,
+		db:            db,
+		config:        &internal.EnvConfig{PlayersPerRoom: 2},
 	}
 }
 
@@ -55,7 +55,7 @@ func TestCreateMatches(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			wm, db, m := newMockMatchmaker(t)
 
-			if len(tc.users) >= m.playersPerRoom {
+			if len(tc.users) >= m.config.PlayersPerRoom {
 				gomock.InOrder(
 					db.EXPECT().GetNextMatchId(gomock.Any()).Return(1, nil),
 					wm.EXPECT().AssignMatch(gomock.Any(), gomock.Any()).Return(internal.ServerInfo{}, nil),

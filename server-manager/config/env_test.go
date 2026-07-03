@@ -21,6 +21,7 @@ func setAllEnvExcept(t *testing.T, except ...string) *internal.EnvConfig {
 		{"GAME_SERVER_CLIENT_PORT", "80"},
 		{"NATS_URI", "nats://localhost:4222"},
 		{"PUBLIC_HOST", "127.0.0.1"},
+		{"PLAYERS_PER_ROOM", "2"},
 	} {
 		skip := false
 		for _, x := range except {
@@ -127,6 +128,17 @@ func TestReadConfig(t *testing.T) {
 		}
 	})
 
+	t.Run("playersPerRoom count less than two", func(t *testing.T) {
+		for _, count := range []string{"-1", "0", "1"} {
+			t.Run("count "+count, func(t *testing.T) {
+				setAllEnvExcept(t)
+				t.Setenv("PLAYERS_PER_ROOM", count)
+				_, err := ReadConfig()
+				assert.ErrorIs(t, err, ErrTooFewPlayersPerRoom)
+			})
+		}
+	})
+
 	t.Run("missing required field", func(t *testing.T) {
 		for _, field := range []string{
 			"GAME_SERVER_IMAGE",
@@ -135,6 +147,7 @@ func TestReadConfig(t *testing.T) {
 			"GAME_SERVER_CLIENT_PORT",
 			"NATS_URI",
 			"PUBLIC_HOST",
+			"PLAYERS_PER_ROOM",
 		} {
 			t.Run(field, func(t *testing.T) {
 				setAllEnvExcept(t, field)

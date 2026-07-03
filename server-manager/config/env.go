@@ -13,15 +13,17 @@ var (
 	ErrWorkerCountNotPositive = errors.New("worker count not positive")
 	ErrClientPortNotInExposed = errors.New("client port not in expose ports")
 	ErrInvalidPortString      = errors.New("invalid port string")
+	ErrTooFewPlayersPerRoom   = errors.New("too few players per room; must be atleast two")
 )
 
 type parsedConfig struct {
-	Image       string   `env:"GAME_SERVER_IMAGE,required,notEmpty"`
-	WorkerCount int      `env:"GAME_SERVER_COUNT,required"`
-	ExposePorts []string `env:"GAME_SERVER_EXPOSE_PORTS,required,notEmpty"`
-	ClientPort  string   `env:"GAME_SERVER_CLIENT_PORT,required,notEmpty"`
-	BrokerURI   string   `env:"NATS_URI,required,notEmpty"`
-	PublicHost  string   `env:"PUBLIC_HOST,required,notEmpty"`
+	Image          string   `env:"GAME_SERVER_IMAGE,required,notEmpty"`
+	WorkerCount    int      `env:"GAME_SERVER_COUNT,required"`
+	ExposePorts    []string `env:"GAME_SERVER_EXPOSE_PORTS,required,notEmpty"`
+	ClientPort     string   `env:"GAME_SERVER_CLIENT_PORT,required,notEmpty"`
+	BrokerURI      string   `env:"NATS_URI,required,notEmpty"`
+	PublicHost     string   `env:"PUBLIC_HOST,required,notEmpty"`
+	PlayersPerRoom int      `env:"PLAYERS_PER_ROOM,required"`
 }
 
 func parsePorts(ports []string) (network.PortSet, error) {
@@ -47,6 +49,10 @@ func ReadConfig() (*internal.EnvConfig, error) {
 
 	if config.WorkerCount < 1 {
 		return nil, ErrWorkerCountNotPositive
+	}
+
+	if config.PlayersPerRoom < 2 {
+		return nil, ErrTooFewPlayersPerRoom
 	}
 
 	exposePorts, err := parsePorts(config.ExposePorts)

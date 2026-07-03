@@ -31,8 +31,7 @@ func run() error {
 		return err
 	}
 
-	// TODO: add env for playersPerRoom
-	matchmaker := app.NewMatchmaker(wm, 2)
+	matchmaker := app.NewMatchmaker(wm, config)
 	defer matchmaker.Shutdown()
 	if err := wm.Start(ctx); err != nil {
 		return err

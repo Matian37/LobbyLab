@@ -12,19 +12,19 @@ import (
 var ErrNotEnoughUsers = errors.New("not enough users")
 
 type Matchmaker struct {
-	workerManager  internal.WorkerManager
-	db             internal.DatabaseConnection
-	playersPerRoom int
+	workerManager internal.WorkerManager
+	db            internal.DatabaseConnection
+	config        *internal.EnvConfig
 
 	wg sync.WaitGroup
 }
 
-func NewMatchmaker(workerManager internal.WorkerManager, playersPerRoom int) *Matchmaker {
-	return &Matchmaker{workerManager: workerManager, playersPerRoom: playersPerRoom}
+func NewMatchmaker(workerManager internal.WorkerManager, config *internal.EnvConfig) *Matchmaker {
+	return &Matchmaker{workerManager: workerManager, config: config}
 }
 
-func (m *Matchmaker) Start(ctx context.Context, config *internal.EnvConfig) error {
-	if err := m.db.Open(ctx, config); err != nil {
+func (m *Matchmaker) Start(ctx context.Context) error {
+	if err := m.db.Open(ctx, m.config); err != nil {
 		return err
 	}
 
@@ -38,12 +38,12 @@ func (m *Matchmaker) Start(ctx context.Context, config *internal.EnvConfig) erro
 }
 
 func (m *Matchmaker) createMatches(ctx context.Context, users []internal.User) error {
-	if len(users) < m.playersPerRoom {
+	if len(users) < m.config.PlayersPerRoom {
 		return ErrNotEnoughUsers
 	}
 
-	for i := m.playersPerRoom; i <= len(users); i += m.playersPerRoom {
-		matchUsers := users[i-m.playersPerRoom : i]
+	for i := m.config.PlayersPerRoom; i <= len(users); i += m.config.PlayersPerRoom {
+		matchUsers := users[i-m.config.PlayersPerRoom : i]
 
 		gameConfig, err := json.Marshal(struct{ Players []internal.User }{Players: users})
 		if err != nil {
