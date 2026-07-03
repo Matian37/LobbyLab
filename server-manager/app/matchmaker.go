@@ -98,6 +98,12 @@ func (m *Matchmaker) runMatchmaking(ctx context.Context) error {
 	return m.CreateMatches(ctxTimeout, users)
 }
 
-func (m *Matchmaker) WaitForShutdown() {
+func (m *Matchmaker) Close() {
+	if m.workerManager != nil {
+		_ = m.workerManager.Close()
+	}
+	if m.db != nil {
+		_ = m.db.Close()
+	}
 	m.wg.Wait()
 }
