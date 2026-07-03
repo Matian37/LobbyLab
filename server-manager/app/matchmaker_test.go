@@ -2,27 +2,23 @@ package app
 
 import (
 	"context"
-	"errors"
 	"server-manager/internal"
-	mocks "server-manager/internal/mocks"
+	"server-manager/internal/mocks"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 )
 
 func newMockMatchmaker(t *testing.T) (*mocks.MockWorkerManager, *mocks.MockDatabaseConnection, *Matchmaker) {
 	ctrl := gomock.NewController(t)
-
 	wm := mocks.NewMockWorkerManager(ctrl)
 	db := mocks.NewMockDatabaseConnection(ctrl)
-
 	return wm, db, &Matchmaker{
-		WorkerManager:  wm,
-		Db:             db,
-		PlayersPerRoom: 2,
-		EnvConfig: internal.EnvConfig{
-			DatabaseURI: "host=localhost port=5432 user=postgres password=123 dbname=postgres sslmode=disable",
-		},
+		workerManager:  wm,
+		db:             db,
+		playersPerRoom: 2,
+		config:         internal.EnvConfig{DatabaseURI: "exampleURI"},
 	}
 }
 
@@ -32,25 +28,35 @@ func TestCreateMatches(t *testing.T) {
 		users    []internal.User
 		expected error
 	}{
-		{"not enough users", []internal.User{}, errors.New("not enough users")},
-
-		{"exact number of users", []internal.User{
-			internal.User{Login: "user1"},
-			internal.User{Login: "user2"},
-		}, nil},
-
-		{"more than enough users", []internal.User{
-			internal.User{Login: "user3"},
-			internal.User{Login: "user4"},
-			internal.User{Login: "user5"},
-		}, nil},
+		{
+			name:     "not enough users",
+			users:    []internal.User{},
+			expected: ErrNotEnoughUsers,
+		},
+		{
+			name: "exact number of users",
+			users: []internal.User{
+				{Login: "user1"},
+				{Login: "user2"},
+			},
+			expected: nil,
+		},
+		{
+			name: "more than enough users",
+			users: []internal.User{
+				{Login: "user3"},
+				{Login: "user4"},
+				{Login: "user5"},
+			},
+			expected: nil,
+		},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			wm, db, m := newMockMatchmaker(t)
 
-			if len(tc.users) >= m.PlayersPerRoom {
+			if len(tc.users) >= m.playersPerRoom {
 				gomock.InOrder(
 					db.EXPECT().GetNextMatchId(gomock.Any()).Return(1, nil),
 					wm.EXPECT().AssignMatch(gomock.Any(), gomock.Any()).Return(internal.ServerInfo{}, nil),
@@ -58,17 +64,8 @@ func TestCreateMatches(t *testing.T) {
 				)
 			}
 
-			result := m.CreateMatches(context.Background(), tc.users)
-
-			if result == nil {
-				if tc.expected != nil {
-					t.Errorf("returned nil, should have returned error %s", tc.expected.Error())
-				}
-			} else {
-				if tc.expected.Error() != result.Error() {
-					t.Errorf("got error %s, expected %s", result.Error(), tc.expected.Error())
-				}
-			}
+			err := m.CreateMatches(context.Background(), tc.users)
+			assert.ErrorIs(t, err, tc.expected)
 		})
 	}
 }

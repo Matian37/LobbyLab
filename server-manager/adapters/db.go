@@ -10,59 +10,55 @@ import (
 )
 
 type DatabaseConnection struct {
-	Db       *sql.DB
-	Listener *pq.Listener
+	db       *sql.DB
+	listener *pq.Listener
 }
 
 func NewDatabaseConnection() *DatabaseConnection {
 	return &DatabaseConnection{}
 }
 
-func (d *DatabaseConnection) Init(ctx context.Context, config *internal.EnvConfig) error {
+func (dc *DatabaseConnection) Init(ctx context.Context, config *internal.EnvConfig) error {
 	db, err := sql.Open("postgres", config.DatabaseURI)
 	if err != nil {
 		return err
 	}
 
-	err = db.PingContext(ctx)
-	if err != nil {
+	if err = db.PingContext(ctx); err != nil {
 		return err
 	}
 
-	listener := pq.NewListener(config.DatabaseURI, 10*time.Second, time.Minute, nil)
+	dc.db = db
+	dc.listener = pq.NewListener(config.DatabaseURI, 10*time.Second, time.Minute, nil)
 
-	d.Listener = listener
-	d.Db = db
 	return nil
 }
 
-func (d *DatabaseConnection) Close() error {
-	err := d.Db.Close()
-	if err != nil {
+func (dc *DatabaseConnection) Close() error {
+	if err := dc.db.Close(); err != nil {
 		return err
 	}
-	err = d.Listener.Close()
-	if err != nil {
+	if err := dc.listener.Close(); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (d *DatabaseConnection) StartListening(ctx context.Context) error {
-	return d.Listener.Listen("new_waiting_user")
+func (dc *DatabaseConnection) StartListening(ctx context.Context) error {
+	return dc.listener.Listen("new_waiting_user")
 }
 
-func (d *DatabaseConnection) ListenForQueueChange(ctx context.Context) error {
+func (dc *DatabaseConnection) ListenForQueueChange(ctx context.Context) error {
 	select {
-	case <-d.Listener.Notify:
+	case <-dc.listener.Notify:
 		return nil
 	case <-ctx.Done():
 		return ctx.Err()
 	}
 }
 
-func (d *DatabaseConnection) GetList(ctx context.Context) ([]internal.User, error) {
-	rows, err := d.Db.QueryContext(ctx, "SELECT * FROM waiting")
+func (dc *DatabaseConnection) GetList(ctx context.Context) ([]internal.User, error) {
+	rows, err := dc.db.QueryContext(ctx, "SELECT * FROM waiting")
 	if err != nil {
 		return nil, err
 	}
@@ -79,34 +75,52 @@ func (d *DatabaseConnection) GetList(ctx context.Context) ([]internal.User, erro
 	return users, nil
 }
 
-func (d *DatabaseConnection) AddMatch(ctx context.Context, users []internal.User, serverInfo internal.ServerInfo, matchId int) error {
-	_, err := d.Db.ExecContext(ctx, "INSERT INTO matches (id, host, port) VALUES ($1, $2, $3)", matchId, serverInfo.Host, serverInfo.Port)
+func (dc *DatabaseConnection) AddMatch(
+	ctx context.Context,
+	users []internal.User,
+	serverInfo internal.ServerInfo,
+	matchId int,
+) error {
+	_, err := dc.db.ExecContext(
+		ctx,
+		"INSERT INTO matches (id, host, port) VALUES ($1, $2, $3)",
+		matchId,
+		serverInfo.Host,
+		serverInfo.Port,
+	)
 	if err != nil {
 		return err
 	}
 
-	logins := make([]string, len(users))
-	for i := 0; i < len(users); i++ {
-		logins[i] = users[i].Login
+	logins := make([]string, 0, len(users))
+	for _, user := range users {
+		logins = append(logins, user.Login)
 	}
 
-	_, err = d.Db.ExecContext(ctx, "UPDATE users SET match_id = $1 WHERE login = ANY($2)", matchId, pq.Array(logins))
+	_, err = dc.db.ExecContext(
+		ctx,
+		"UPDATE users SET match_id = $1 WHERE login = ANY($2)",
+		matchId,
+		pq.Array(logins),
+	)
 	return err
 }
 
-func (d *DatabaseConnection) SaveMatchResults(ctx context.Context, details string, matchID int) error {
-	_, err := d.Db.ExecContext(ctx, "INSERT INTO results (match_id, details) VALUES($1, $2)", matchID, details)
-	if err != nil {
-		return err
-	}
-	return nil
+func (dc *DatabaseConnection) SaveMatchResults(ctx context.Context, details string, matchID int) error {
+	_, err := dc.db.ExecContext(
+		ctx,
+		"INSERT INTO results (match_id, details) VALUES($1, $2)",
+		matchID,
+		details,
+	)
+	return err
 }
 
-func (d *DatabaseConnection) GetNextMatchId(ctx context.Context) (int, error) {
+func (dc *DatabaseConnection) GetNextMatchId(ctx context.Context) (int, error) {
 	var id int
-	err := d.Db.QueryRowContext(ctx, "SELECT nextval('matches_id_seq')").Scan(&id)
+	err := dc.db.QueryRowContext(ctx, "SELECT nextval('matches_id_seq')").Scan(&id)
 	if err != nil {
-		return -1, err
+		return 0, err
 	}
 	return id, nil
 }

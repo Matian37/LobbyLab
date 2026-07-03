@@ -12,9 +12,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/testcontainers/testcontainers-go/modules/postgres"
 )
+
+const dbImage = "postgres:18.4-alpine"
 
 var dbConnString, initSQL string
 
@@ -28,7 +31,7 @@ func TestMain(m *testing.M) {
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 
-	container, err := postgres.Run(ctx, "postgres:18.4-alpine", postgres.BasicWaitStrategies())
+	container, err := postgres.Run(ctx, dbImage, postgres.BasicWaitStrategies())
 	if err != nil {
 		panic(fmt.Sprintf("failed to create postgres test container: %v", err))
 	}
@@ -44,7 +47,6 @@ func TestMain(m *testing.M) {
 	if err := container.Terminate(ctx); err != nil {
 		panic(fmt.Sprintf("failed to terminate postgres test container: %v", err))
 	}
-
 	os.Exit(code)
 }
 
@@ -83,6 +85,13 @@ func restartDB() {
 	}
 }
 
+func newDBConnWithInit(t *testing.T) *DatabaseConnection {
+	d := DatabaseConnection{}
+	err := d.Init(context.Background(), &internal.EnvConfig{DatabaseURI: dbConnString})
+	require.NoError(t, err)
+	return &d
+}
+
 func TestIntegration_DatabaseConnection_Init(t *testing.T) {
 	restartDB()
 
@@ -90,13 +99,13 @@ func TestIntegration_DatabaseConnection_Init(t *testing.T) {
 	defer cancel()
 
 	d := DatabaseConnection{}
+	err := d.Init(ctx, &internal.EnvConfig{DatabaseURI: dbConnString})
+	require.NoError(t, err)
 
-	d.Init(ctx, &internal.EnvConfig{DatabaseURI: dbConnString})
-	rows, err := d.Db.QueryContext(ctx, "SELECT * FROM waiting")
-	if err != nil {
-		t.Errorf("blad przy custom query - %v", err)
-	}
-	defer rows.Close()
+	require.NotNil(t, d.db)
+	assert.NoError(t, d.db.PingContext(ctx))
+
+	assert.NotNil(t, d.listener)
 }
 
 func TestIntegration_DatabaseConnection_GetList(t *testing.T) {
@@ -105,33 +114,19 @@ func TestIntegration_DatabaseConnection_GetList(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	d := DatabaseConnection{}
-	config := &internal.EnvConfig{DatabaseURI: dbConnString}
-	err := d.Init(context.Background(), config)
-	if err != nil {
-		t.Errorf("%v", err)
-	}
-	users, err := d.GetList(ctx)
-	if err != nil {
-		t.Errorf("error while getting the list - %s", err.Error())
-	}
-	if len(users) != 0 {
-		t.Errorf("weird thing returned by getlist - %s", users)
-	}
+	d := newDBConnWithInit(t)
 
-	rows, err := d.Db.QueryContext(ctx, "INSERT INTO waiting (login) VALUES ('user1')")
-	if err != nil {
-		t.Errorf("%v", err)
-	}
+	users, err := d.GetList(ctx)
+	require.NoError(t, err)
+	require.Empty(t, users)
+
+	rows, err := d.db.QueryContext(ctx, "INSERT INTO waiting (login) VALUES ('user1')")
+	require.NoError(t, err)
 	defer rows.Close()
 
 	users, err = d.GetList(ctx)
-	if err != nil {
-		t.Errorf("error while getting the list - %s", err.Error())
-	}
-	if len(users) != 1 || users[0].Login != "user1" {
-		t.Errorf("weird thing returned by getlist - %s", users)
-	}
+	require.NoError(t, err)
+	assert.Equal(t, users, []internal.User{{Login: "user1"}})
 }
 
 func TestIntegration_DatabaseConnection_AddMatch(t *testing.T) {
@@ -139,43 +134,29 @@ func TestIntegration_DatabaseConnection_AddMatch(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	users := []internal.User{internal.User{Login: "user1"}, internal.User{Login: "user2"}}
 
-	d := DatabaseConnection{}
-	config := &internal.EnvConfig{DatabaseURI: dbConnString}
-	err := d.Init(context.Background(), config)
-	if err != nil {
-		t.Errorf("%v", err)
-	}
+	users := []internal.User{{Login: "user1"}, {Login: "user2"}}
 
-	rows, err := d.Db.QueryContext(ctx, "INSERT INTO users (login, password) VALUES ('user1', 'passvvord')")
-	if err != nil {
-		t.Errorf("%v", err)
-	}
+	d := newDBConnWithInit(t)
+
+	rows, err := d.db.QueryContext(ctx, "INSERT INTO users (login, password) VALUES ('user1', 'passvvord')")
+	require.NoError(t, err)
 	defer rows.Close()
 
-	err = d.AddMatch(ctx, users, internal.ServerInfo{Host: "someGameServerHost", Port: "1234"}, 1)
-	if err != nil {
-		t.Errorf("%v", err)
-	}
+	err = d.AddMatch(ctx, users, internal.ServerInfo{Host: "someGameServerHost", Port: "1234/udp"}, 1)
+	require.NoError(t, err)
 
-	var matchId int
-	var host string
-	err = d.Db.QueryRowContext(ctx, "SELECT id, host FROM matches").Scan(&matchId, &host)
-	if err != nil {
-		t.Errorf("%v", err)
-	}
-	if host != "someGameServerHost" {
-		t.Errorf("adding or reading from DB didnt work")
-	}
-	var matchIdUser int
-	err = d.Db.QueryRowContext(ctx, "SELECT match_id FROM users").Scan(&matchIdUser)
-	if err != nil {
-		t.Errorf("%v", err)
-	}
-	if matchId != matchIdUser {
-		t.Errorf("assigning match id to users didnt work")
-	}
+	var matchID int
+	var host, port string
+	err = d.db.QueryRowContext(ctx, "SELECT id, host, port FROM matches").Scan(&matchID, &host, &port)
+	require.NoError(t, err)
+	require.Equal(t, "someGameServerHost", host)
+	require.Equal(t, "1234/udp", port)
+
+	var userMatchID int
+	err = d.db.QueryRowContext(ctx, "SELECT match_id FROM users WHERE login='user1'").Scan(&userMatchID)
+	require.NoError(t, err)
+	require.Equal(t, matchID, userMatchID)
 }
 
 func TestIntegration_DatabaseConnection_SaveMatchResults(t *testing.T) {
@@ -183,32 +164,20 @@ func TestIntegration_DatabaseConnection_SaveMatchResults(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	users := []internal.User{internal.User{Login: "user1"}, internal.User{Login: "user2"}}
 
-	d := DatabaseConnection{}
-	config := &internal.EnvConfig{DatabaseURI: dbConnString}
-	err := d.Init(context.Background(), config)
-	if err != nil {
-		t.Errorf("something wrong when creating db")
-	}
-	details, err2 := json.Marshal(users)
-	if err2 != nil {
-		t.Errorf("%v", err2)
-	}
-	err = d.SaveMatchResults(ctx, string(details), 123)
-	if err != nil {
-		t.Errorf("%v", err)
-	}
+	d := newDBConnWithInit(t)
+
+	users := []internal.User{{Login: "user1"}, {Login: "user2"}}
+	matchDetails, err := json.Marshal(users)
+	require.NoError(t, err)
+
+	err = d.SaveMatchResults(ctx, string(matchDetails), 123)
+	require.NoError(t, err)
 
 	var matchId int
-	err = d.Db.QueryRowContext(ctx, "SELECT match_id FROM results").Scan(&matchId)
-	if err != nil {
-		t.Errorf("couldnt make custom sql query")
-	}
-
-	if matchId != 123 {
-		t.Errorf("error in saving")
-	}
+	err = d.db.QueryRowContext(ctx, "SELECT match_id FROM results").Scan(&matchId)
+	require.NoError(t, err)
+	require.Equal(t, 123, matchId)
 }
 
 func TestIntegration_DatabaseConnection_Close(t *testing.T) {
@@ -217,22 +186,15 @@ func TestIntegration_DatabaseConnection_Close(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	d := DatabaseConnection{}
-	d.Init(ctx, &internal.EnvConfig{DatabaseURI: dbConnString})
-	rows, err := d.Db.QueryContext(ctx, "SELECT * FROM waiting")
-	if err != nil {
-		t.Errorf("%v", err)
-	}
-	defer rows.Close()
+	d := newDBConnWithInit(t)
 
-	err = d.Close()
-	if err != nil {
-		t.Errorf("%v", err)
-	}
-	rows, err = d.Db.QueryContext(ctx, "SELECT * FROM waiting")
-	if err == nil {
-		t.Errorf("db didnt close properly")
-	}
+	err := d.db.PingContext(ctx)
+	require.NoError(t, err)
+
+	require.NoError(t, d.Close())
+
+	err = d.db.PingContext(ctx)
+	require.ErrorContains(t, err, "database is closed")
 }
 
 func TestIntegration_DatabaseConnection_GetNextMatchId(t *testing.T) {
@@ -241,22 +203,15 @@ func TestIntegration_DatabaseConnection_GetNextMatchId(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	d := DatabaseConnection{}
-	err := d.Init(ctx, &internal.EnvConfig{DatabaseURI: dbConnString})
-	if err != nil {
-		t.Errorf("%v", err)
-	}
+	d := newDBConnWithInit(t)
+
 	id, err := d.GetNextMatchId(ctx)
-	if err != nil {
-		t.Errorf("%v", err)
-	}
-	if id != 1 {
-		t.Errorf("wrong id returned - %d", id)
-	}
+	require.NoError(t, err)
+	require.Equal(t, 1, id)
+
 	id, err = d.GetNextMatchId(ctx)
-	if id != 2 {
-		t.Errorf("wrong id returned - %d", id)
-	}
+	require.NoError(t, err)
+	require.Equal(t, 2, id)
 }
 
 func TestIntegration_ListenForQueueChange(t *testing.T) {
@@ -265,24 +220,22 @@ func TestIntegration_ListenForQueueChange(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	d := DatabaseConnection{}
-	err := d.Init(ctx, &internal.EnvConfig{DatabaseURI: dbConnString})
-	if err != nil {
-		t.Errorf("%v", err)
-	}
+	d := newDBConnWithInit(t)
+
 	require.NoError(t, d.StartListening(ctx))
 
-	_, err = d.Db.QueryContext(ctx, "INSERT INTO waiting (login) VALUES ($1)", "")
+	_, err := d.db.QueryContext(ctx, "INSERT INTO waiting (login) VALUES ($1)", "")
 	require.NoError(t, err)
 
-	done := make(chan struct{})
+	done := make(chan error)
 	go func() {
-		d.ListenForQueueChange(context.Background())
-		done <- struct{}{}
+		err := d.ListenForQueueChange(context.Background())
+		done <- err
 	}()
 
 	select {
-	case <-done:
+	case res := <-done:
+		require.NoError(t, res)
 	case <-time.After(2 * time.Second):
 		t.Fatal("function didn't finish within timeout")
 	}
@@ -291,12 +244,13 @@ func TestIntegration_ListenForQueueChange(t *testing.T) {
 	cancel()
 
 	go func() {
-		d.ListenForQueueChange(ctx)
-		done <- struct{}{}
+		err := d.ListenForQueueChange(ctx)
+		done <- err
 	}()
 
 	select {
-	case <-done:
+	case res := <-done:
+		require.ErrorIs(t, res, ctx.Err())
 	case <-time.After(2 * time.Second):
 		t.Fatal("function didn't finish within timeout")
 	}
