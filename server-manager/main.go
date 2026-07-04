@@ -32,7 +32,7 @@ func run() error {
 	}
 
 	matchmaker := app.NewMatchmaker(wm, config)
-	defer matchmaker.Shutdown()
+	defer func() { _ = matchmaker.Shutdown() }()
 	if err := wm.Start(ctx); err != nil {
 		return err
 	}

@@ -98,6 +98,6 @@ func TestMatchmaker_Start(t *testing.T) {
 func TestMatchmaker_Shutdown(t *testing.T) {
 	t.Run("already closed", func(t *testing.T) {
 		m := Matchmaker{closed: true}
-		m.Shutdown()
+		require.ErrorIs(t, m.Shutdown(), ErrMatchmakerAlreadyShutdown)
 	})
 }

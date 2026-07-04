@@ -11,9 +11,9 @@ import (
 )
 
 var (
-	ErrNotEnoughUsers         = errors.New("not enough users")
-	ErrMatchmakerClosed       = errors.New("matchmaker closed")
-	ErrMatchmakerAlreadyOpen  = errors.New("matchmaker already open")
+	ErrNotEnoughUsers            = errors.New("not enough users")
+	ErrMatchmakerClosed          = errors.New("matchmaker closed")
+	ErrMatchmakerAlreadyOpen     = errors.New("matchmaker already open")
 	ErrMatchmakerAlreadyShutdown = errors.New("matchmaker already shutdown")
 )
 
@@ -122,15 +122,17 @@ func (m *Matchmaker) runMatchmaking(ctx context.Context) error {
 	return m.createMatches(ctxTimeout, users)
 }
 
-func (m *Matchmaker) Shutdown() {
+func (m *Matchmaker) Shutdown() error {
 	if m.closed {
-		return
+		return ErrMatchmakerAlreadyShutdown
 	}
 
+	var err error
 	if m.db != nil {
-		_ = m.db.Close()
+		err = m.db.Close()
 	}
 	m.wg.Wait()
 
 	m.closed = true
+	return err
 }

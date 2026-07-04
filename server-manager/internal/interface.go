@@ -48,5 +48,5 @@ type Message interface {
 
 type Matchmaker interface {
 	Start(ctx context.Context) error
-	Shutdown()
+	Shutdown() error
 }

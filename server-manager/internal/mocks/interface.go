@@ -517,9 +517,11 @@ func (m *MockMatchmaker) EXPECT() *MockMatchmakerMockRecorder {
 }
 
 // Shutdown mocks base method.
-func (m *MockMatchmaker) Shutdown() {
+func (m *MockMatchmaker) Shutdown() error {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "Shutdown")
+	ret := m.ctrl.Call(m, "Shutdown")
+	ret0, _ := ret[0].(error)
+	return ret0
 }
 
 // Shutdown indicates an expected call of Shutdown.
