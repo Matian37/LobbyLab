@@ -45,8 +45,3 @@ type Message interface {
 	Data() []byte
 	Ack() error
 }
-
-type Matchmaker interface {
-	Start(ctx context.Context) error
-	Shutdown() error
-}
