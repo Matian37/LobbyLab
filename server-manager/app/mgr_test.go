@@ -120,7 +120,7 @@ func TestWorkerManager_Start(t *testing.T) {
 
 		docker.EXPECT().Open(wm.config).Return(nil)
 		broker.EXPECT().Open(ctx, wm.config).Return(nil)
-		db.EXPECT().Open(ctx, wm.config).Return(wantErr)
+		db.EXPECT().Open(ctx).Return(wantErr)
 
 		err := wm.Start(ctx)
 		require.ErrorIs(t, err, wantErr)
@@ -138,7 +138,7 @@ func TestWorkerManager_Start(t *testing.T) {
 		gomock.InOrder(
 			docker.EXPECT().Open(wm.config).Return(nil),
 			broker.EXPECT().Open(ctx, wm.config).Return(nil),
-			db.EXPECT().Open(ctx, wm.config).Return(nil),
+			db.EXPECT().Open(ctx).Return(nil),
 			docker.EXPECT().SpawnContainer(ctx).Return("worker-1", nil),
 			docker.EXPECT().SpawnContainer(ctx).Return("", wantErr),
 		)
@@ -163,7 +163,7 @@ func TestWorkerManager_Start(t *testing.T) {
 		gomock.InOrder(
 			docker.EXPECT().Open(wm.config).Return(nil),
 			broker.EXPECT().Open(ctx, wm.config).Return(nil),
-			db.EXPECT().Open(ctx, wm.config).Return(nil),
+			db.EXPECT().Open(ctx).Return(nil),
 			docker.EXPECT().SpawnContainer(ctx).Return("worker-1", nil),
 			docker.EXPECT().SpawnContainer(ctx).Return("worker-2", nil),
 		)

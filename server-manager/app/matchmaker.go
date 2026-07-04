@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"server-manager/adapters"
 	"server-manager/internal"
 	"sync"
 	"time"
@@ -20,11 +21,15 @@ type Matchmaker struct {
 }
 
 func NewMatchmaker(workerManager internal.WorkerManager, config *internal.EnvConfig) *Matchmaker {
-	return &Matchmaker{workerManager: workerManager, config: config}
+	return &Matchmaker{
+		workerManager: workerManager,
+		db:            adapters.NewDatabaseConnection(config),
+		config:        config,
+	}
 }
 
 func (m *Matchmaker) Start(ctx context.Context) error {
-	if err := m.db.Open(ctx, m.config); err != nil {
+	if err := m.db.Open(ctx); err != nil {
 		return err
 	}
 

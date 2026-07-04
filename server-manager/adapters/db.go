@@ -5,34 +5,28 @@ import (
 	"server-manager/internal"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type DatabaseConnection struct {
-	pool     *pgxpool.Pool
+	conn     *pgx.Conn
 	listener *pgx.Conn
+	config   *internal.EnvConfig
 }
 
-func NewDatabaseConnection() *DatabaseConnection {
-	return &DatabaseConnection{}
+func NewDatabaseConnection(config *internal.EnvConfig) *DatabaseConnection {
+	return &DatabaseConnection{config: config}
 }
 
-func (dc *DatabaseConnection) Open(ctx context.Context, config *internal.EnvConfig) error {
-	pool, err := pgxpool.New(ctx, config.DatabaseURI)
+func (dc *DatabaseConnection) Open(ctx context.Context) error {
+	conn, err := pgx.Connect(ctx, dc.config.DatabaseURI)
 	if err != nil {
 		return err
 	}
-	dc.pool = pool
+	dc.conn = conn
 
-	if err = pool.Ping(ctx); err != nil {
+	if err = conn.Ping(ctx); err != nil {
 		return err
 	}
-
-	conn, err := pgx.Connect(ctx, config.DatabaseURI)
-	if err != nil {
-		return err
-	}
-	dc.listener = conn
 
 	return nil
 }
@@ -41,14 +35,20 @@ func (dc *DatabaseConnection) Close() error {
 	if dc.listener != nil {
 		_ = dc.listener.Close(context.Background())
 	}
-	if dc.pool != nil {
-		dc.pool.Close()
+	if dc.conn != nil {
+		_ = dc.conn.Close(context.Background())
 	}
 	return nil
 }
 
 func (dc *DatabaseConnection) StartListening(ctx context.Context) error {
-	_, err := dc.listener.Exec(ctx, "LISTEN new_waiting_user")
+	listener, err := pgx.Connect(ctx, dc.config.DatabaseURI)
+	if err != nil {
+		return err
+	}
+	dc.listener = listener
+
+	_, err = dc.listener.Exec(ctx, "LISTEN new_waiting_user")
 	return err
 }
 
@@ -58,7 +58,7 @@ func (dc *DatabaseConnection) ListenForQueueChange(ctx context.Context) error {
 }
 
 func (dc *DatabaseConnection) GetList(ctx context.Context) ([]internal.User, error) {
-	rows, err := dc.pool.Query(ctx, "SELECT * FROM waiting")
+	rows, err := dc.conn.Query(ctx, "SELECT * FROM waiting")
 	if err != nil {
 		return nil, err
 	}
@@ -81,7 +81,7 @@ func (dc *DatabaseConnection) AddMatch(
 	serverInfo internal.ServerInfo,
 	matchId int,
 ) error {
-	_, err := dc.pool.Exec(
+	_, err := dc.conn.Exec(
 		ctx,
 		"INSERT INTO matches (id, host, port) VALUES ($1, $2, $3)",
 		matchId,
@@ -97,7 +97,7 @@ func (dc *DatabaseConnection) AddMatch(
 		logins = append(logins, user.Login)
 	}
 
-	_, err = dc.pool.Exec(
+	_, err = dc.conn.Exec(
 		ctx,
 		"UPDATE users SET match_id = $1 WHERE login = ANY($2)",
 		matchId,
@@ -107,7 +107,7 @@ func (dc *DatabaseConnection) AddMatch(
 }
 
 func (dc *DatabaseConnection) SaveMatchResults(ctx context.Context, details string, matchID int) error {
-	_, err := dc.pool.Exec(
+	_, err := dc.conn.Exec(
 		ctx,
 		"INSERT INTO results (match_id, details) VALUES($1, $2)",
 		matchID,
@@ -118,7 +118,7 @@ func (dc *DatabaseConnection) SaveMatchResults(ctx context.Context, details stri
 
 func (dc *DatabaseConnection) GetNextMatchId(ctx context.Context) (int, error) {
 	var id int
-	err := dc.pool.QueryRow(ctx, "SELECT nextval('matches_id_seq')").Scan(&id)
+	err := dc.conn.QueryRow(ctx, "SELECT nextval('matches_id_seq')").Scan(&id)
 	if err != nil {
 		return 0, err
 	}

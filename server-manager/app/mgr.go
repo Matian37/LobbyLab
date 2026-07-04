@@ -60,7 +60,7 @@ func NewWorkerManager(config *internal.EnvConfig) *WorkerManager {
 	return &WorkerManager{
 		dockerConn:           adapters.NewDockerConnection(),
 		brokerConn:           adapters.NewNATSConnection(),
-		dbConn:               adapters.NewDatabaseConnection(),
+		dbConn:               adapters.NewDatabaseConnection(config),
 		config:               config,
 		healthCheckTick:      5 * time.Second,
 		resultChanSize:       8192,
@@ -84,7 +84,7 @@ func (wm *WorkerManager) Start(ctx context.Context) error {
 	if err := wm.brokerConn.Open(ctx, wm.config); err != nil {
 		return err
 	}
-	if err := wm.dbConn.Open(ctx, wm.config); err != nil {
+	if err := wm.dbConn.Open(ctx); err != nil {
 		return err
 	}
 

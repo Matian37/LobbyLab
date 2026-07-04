@@ -82,10 +82,9 @@ func restartDB() {
 }
 
 func newDBConnWithOpen(t *testing.T) *DatabaseConnection {
-	d := DatabaseConnection{}
-	err := d.Open(context.Background(), &internal.EnvConfig{DatabaseURI: dbConnString})
-	require.NoError(t, err)
-	return &d
+	d := NewDatabaseConnection(&internal.EnvConfig{DatabaseURI: dbConnString})
+	require.NoError(t, d.Open(context.Background()))
+	return d
 }
 
 func TestIntegration_DatabaseConnection_Open(t *testing.T) {
@@ -94,14 +93,13 @@ func TestIntegration_DatabaseConnection_Open(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	d := DatabaseConnection{}
-	err := d.Open(ctx, &internal.EnvConfig{DatabaseURI: dbConnString})
-	require.NoError(t, err)
+	d := NewDatabaseConnection(&internal.EnvConfig{DatabaseURI: dbConnString})
+	require.NoError(t, d.Open(ctx))
 
-	require.NotNil(t, d.pool)
-	assert.NoError(t, d.pool.Ping(ctx))
+	assert.Nil(t, d.listener)
 
-	assert.NotNil(t, d.listener)
+	require.NotNil(t, d.conn)
+	assert.NoError(t, d.conn.Ping(ctx))
 }
 
 func TestIntegration_DatabaseConnection_GetList(t *testing.T) {
@@ -116,7 +114,7 @@ func TestIntegration_DatabaseConnection_GetList(t *testing.T) {
 	require.NoError(t, err)
 	require.Empty(t, users)
 
-	_, err = d.pool.Exec(ctx, "INSERT INTO waiting (login) VALUES ('user1')")
+	_, err = d.conn.Exec(ctx, "INSERT INTO waiting (login) VALUES ('user1')")
 	require.NoError(t, err)
 
 	users, err = d.GetList(ctx)
@@ -134,7 +132,7 @@ func TestIntegration_DatabaseConnection_AddMatch(t *testing.T) {
 
 	d := newDBConnWithOpen(t)
 
-	_, err := d.pool.Exec(ctx, "INSERT INTO users (login, password) VALUES ('user1', 'passvvord')")
+	_, err := d.conn.Exec(ctx, "INSERT INTO users (login, password) VALUES ('user1', 'passvvord')")
 	require.NoError(t, err)
 
 	err = d.AddMatch(ctx, users, internal.ServerInfo{Host: "someGameServerHost", Port: "1234/udp"}, 1)
@@ -142,13 +140,13 @@ func TestIntegration_DatabaseConnection_AddMatch(t *testing.T) {
 
 	var matchID int
 	var host, port string
-	err = d.pool.QueryRow(ctx, "SELECT id, host, port FROM matches").Scan(&matchID, &host, &port)
+	err = d.conn.QueryRow(ctx, "SELECT id, host, port FROM matches").Scan(&matchID, &host, &port)
 	require.NoError(t, err)
 	require.Equal(t, "someGameServerHost", host)
 	require.Equal(t, "1234/udp", port)
 
 	var userMatchID int
-	err = d.pool.QueryRow(ctx, "SELECT match_id FROM users WHERE login='user1'").Scan(&userMatchID)
+	err = d.conn.QueryRow(ctx, "SELECT match_id FROM users WHERE login='user1'").Scan(&userMatchID)
 	require.NoError(t, err)
 	require.Equal(t, matchID, userMatchID)
 }
@@ -169,7 +167,7 @@ func TestIntegration_DatabaseConnection_SaveMatchResults(t *testing.T) {
 	require.NoError(t, err)
 
 	var matchId int
-	err = d.pool.QueryRow(ctx, "SELECT match_id FROM results").Scan(&matchId)
+	err = d.conn.QueryRow(ctx, "SELECT match_id FROM results").Scan(&matchId)
 	require.NoError(t, err)
 	require.Equal(t, 123, matchId)
 }
@@ -182,12 +180,12 @@ func TestIntegration_DatabaseConnection_Close(t *testing.T) {
 
 	d := newDBConnWithOpen(t)
 
-	err := d.pool.Ping(ctx)
+	err := d.conn.Ping(ctx)
 	require.NoError(t, err)
 
 	require.NoError(t, d.Close())
 
-	err = d.pool.Ping(ctx)
+	err = d.conn.Ping(ctx)
 	require.ErrorContains(t, err, "closed")
 }
 
@@ -218,7 +216,7 @@ func TestIntegration_ListenForQueueChange(t *testing.T) {
 
 	require.NoError(t, d.StartListening(ctx))
 
-	_, err := d.pool.Exec(ctx, "INSERT INTO waiting (login) VALUES ($1)", "")
+	_, err := d.conn.Exec(ctx, "INSERT INTO waiting (login) VALUES ($1)", "")
 	require.NoError(t, err)
 
 	done := make(chan error)

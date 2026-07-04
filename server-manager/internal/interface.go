@@ -31,7 +31,7 @@ type WorkerManager interface {
 }
 
 type DatabaseConnection interface {
-	Open(ctx context.Context, config *EnvConfig) error
+	Open(ctx context.Context) error
 	Close() error
 	SaveMatchResults(ctx context.Context, details string, matchID int) error
 	StartListening(ctx context.Context) error

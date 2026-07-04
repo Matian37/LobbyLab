@@ -399,17 +399,17 @@ func (mr *MockDatabaseConnectionMockRecorder) ListenForQueueChange(ctx any) *gom
 }
 
 // Open mocks base method.
-func (m *MockDatabaseConnection) Open(ctx context.Context, config *internal.EnvConfig) error {
+func (m *MockDatabaseConnection) Open(ctx context.Context) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Open", ctx, config)
+	ret := m.ctrl.Call(m, "Open", ctx)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // Open indicates an expected call of Open.
-func (mr *MockDatabaseConnectionMockRecorder) Open(ctx, config any) *gomock.Call {
+func (mr *MockDatabaseConnectionMockRecorder) Open(ctx any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Open", reflect.TypeOf((*MockDatabaseConnection)(nil).Open), ctx, config)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Open", reflect.TypeOf((*MockDatabaseConnection)(nil).Open), ctx)
 }
 
 // SaveMatchResults mocks base method.
