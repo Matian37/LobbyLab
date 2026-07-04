@@ -87,7 +87,7 @@ func newDBConnWithOpen(t *testing.T) *DatabaseConnection {
 	return d
 }
 
-func TestDatabaseConnection_Open(t *testing.T) {
+func TestIntegration_DatabaseConnection_Open(t *testing.T) {
 	t.Run("closed", func(t *testing.T) {
 		dc := DatabaseConnection{connOpened: true, closed: true}
 		err := dc.Open(context.Background())
@@ -116,7 +116,7 @@ func TestDatabaseConnection_Open(t *testing.T) {
 	})
 }
 
-func TestDatabaseConnection_Close(t *testing.T) {
+func TestIntegration_DatabaseConnection_Close(t *testing.T) {
 	t.Run("already closed", func(t *testing.T) {
 		dc := DatabaseConnection{closed: true}
 		err := dc.Close()
@@ -147,7 +147,7 @@ func TestDatabaseConnection_Close(t *testing.T) {
 	})
 }
 
-func TestDatabaseConnection_StartListening(t *testing.T) {
+func TestIntegration_DatabaseConnection_StartListening(t *testing.T) {
 	t.Run("closed", func(t *testing.T) {
 		dc := DatabaseConnection{closed: true, listenerOpened: true}
 		err := dc.StartListening(context.Background())
@@ -161,7 +161,7 @@ func TestDatabaseConnection_StartListening(t *testing.T) {
 	})
 }
 
-func TestDatabaseConnection_ListenForQueueChange(t *testing.T) {
+func TestIntegration_DatabaseConnection_ListenForQueueChange(t *testing.T) {
 	t.Run("closed", func(t *testing.T) {
 		dc := DatabaseConnection{closed: true}
 		err := dc.ListenForQueueChange(context.Background())
@@ -217,7 +217,7 @@ func TestDatabaseConnection_ListenForQueueChange(t *testing.T) {
 	})
 }
 
-func TestDatabaseConnection_GetList(t *testing.T) {
+func TestIntegration_DatabaseConnection_GetList(t *testing.T) {
 	t.Run("not open", func(t *testing.T) {
 		dc := DatabaseConnection{}
 		_, err := dc.GetList(context.Background())
@@ -251,7 +251,7 @@ func TestDatabaseConnection_GetList(t *testing.T) {
 	})
 }
 
-func TestDatabaseConnection_AddMatch(t *testing.T) {
+func TestIntegration_DatabaseConnection_AddMatch(t *testing.T) {
 	t.Run("not open", func(t *testing.T) {
 		dc := DatabaseConnection{}
 		err := dc.AddMatch(context.Background(), nil, internal.ServerInfo{}, 0)
@@ -294,7 +294,7 @@ func TestDatabaseConnection_AddMatch(t *testing.T) {
 	})
 }
 
-func TestDatabaseConnection_SaveMatchResults(t *testing.T) {
+func TestIntegration_DatabaseConnection_SaveMatchResults(t *testing.T) {
 	t.Run("not open", func(t *testing.T) {
 		dc := DatabaseConnection{}
 		err := dc.SaveMatchResults(context.Background(), "", 0)
@@ -329,7 +329,7 @@ func TestDatabaseConnection_SaveMatchResults(t *testing.T) {
 	})
 }
 
-func TestDatabaseConnection_GetNextMatchId(t *testing.T) {
+func TestIntegration_DatabaseConnection_GetNextMatchId(t *testing.T) {
 	t.Run("not open", func(t *testing.T) {
 		dc := DatabaseConnection{}
 		_, err := dc.GetNextMatchId(context.Background())
