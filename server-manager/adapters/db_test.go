@@ -135,33 +135,6 @@ func TestIntegration_DatabaseConnection_Open(t *testing.T) {
 	})
 }
 
-func TestIntegration_DatabaseConnection_Close(t *testing.T) {
-	t.Run("already closed", func(t *testing.T) {
-		dc := DatabaseConnection{closed: true}
-		err := dc.Close()
-		assert.ErrorIs(t, err, ErrDBConnAlreadyClosed)
-	})
-
-	t.Run("not opened", func(t *testing.T) {
-		dc := DatabaseConnection{}
-		assert.NoError(t, dc.Close())
-		assert.True(t, dc.closed)
-	})
-
-	t.Run("success", func(t *testing.T) {
-		restartDB(t)
-
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-
-		d := newDBConnWithOpen(t)
-
-		require.NoError(t, d.conn.Ping(ctx))
-		require.NoError(t, d.Close())
-		require.ErrorContains(t, d.conn.Ping(ctx), "closed")
-	})
-}
-
 func TestIntegration_DatabaseConnection_StartListening(t *testing.T) {
 	t.Run("closed", func(t *testing.T) {
 		dc := DatabaseConnection{closed: true, listenerOpened: true}
@@ -187,6 +160,44 @@ func TestIntegration_DatabaseConnection_StartListening(t *testing.T) {
 
 		require.NotNil(t, dc.listener)
 		assert.NoError(t, dc.listener.Ping(ctx))
+	})
+}
+
+func TestIntegration_DatabaseConnection_Close(t *testing.T) {
+	t.Run("already closed", func(t *testing.T) {
+		dc := DatabaseConnection{closed: true}
+		err := dc.Close()
+		assert.ErrorIs(t, err, ErrDBConnAlreadyClosed)
+	})
+
+	t.Run("not opened", func(t *testing.T) {
+		dc := DatabaseConnection{}
+		assert.NoError(t, dc.Close())
+		assert.True(t, dc.closed)
+	})
+
+	t.Run("success", func(t *testing.T) {
+		tests := []struct {
+			name           string
+			listenerOpened bool
+		}{
+			{name: "listener not opened", listenerOpened: false},
+			{name: "listener opened", listenerOpened: true},
+		}
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				restartDB(t)
+
+				ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+				defer cancel()
+
+				d := newDBConnWithOpen(t)
+
+				require.NoError(t, d.conn.Ping(ctx))
+				require.NoError(t, d.Close())
+				require.ErrorContains(t, d.conn.Ping(ctx), "closed")
+			})
+		}
 	})
 }
 
