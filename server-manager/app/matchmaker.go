@@ -10,12 +10,20 @@ import (
 	"time"
 )
 
-var ErrNotEnoughUsers = errors.New("not enough users")
+var (
+	ErrNotEnoughUsers         = errors.New("not enough users")
+	ErrMatchmakerClosed       = errors.New("matchmaker closed")
+	ErrMatchmakerAlreadyOpen  = errors.New("matchmaker already open")
+	ErrMatchmakerAlreadyShutdown = errors.New("matchmaker already shutdown")
+)
 
 type Matchmaker struct {
 	workerManager internal.WorkerManager
 	db            internal.DatabaseConnection
 	config        *internal.EnvConfig
+
+	opened bool
+	closed bool
 
 	wg sync.WaitGroup
 }
@@ -29,6 +37,13 @@ func NewMatchmaker(workerManager internal.WorkerManager, config *internal.EnvCon
 }
 
 func (m *Matchmaker) Start(ctx context.Context) error {
+	if m.closed {
+		return ErrMatchmakerClosed
+	}
+	if m.opened {
+		return ErrMatchmakerAlreadyOpen
+	}
+
 	if err := m.db.Open(ctx); err != nil {
 		return err
 	}
@@ -39,6 +54,7 @@ func (m *Matchmaker) Start(ctx context.Context) error {
 
 	m.wg.Go(func() { m.listenLoop(ctx) })
 
+	m.opened = true
 	return nil
 }
 
@@ -107,8 +123,14 @@ func (m *Matchmaker) runMatchmaking(ctx context.Context) error {
 }
 
 func (m *Matchmaker) Shutdown() {
+	if m.closed {
+		return
+	}
+
 	if m.db != nil {
 		_ = m.db.Close()
 	}
 	m.wg.Wait()
+
+	m.closed = true
 }

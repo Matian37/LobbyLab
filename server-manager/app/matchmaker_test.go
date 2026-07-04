@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 )
 
@@ -67,4 +68,36 @@ func TestCreateMatches(t *testing.T) {
 			assert.ErrorIs(t, err, tc.expected)
 		})
 	}
+}
+
+func TestNewMatchmaker(t *testing.T) {
+	config := &internal.EnvConfig{}
+	m := NewMatchmaker(nil, config)
+
+	require.NotNil(t, m)
+	assert.Same(t, config, m.config)
+	assert.NotNil(t, m.db)
+	assert.False(t, m.opened)
+	assert.False(t, m.closed)
+}
+
+func TestMatchmaker_Start(t *testing.T) {
+	t.Run("closed", func(t *testing.T) {
+		m := Matchmaker{closed: true, opened: true}
+		err := m.Start(context.Background())
+		assert.ErrorIs(t, err, ErrMatchmakerClosed)
+	})
+
+	t.Run("already open", func(t *testing.T) {
+		m := Matchmaker{opened: true}
+		err := m.Start(context.Background())
+		assert.ErrorIs(t, err, ErrMatchmakerAlreadyOpen)
+	})
+}
+
+func TestMatchmaker_Shutdown(t *testing.T) {
+	t.Run("already closed", func(t *testing.T) {
+		m := Matchmaker{closed: true}
+		m.Shutdown()
+	})
 }

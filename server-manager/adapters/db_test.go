@@ -87,163 +87,275 @@ func newDBConnWithOpen(t *testing.T) *DatabaseConnection {
 	return d
 }
 
-func TestIntegration_DatabaseConnection_Open(t *testing.T) {
-	restartDB()
+func TestDatabaseConnection_Open(t *testing.T) {
+	t.Run("closed", func(t *testing.T) {
+		dc := DatabaseConnection{connOpened: true, closed: true}
+		err := dc.Open(context.Background())
+		assert.ErrorIs(t, err, ErrDBConnClosed)
+	})
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
+	t.Run("already open", func(t *testing.T) {
+		dc := DatabaseConnection{connOpened: true}
+		err := dc.Open(context.Background())
+		assert.ErrorIs(t, err, ErrDBConnAlreadyOpen)
+	})
 
-	d := NewDatabaseConnection(&internal.EnvConfig{DatabaseURI: dbConnString})
-	require.NoError(t, d.Open(ctx))
+	t.Run("success", func(t *testing.T) {
+		restartDB()
 
-	assert.Nil(t, d.listener)
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
 
-	require.NotNil(t, d.conn)
-	assert.NoError(t, d.conn.Ping(ctx))
+		d := NewDatabaseConnection(&internal.EnvConfig{DatabaseURI: dbConnString})
+		require.NoError(t, d.Open(ctx))
+
+		assert.Nil(t, d.listener)
+
+		require.NotNil(t, d.conn)
+		assert.NoError(t, d.conn.Ping(ctx))
+	})
 }
 
-func TestIntegration_DatabaseConnection_GetList(t *testing.T) {
-	restartDB()
+func TestDatabaseConnection_Close(t *testing.T) {
+	t.Run("already closed", func(t *testing.T) {
+		dc := DatabaseConnection{closed: true}
+		err := dc.Close()
+		assert.ErrorIs(t, err, ErrDBConnAlreadyClosed)
+	})
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
+	t.Run("not opened", func(t *testing.T) {
+		dc := DatabaseConnection{}
+		assert.NoError(t, dc.Close())
+		assert.True(t, dc.closed)
+	})
 
-	d := newDBConnWithOpen(t)
+	t.Run("success", func(t *testing.T) {
+		restartDB()
 
-	users, err := d.GetList(ctx)
-	require.NoError(t, err)
-	require.Empty(t, users)
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
 
-	_, err = d.conn.Exec(ctx, "INSERT INTO waiting (login) VALUES ('user1')")
-	require.NoError(t, err)
+		d := newDBConnWithOpen(t)
 
-	users, err = d.GetList(ctx)
-	require.NoError(t, err)
-	assert.Equal(t, users, []internal.User{{Login: "user1"}})
+		err := d.conn.Ping(ctx)
+		require.NoError(t, err)
+
+		require.NoError(t, d.Close())
+
+		err = d.conn.Ping(ctx)
+		require.ErrorContains(t, err, "closed")
+	})
 }
 
-func TestIntegration_DatabaseConnection_AddMatch(t *testing.T) {
-	restartDB()
+func TestDatabaseConnection_StartListening(t *testing.T) {
+	t.Run("closed", func(t *testing.T) {
+		dc := DatabaseConnection{closed: true, listenerOpened: true}
+		err := dc.StartListening(context.Background())
+		assert.ErrorIs(t, err, ErrDBConnClosed)
+	})
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	users := []internal.User{{Login: "user1"}, {Login: "user2"}}
-
-	d := newDBConnWithOpen(t)
-
-	_, err := d.conn.Exec(ctx, "INSERT INTO users (login, password) VALUES ('user1', 'passvvord')")
-	require.NoError(t, err)
-
-	err = d.AddMatch(ctx, users, internal.ServerInfo{Host: "someGameServerHost", Port: "1234/udp"}, 1)
-	require.NoError(t, err)
-
-	var matchID int
-	var host, port string
-	err = d.conn.QueryRow(ctx, "SELECT id, host, port FROM matches").Scan(&matchID, &host, &port)
-	require.NoError(t, err)
-	require.Equal(t, "someGameServerHost", host)
-	require.Equal(t, "1234/udp", port)
-
-	var userMatchID int
-	err = d.conn.QueryRow(ctx, "SELECT match_id FROM users WHERE login='user1'").Scan(&userMatchID)
-	require.NoError(t, err)
-	require.Equal(t, matchID, userMatchID)
+	t.Run("already started", func(t *testing.T) {
+		dc := DatabaseConnection{listenerOpened: true}
+		err := dc.StartListening(context.Background())
+		assert.ErrorIs(t, err, ErrDBListenerAlreadyStarted)
+	})
 }
 
-func TestIntegration_DatabaseConnection_SaveMatchResults(t *testing.T) {
-	restartDB()
+func TestDatabaseConnection_ListenForQueueChange(t *testing.T) {
+	t.Run("closed", func(t *testing.T) {
+		dc := DatabaseConnection{closed: true}
+		err := dc.ListenForQueueChange(context.Background())
+		assert.ErrorIs(t, err, ErrDBConnClosed)
+	})
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
+	t.Run("listener not started", func(t *testing.T) {
+		dc := DatabaseConnection{connOpened: true}
+		err := dc.ListenForQueueChange(context.Background())
+		assert.ErrorIs(t, err, ErrDBNotListening)
+	})
 
-	d := newDBConnWithOpen(t)
+	t.Run("success", func(t *testing.T) {
+		restartDB()
 
-	users := []internal.User{{Login: "user1"}, {Login: "user2"}}
-	matchDetails, err := json.Marshal(users)
-	require.NoError(t, err)
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
 
-	err = d.SaveMatchResults(ctx, string(matchDetails), 123)
-	require.NoError(t, err)
+		d := newDBConnWithOpen(t)
 
-	var matchId int
-	err = d.conn.QueryRow(ctx, "SELECT match_id FROM results").Scan(&matchId)
-	require.NoError(t, err)
-	require.Equal(t, 123, matchId)
+		require.NoError(t, d.StartListening(ctx))
+
+		_, err := d.conn.Exec(ctx, "INSERT INTO waiting (login) VALUES ($1)", "")
+		require.NoError(t, err)
+
+		done := make(chan error)
+		go func() {
+			err := d.ListenForQueueChange(context.Background())
+			done <- err
+		}()
+
+		select {
+		case res := <-done:
+			require.NoError(t, res)
+		case <-time.After(2 * time.Second):
+			t.Fatal("function didn't finish within timeout")
+		}
+
+		ctx, cancel = context.WithTimeout(context.Background(), 2*time.Second)
+		cancel()
+
+		go func() {
+			err := d.ListenForQueueChange(ctx)
+			done <- err
+		}()
+
+		select {
+		case res := <-done:
+			require.ErrorIs(t, res, ctx.Err())
+		case <-time.After(2 * time.Second):
+			t.Fatal("function didn't finish within timeout")
+		}
+	})
 }
 
-func TestIntegration_DatabaseConnection_Close(t *testing.T) {
-	restartDB()
+func TestDatabaseConnection_GetList(t *testing.T) {
+	t.Run("not open", func(t *testing.T) {
+		dc := DatabaseConnection{}
+		_, err := dc.GetList(context.Background())
+		assert.ErrorIs(t, err, ErrDBConnNotOpen)
+	})
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
+	t.Run("closed", func(t *testing.T) {
+		dc := DatabaseConnection{connOpened: true, closed: true}
+		_, err := dc.GetList(context.Background())
+		assert.ErrorIs(t, err, ErrDBConnClosed)
+	})
 
-	d := newDBConnWithOpen(t)
+	t.Run("success", func(t *testing.T) {
+		restartDB()
 
-	err := d.conn.Ping(ctx)
-	require.NoError(t, err)
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
 
-	require.NoError(t, d.Close())
+		d := newDBConnWithOpen(t)
 
-	err = d.conn.Ping(ctx)
-	require.ErrorContains(t, err, "closed")
+		users, err := d.GetList(ctx)
+		require.NoError(t, err)
+		require.Empty(t, users)
+
+		_, err = d.conn.Exec(ctx, "INSERT INTO waiting (login) VALUES ('user1')")
+		require.NoError(t, err)
+
+		users, err = d.GetList(ctx)
+		require.NoError(t, err)
+		assert.Equal(t, users, []internal.User{{Login: "user1"}})
+	})
 }
 
-func TestIntegration_DatabaseConnection_GetNextMatchId(t *testing.T) {
-	restartDB()
+func TestDatabaseConnection_AddMatch(t *testing.T) {
+	t.Run("not open", func(t *testing.T) {
+		dc := DatabaseConnection{}
+		err := dc.AddMatch(context.Background(), nil, internal.ServerInfo{}, 0)
+		assert.ErrorIs(t, err, ErrDBConnNotOpen)
+	})
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
+	t.Run("closed", func(t *testing.T) {
+		dc := DatabaseConnection{connOpened: true, closed: true}
+		err := dc.AddMatch(context.Background(), nil, internal.ServerInfo{}, 0)
+		assert.ErrorIs(t, err, ErrDBConnClosed)
+	})
 
-	d := newDBConnWithOpen(t)
+	t.Run("success", func(t *testing.T) {
+		restartDB()
 
-	id, err := d.GetNextMatchId(ctx)
-	require.NoError(t, err)
-	require.Equal(t, 1, id)
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
 
-	id, err = d.GetNextMatchId(ctx)
-	require.NoError(t, err)
-	require.Equal(t, 2, id)
+		users := []internal.User{{Login: "user1"}, {Login: "user2"}}
+
+		d := newDBConnWithOpen(t)
+
+		_, err := d.conn.Exec(ctx, "INSERT INTO users (login, password) VALUES ('user1', 'passvvord')")
+		require.NoError(t, err)
+
+		err = d.AddMatch(ctx, users, internal.ServerInfo{Host: "someGameServerHost", Port: "1234/udp"}, 1)
+		require.NoError(t, err)
+
+		var matchID int
+		var host, port string
+		err = d.conn.QueryRow(ctx, "SELECT id, host, port FROM matches").Scan(&matchID, &host, &port)
+		require.NoError(t, err)
+		require.Equal(t, "someGameServerHost", host)
+		require.Equal(t, "1234/udp", port)
+
+		var userMatchID int
+		err = d.conn.QueryRow(ctx, "SELECT match_id FROM users WHERE login='user1'").Scan(&userMatchID)
+		require.NoError(t, err)
+		require.Equal(t, matchID, userMatchID)
+	})
 }
 
-func TestIntegration_ListenForQueueChange(t *testing.T) {
-	restartDB()
+func TestDatabaseConnection_SaveMatchResults(t *testing.T) {
+	t.Run("not open", func(t *testing.T) {
+		dc := DatabaseConnection{}
+		err := dc.SaveMatchResults(context.Background(), "", 0)
+		assert.ErrorIs(t, err, ErrDBConnNotOpen)
+	})
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
+	t.Run("closed", func(t *testing.T) {
+		dc := DatabaseConnection{connOpened: true, closed: true}
+		err := dc.SaveMatchResults(context.Background(), "", 0)
+		assert.ErrorIs(t, err, ErrDBConnClosed)
+	})
 
-	d := newDBConnWithOpen(t)
+	t.Run("success", func(t *testing.T) {
+		restartDB()
 
-	require.NoError(t, d.StartListening(ctx))
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
 
-	_, err := d.conn.Exec(ctx, "INSERT INTO waiting (login) VALUES ($1)", "")
-	require.NoError(t, err)
+		d := newDBConnWithOpen(t)
 
-	done := make(chan error)
-	go func() {
-		err := d.ListenForQueueChange(context.Background())
-		done <- err
-	}()
+		users := []internal.User{{Login: "user1"}, {Login: "user2"}}
+		matchDetails, err := json.Marshal(users)
+		require.NoError(t, err)
 
-	select {
-	case res := <-done:
-		require.NoError(t, res)
-	case <-time.After(2 * time.Second):
-		t.Fatal("function didn't finish within timeout")
-	}
+		err = d.SaveMatchResults(ctx, string(matchDetails), 123)
+		require.NoError(t, err)
 
-	ctx, cancel = context.WithTimeout(context.Background(), 2*time.Second)
-	cancel()
+		var matchId int
+		err = d.conn.QueryRow(ctx, "SELECT match_id FROM results").Scan(&matchId)
+		require.NoError(t, err)
+		require.Equal(t, 123, matchId)
+	})
+}
 
-	go func() {
-		err := d.ListenForQueueChange(ctx)
-		done <- err
-	}()
+func TestDatabaseConnection_GetNextMatchId(t *testing.T) {
+	t.Run("not open", func(t *testing.T) {
+		dc := DatabaseConnection{}
+		_, err := dc.GetNextMatchId(context.Background())
+		assert.ErrorIs(t, err, ErrDBConnNotOpen)
+	})
 
-	select {
-	case res := <-done:
-		require.ErrorIs(t, res, ctx.Err())
-	case <-time.After(2 * time.Second):
-		t.Fatal("function didn't finish within timeout")
-	}
+	t.Run("closed", func(t *testing.T) {
+		dc := DatabaseConnection{connOpened: true, closed: true}
+		_, err := dc.GetNextMatchId(context.Background())
+		assert.ErrorIs(t, err, ErrDBConnClosed)
+	})
+
+	t.Run("success", func(t *testing.T) {
+		restartDB()
+
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		d := newDBConnWithOpen(t)
+
+		id, err := d.GetNextMatchId(ctx)
+		require.NoError(t, err)
+		require.Equal(t, 1, id)
+
+		id, err = d.GetNextMatchId(ctx)
+		require.NoError(t, err)
+		require.Equal(t, 2, id)
+	})
 }
