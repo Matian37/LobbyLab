@@ -50,7 +50,9 @@ func TestMain(m *testing.M) {
 	os.Exit(code)
 }
 
-func restartSchema(ctx context.Context) error {
+func restartSchema(t *testing.T, ctx context.Context) error {
+	t.Helper()
+
 	conn, err := pgx.Connect(ctx, dbConnString)
 	if err != nil {
 		return fmt.Errorf("failed to open database: %w", err)
@@ -71,14 +73,31 @@ func restartSchema(ctx context.Context) error {
 	return nil
 }
 
-func restartDB() {
+func restartDB(t *testing.T) {
+	t.Helper()
+
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	err := restartSchema(ctx)
+	err := restartSchema(t, ctx)
 	if err != nil {
 		panic(fmt.Sprintf("failed to restart db: %v", err))
 	}
+}
+
+func newHelperConn(t *testing.T) *pgx.Conn {
+	t.Helper()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	conn, err := pgx.Connect(ctx, dbConnString)
+	if err != nil {
+		panic(fmt.Sprintf("failed to connect to db: %v", err))
+	}
+	t.Cleanup(func() { _ = conn.Close(context.Background()) })
+
+	return conn
 }
 
 func newDBConnWithOpen(t *testing.T) *DatabaseConnection {
@@ -101,7 +120,7 @@ func TestIntegration_DatabaseConnection_Open(t *testing.T) {
 	})
 
 	t.Run("success", func(t *testing.T) {
-		restartDB()
+		restartDB(t)
 
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
@@ -130,20 +149,16 @@ func TestIntegration_DatabaseConnection_Close(t *testing.T) {
 	})
 
 	t.Run("success", func(t *testing.T) {
-		restartDB()
+		restartDB(t)
 
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 
 		d := newDBConnWithOpen(t)
 
-		err := d.conn.Ping(ctx)
-		require.NoError(t, err)
-
+		require.NoError(t, d.conn.Ping(ctx))
 		require.NoError(t, d.Close())
-
-		err = d.conn.Ping(ctx)
-		require.ErrorContains(t, err, "closed")
+		require.ErrorContains(t, d.conn.Ping(ctx), "closed")
 	})
 }
 
@@ -158,6 +173,20 @@ func TestIntegration_DatabaseConnection_StartListening(t *testing.T) {
 		dc := DatabaseConnection{listenerOpened: true}
 		err := dc.StartListening(context.Background())
 		assert.ErrorIs(t, err, ErrDBListenerAlreadyStarted)
+	})
+
+	t.Run("success", func(t *testing.T) {
+		dc := newDBConnWithOpen(t)
+
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		require.NoError(t, dc.StartListening(ctx))
+
+		assert.True(t, dc.listenerOpened)
+
+		require.NotNil(t, dc.listener)
+		assert.NoError(t, dc.listener.Ping(ctx))
 	})
 }
 
@@ -174,14 +203,38 @@ func TestIntegration_DatabaseConnection_ListenForQueueChange(t *testing.T) {
 		assert.ErrorIs(t, err, ErrDBNotListening)
 	})
 
+	t.Run("context caneled", func(t *testing.T) {
+		restartDB(t)
+
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+
+		d := newDBConnWithOpen(t)
+		require.NoError(t, d.StartListening(ctx))
+
+		done := make(chan error)
+		go func() {
+			err := d.ListenForQueueChange(ctx)
+			done <- err
+		}()
+
+		cancel()
+
+		select {
+		case res := <-done:
+			require.ErrorIs(t, res, ctx.Err())
+		case <-time.After(2 * time.Second):
+			t.Fatal("function didn't finish within timeout")
+		}
+	})
+
 	t.Run("success", func(t *testing.T) {
-		restartDB()
+		restartDB(t)
 
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 
 		d := newDBConnWithOpen(t)
-
 		require.NoError(t, d.StartListening(ctx))
 
 		_, err := d.conn.Exec(ctx, "INSERT INTO waiting (login) VALUES ($1)", "")
@@ -196,21 +249,6 @@ func TestIntegration_DatabaseConnection_ListenForQueueChange(t *testing.T) {
 		select {
 		case res := <-done:
 			require.NoError(t, res)
-		case <-time.After(2 * time.Second):
-			t.Fatal("function didn't finish within timeout")
-		}
-
-		ctx, cancel = context.WithTimeout(context.Background(), 2*time.Second)
-		cancel()
-
-		go func() {
-			err := d.ListenForQueueChange(ctx)
-			done <- err
-		}()
-
-		select {
-		case res := <-done:
-			require.ErrorIs(t, res, ctx.Err())
 		case <-time.After(2 * time.Second):
 			t.Fatal("function didn't finish within timeout")
 		}
@@ -231,23 +269,34 @@ func TestIntegration_DatabaseConnection_GetList(t *testing.T) {
 	})
 
 	t.Run("success", func(t *testing.T) {
-		restartDB()
+		tests := []struct {
+			name          string
+			expectedUsers []internal.User
+		}{
+			{name: "empty", expectedUsers: nil},
+			{name: "one user", expectedUsers: []internal.User{{Login: "user1"}}},
+			{name: "multiple users", expectedUsers: []internal.User{{Login: "user1"}, {Login: "user2"}}},
+		}
 
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
+		for _, test := range tests {
+			t.Run(test.name, func(t *testing.T) {
+				restartDB(t)
 
-		d := newDBConnWithOpen(t)
+				ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+				defer cancel()
 
-		users, err := d.GetList(ctx)
-		require.NoError(t, err)
-		require.Empty(t, users)
+				hc := newHelperConn(t)
+				for _, user := range test.expectedUsers {
+					_, err := hc.Exec(ctx, "INSERT INTO waiting (login) VALUES ($1)", user.Login)
+					require.NoError(t, err)
+				}
 
-		_, err = d.conn.Exec(ctx, "INSERT INTO waiting (login) VALUES ('user1')")
-		require.NoError(t, err)
-
-		users, err = d.GetList(ctx)
-		require.NoError(t, err)
-		assert.Equal(t, users, []internal.User{{Login: "user1"}})
+				d := newDBConnWithOpen(t)
+				users, err := d.GetList(ctx)
+				require.NoError(t, err)
+				assert.Equal(t, users, test.expectedUsers)
+			})
+		}
 	})
 }
 
@@ -265,7 +314,7 @@ func TestIntegration_DatabaseConnection_AddMatch(t *testing.T) {
 	})
 
 	t.Run("success", func(t *testing.T) {
-		restartDB()
+		restartDB(t)
 
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
@@ -308,7 +357,7 @@ func TestIntegration_DatabaseConnection_SaveMatchResults(t *testing.T) {
 	})
 
 	t.Run("success", func(t *testing.T) {
-		restartDB()
+		restartDB(t)
 
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
@@ -343,7 +392,7 @@ func TestIntegration_DatabaseConnection_GetNextMatchId(t *testing.T) {
 	})
 
 	t.Run("success", func(t *testing.T) {
-		restartDB()
+		restartDB(t)
 
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
