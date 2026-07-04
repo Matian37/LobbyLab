@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"server-manager/adapters"
 	"server-manager/internal"
 	"sync"
@@ -58,15 +59,30 @@ func (m *Matchmaker) Start(ctx context.Context) error {
 	return nil
 }
 
+func (m *Matchmaker) Shutdown() error {
+	if m.closed {
+		return ErrMatchmakerAlreadyShutdown
+	}
+
+	var err error
+	if m.db != nil {
+		err = m.db.Close()
+	}
+	m.wg.Wait()
+
+	m.closed = true
+	return err
+}
+
 func (m *Matchmaker) createMatches(ctx context.Context, users []internal.User) error {
 	if len(users) < m.config.PlayersPerRoom {
-		return ErrNotEnoughUsers
+		return nil
 	}
 
 	for i := m.config.PlayersPerRoom; i <= len(users); i += m.config.PlayersPerRoom {
 		matchUsers := users[i-m.config.PlayersPerRoom : i]
 
-		gameConfig, err := json.Marshal(struct{ Players []internal.User }{Players: users})
+		gameConfig, err := json.Marshal(struct{ Players []internal.User }{Players: matchUsers})
 		if err != nil {
 			return err
 		}
@@ -95,19 +111,14 @@ func (m *Matchmaker) createMatches(ctx context.Context, users []internal.User) e
 
 func (m *Matchmaker) listenLoop(ctx context.Context) {
 	for {
-		select {
-		case <-ctx.Done():
-			return
-		default:
-		}
-
 		_ = m.db.ListenForQueueChange(ctx)
 		if ctx.Err() != nil {
 			return
 		}
 
-		// TODO: handle error somehow
-		_ = m.runMatchmaking(ctx)
+		if err := m.runMatchmaking(ctx); err != nil {
+			slog.Error("failed to matchmake", "error", err)
+		}
 	}
 }
 
@@ -120,19 +131,4 @@ func (m *Matchmaker) runMatchmaking(ctx context.Context) error {
 		return err
 	}
 	return m.createMatches(ctxTimeout, users)
-}
-
-func (m *Matchmaker) Shutdown() error {
-	if m.closed {
-		return ErrMatchmakerAlreadyShutdown
-	}
-
-	var err error
-	if m.db != nil {
-		err = m.db.Close()
-	}
-	m.wg.Wait()
-
-	m.closed = true
-	return err
 }
