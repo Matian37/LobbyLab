@@ -156,6 +156,12 @@ func (dc *DatabaseConnection) AddMatch(
 	logins := make([]string, 0, len(users))
 	for _, user := range users {
 		logins = append(logins, user.Login)
+		_, err = dc.conn.Exec(
+			ctx,
+			"INSERT INTO user_matches (user_id, match_id) VALUES ($1,  $2)",
+			user.Login,
+			matchId,
+		)
 	}
 
 	_, err = dc.conn.Exec(
