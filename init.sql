@@ -5,20 +5,22 @@ CREATE TABLE IF NOT EXISTS matches(
     host TEXT NOT NULL,
     port TEXT NOT NULL,
     active BOOLEAN NOT NULL DEFAULT true
+    results JSONB
+
 );
 
 ALTER SEQUENCE matches_id_seq OWNED BY matches.id;
 
+CREATE TABLE IF NOT EXISTS user_matches (
+    user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    match_id BIGINT NOT NULL REFERENCES matches(id) ON DELETE CASCADE,
+    PRIMARY KEY (user_id, match_id)
+);
 
 CREATE TABLE IF NOT EXISTS users(
     login TEXT PRIMARY KEY,
     password TEXT NOT NULL,
     match_id INT REFERENCES matches(id)
-);
-
-CREATE TABLE IF NOT EXISTS results(
-    match_id INT,
-    details JSONB
 );
 
 CREATE TABLE IF NOT EXISTS waiting(
