@@ -162,6 +162,9 @@ func (dc *DatabaseConnection) AddMatch(
 			user.Login,
 			matchId,
 		)
+		if err != nil {
+			return err
+		}
 	}
 
 	_, err = dc.conn.Exec(
