@@ -4,6 +4,7 @@
     let title = $state('Zaloguj sie');
     let buttonText = $state('Play');
     let user = false;
+    let rows = $state([]);
 
     LoadUser();
     async function LoadUser(){
@@ -12,7 +13,13 @@
         else{
             user = {login: data.login, token: data.token};
             title = data.login;
+            LoadMatches(data.login);
         } 
+    }
+
+    async function LoadMatches(login){
+        let query = await fetch(`/api/results?login=${login}`);
+        rows = await query.json();
     }
 
     export function changePage(path) {
@@ -69,3 +76,22 @@
 </button>
 
 <h1 data-testid='title'>{title}</h1>
+
+<table>
+    <thead>
+      <tr>
+        <th>Player 1</th>
+        <th>Player 2</th>
+        <th>Winner</th>
+      </tr>
+    </thead>
+    <tbody>
+      {#each rows as row}
+        <tr>
+          <td>{row.player1}</td>
+          <td>{row.player2}</td>
+          <td>{row.player3}</td>
+        </tr>
+      {/each}
+    </tbody>
+  </table>

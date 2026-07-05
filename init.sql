@@ -1,8 +1,19 @@
+CREATE SEQUENCE matches_id_seq;
+
 CREATE TABLE IF NOT EXISTS matches(
     id SERIAL PRIMARY KEY,
     host TEXT NOT NULL,
     port INT NOT NULL,
     active BOOLEAN NOT NULL DEFAULT true
+    results JSONB
+);
+
+ALTER SEQUENCE matches_id_seq OWNED BY matches.id;
+
+CREATE TABLE IF NOT EXISTS user_matches (
+    user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    match_id BIGINT NOT NULL REFERENCES matches(id) ON DELETE CASCADE,
+    PRIMARY KEY (user_id, match_id)
 );
 
 CREATE TABLE IF NOT EXISTS users(

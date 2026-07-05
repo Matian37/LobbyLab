@@ -101,6 +101,20 @@ export async function tokenExists(token){
     return q;
 }
 
+export async function getMatchResults(login){
+    const q = await sql`
+        SELECT match_id FROM user_matches WHERE user_id = ${login}
+    `
+    const matchIds = q.map(row => row.match_id);
+
+    const q1 = await sql`
+        SELECT results FROM matches WHERE id = ANY(${sql.array(matchIds)})
+    `
+    const matches = q1.map(results => result.results);
+    return matches;
+}
+
+
 async function deleteOldSessions(){
     await sql`
         DELETE FROM sessions WHERE date < NOW() - INTERVAL '3 months'
