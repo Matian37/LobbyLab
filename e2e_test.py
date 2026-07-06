@@ -2,6 +2,8 @@ import subprocess
 import requests
 import json
 import pytest
+import socket
+import time
 
 @pytest.fixture()
 def setup_services():
@@ -33,5 +35,17 @@ def test_add2users(setup_services):
     assert data2["username"] == 'user2'
     assert data1["host"] == data2["host"]
     assert data1["port"] == data2["port"]
-
     
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    sock.settimeout(2)
+    sock.sendto('hello'.encode(), (data1["host"], data1["port"]))
+    try:
+        sock.recvfrom(1024)
+    except socket.timeout:
+        assert False
+
+    time.sleep(15)
+
+    query = requests.get(f'http://localhost:5173/api/results?login=user1')
+    response = query.json()
+    assert response == {'players': ['user1', 'user2'], 'winner': 'user1'}
