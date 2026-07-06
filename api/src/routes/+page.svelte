@@ -13,13 +13,16 @@
         else{
             user = {login: data.login, token: data.token};
             title = data.login;
-            LoadMatches(data.login);
+            LoadMatches(data.token);
         } 
     }
 
-    async function LoadMatches(login){
-        let query = await fetch(`/api/results?login=${login}`);
-        rows = await query.json();
+    async function LoadMatches(token){
+        const query = await fetch(`/api/results?token=${token}`);
+        const response = await query.json();
+        if(!response.sukces)
+            return;
+        rows = response.matches;
     }
 
     export function changePage(path) {
