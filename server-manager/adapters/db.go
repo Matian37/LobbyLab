@@ -3,6 +3,7 @@ package adapters
 import (
 	"context"
 	"errors"
+	"fmt"
 	"server-manager/internal"
 
 	"github.com/jackc/pgx/v5"
@@ -15,6 +16,7 @@ var (
 	ErrDBConnAlreadyClosed      = errors.New("connection already closed")
 	ErrDBNotListening           = errors.New("listener not started")
 	ErrDBListenerAlreadyStarted = errors.New("listener already started")
+	ErrDBMatchNotFound          = errors.New("match not found")
 )
 
 type DatabaseConnection struct {
@@ -133,7 +135,7 @@ func (dc *DatabaseConnection) AddMatch(
 	ctx context.Context,
 	users []internal.User,
 	serverInfo internal.ServerInfo,
-	matchId int,
+	matchID int,
 ) error {
 	if !dc.connOpened {
 		return ErrDBConnNotOpen
@@ -145,7 +147,7 @@ func (dc *DatabaseConnection) AddMatch(
 	_, err := dc.conn.Exec(
 		ctx,
 		"INSERT INTO matches (id, host, port) VALUES ($1, $2, $3)",
-		matchId,
+		matchID,
 		serverInfo.Host,
 		serverInfo.Port,
 	)
@@ -156,21 +158,25 @@ func (dc *DatabaseConnection) AddMatch(
 	logins := make([]string, 0, len(users))
 	for _, user := range users {
 		logins = append(logins, user.Login)
-		_, err = dc.conn.Exec(
-			ctx,
-			"INSERT INTO user_matches (user_id, match_id) VALUES ($1,  $2)",
-			user.Login,
-			matchId,
-		)
-		if err != nil {
-			return err
-		}
+	}
+
+	_, err = dc.conn.Exec(
+		ctx,
+		`
+		INSERT INTO user_matches (user_id, match_id)
+		SELECT unnest($1::text[]), $2
+		`,
+		logins,
+		matchID,
+	)
+	if err != nil {
+		return err
 	}
 
 	_, err = dc.conn.Exec(
 		ctx,
 		"UPDATE users SET match_id = $1 WHERE login = ANY($2)",
-		matchId,
+		matchID,
 		logins,
 	)
 	return err
@@ -184,13 +190,19 @@ func (dc *DatabaseConnection) SaveMatchResults(ctx context.Context, details stri
 		return ErrDBConnClosed
 	}
 
-	_, err := dc.conn.Exec(
+	res, err := dc.conn.Exec(
 		ctx,
-		"INSERT INTO results (match_id, details) VALUES($1, $2)",
-		matchID,
+		"UPDATE matches SET results = $1 WHERE id = $2",
 		details,
+		matchID,
 	)
-	return err
+	if err != nil {
+		return err
+	}
+	if res.RowsAffected() == 0 {
+		return fmt.Errorf("%w id=%d", ErrDBMatchNotFound, matchID)
+	}
+	return nil
 }
 
 func (dc *DatabaseConnection) GetNextMatchId(ctx context.Context) (int, error) {

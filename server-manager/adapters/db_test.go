@@ -4,7 +4,6 @@ package adapters
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
 	"server-manager/internal"
@@ -334,7 +333,13 @@ func TestIntegration_DatabaseConnection_AddMatch(t *testing.T) {
 
 		d := newDBConnWithOpen(t)
 
-		_, err := d.conn.Exec(ctx, "INSERT INTO users (login, password) VALUES ('user1', 'passvvord')")
+		_, err := d.conn.Exec(
+			ctx, `
+			INSERT INTO users (login, password)
+			VALUES ('user1', ''),
+				   ('user2', '')
+			`,
+		)
 		require.NoError(t, err)
 
 		err = d.AddMatch(ctx, users, internal.ServerInfo{Host: "someGameServerHost", Port: "1234/udp"}, 1)
@@ -351,6 +356,19 @@ func TestIntegration_DatabaseConnection_AddMatch(t *testing.T) {
 		err = d.conn.QueryRow(ctx, "SELECT match_id FROM users WHERE login='user1'").Scan(&userMatchID)
 		require.NoError(t, err)
 		require.Equal(t, matchID, userMatchID)
+
+		rows, err := d.conn.Query(ctx, "SELECT user_id, match_id FROM user_matches ORDER BY (user_id, match_id)")
+		require.NoError(t, err)
+
+		type UserMatch struct {
+			UserID  string `db:"user_id"`
+			MatchID int    `db:"match_id"`
+		}
+		matches, err := pgx.CollectRows(rows, pgx.RowToStructByName[UserMatch])
+		require.NoError(t, err)
+
+		expectedMatches := []UserMatch{{UserID: "user1", MatchID: matchID}, {UserID: "user2", MatchID: matchID}}
+		require.Equal(t, expectedMatches, matches)
 	})
 }
 
@@ -367,7 +385,7 @@ func TestIntegration_DatabaseConnection_SaveMatchResults(t *testing.T) {
 		assert.ErrorIs(t, err, ErrDBConnClosed)
 	})
 
-	t.Run("success", func(t *testing.T) {
+	t.Run("no match found", func(t *testing.T) {
 		restartDB(t)
 
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -375,17 +393,28 @@ func TestIntegration_DatabaseConnection_SaveMatchResults(t *testing.T) {
 
 		d := newDBConnWithOpen(t)
 
-		users := []internal.User{{Login: "user1"}, {Login: "user2"}}
-		matchDetails, err := json.Marshal(users)
+		require.ErrorIs(t, d.SaveMatchResults(ctx, "{}", 123), ErrDBMatchNotFound)
+	})
+
+	t.Run("success", func(t *testing.T) {
+		restartDB(t)
+
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		conn := newHelperConn(t)
+		_, err := conn.Exec(ctx, "INSERT INTO matches (id, host, port) VALUES ($1, $2, $3)", 1, "", "")
 		require.NoError(t, err)
 
-		err = d.SaveMatchResults(ctx, string(matchDetails), 123)
-		require.NoError(t, err)
+		d := newDBConnWithOpen(t)
 
-		var matchId int
-		err = d.conn.QueryRow(ctx, "SELECT match_id FROM results").Scan(&matchId)
+		wantJSON := `{"example": {"id": 1}}`
+		require.NoError(t, d.SaveMatchResults(ctx, string(wantJSON), 1))
+
+		var json string
+		err = d.conn.QueryRow(ctx, "SELECT results FROM matches WHERE id = $1", 1).Scan(&json)
 		require.NoError(t, err)
-		require.Equal(t, 123, matchId)
+		require.Equal(t, wantJSON, json)
 	})
 }
 
