@@ -5,7 +5,7 @@ let DATABASE_URL = process.env.DATABASE_URL;
 if(!DATABASE_URL && process.env.VITEST)
     DATABASE_URL = 'postgresql://postgres:123@localhost:5432/postgres';
 
-const sql = postgres(DATABASE_URL);
+export const sql = postgres(DATABASE_URL);
 
 export async function findUserByLogin(login){
     const q = await sql`
@@ -108,9 +108,9 @@ export async function getMatchResults(login){
     const matchIds = q.map(row => row.match_id);
 
     const q1 = await sql`
-        SELECT results FROM matches WHERE id = ANY(${sql.array(matchIds)})
+        SELECT results FROM matches WHERE id = ANY(${matchIds}::int[])
     `
-    const matches = q1.map(results => result.results);
+    const matches = q1.map(result => JSON.parse(result.results));
     return matches;
 }
 

@@ -2,6 +2,7 @@ import { vi, test, expect, describe, beforeEach } from 'vitest';
 import * as loginAPI from '$routes/api/login/+server.js';
 import * as registerAPI from '$routes/api/register/+server.js';
 import * as waitingAPI from '$routes/api/waiting/+server.js';
+import * as resultsAPI from '$routes/api/results/+server.js'
 import * as db from '$lib/db.js';
 import bcrypt from 'bcryptjs';
 
@@ -9,13 +10,17 @@ import bcrypt from 'bcryptjs';
 vi.mock('$lib/db.js', () => {
     const bcrypt = require('bcryptjs')
     return {
-      findUserByLogin: vi.fn().mockResolvedValue([{ login: 'user', password: bcrypt.hashSync("123", 10) }]),
-      tokenExists: vi.fn().mockResolvedValue([]),
-      setSession: vi.fn().mockResolvedValue(true),
-      addUser: vi.fn().mockResolvedValue(true),
-      getLoginFromToken: vi.fn().mockResolvedValue([{login: "user"}]),
-      addToWaiting: vi.fn().mockResolvedValue(true),
-      deleteFromWaiting: vi.fn().mockResolvedValue(true),
+        findUserByLogin: vi.fn().mockResolvedValue([{ login: 'user', password: bcrypt.hashSync("123", 10) }]),
+        tokenExists: vi.fn().mockResolvedValue([]),
+        setSession: vi.fn().mockResolvedValue(true),
+        addUser: vi.fn().mockResolvedValue(true),
+        getLoginFromToken: vi.fn().mockResolvedValue([{login: "user"}]),
+        addToWaiting: vi.fn().mockResolvedValue(true),
+        deleteFromWaiting: vi.fn().mockResolvedValue(true),
+        getMatchResults: vi.fn().mockResolvedValue([
+            {players: ['albert', 'zbychu'], winner: 'albert'},
+            {players: ['user1', 'albert'], winner: 'user1'},
+        ]),
     }
 })
 
@@ -152,5 +157,17 @@ describe('waiting', () => {
         const response = await waitingAPI.DELETE({ request });
         const result = await response.json();
         expect(result.sukces).toBe(true);
+    });
+});
+
+describe('statistics', () => {
+    test('getting matches', async () => {
+        const url = new URL("http://cos.pl/api/results?login=alfred");
+        const response = await resultsAPI.GET( {url} );
+        const result = await response.json();
+        expect(result).toEqual([
+            {players: ['albert', 'zbychu'], winner: 'albert'},
+            {players: ['user1', 'albert'], winner: 'user1'},
+        ]);
     });
 });

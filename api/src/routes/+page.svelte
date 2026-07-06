@@ -80,18 +80,22 @@
 <table>
     <thead>
       <tr>
-        <th>Player 1</th>
-        <th>Player 2</th>
+        {#each Array(rows.players.length) as _, i}
+            <th>Player {i + 1}</th>
+        {/each}
         <th>Winner</th>
       </tr>
     </thead>
     <tbody>
-      {#each rows as row}
-        <tr>
-          <td>{row.player1}</td>
-          <td>{row.player2}</td>
-          <td>{row.player3}</td>
-        </tr>
-      {/each}
+        {#if rows.length > 0}
+            {#each rows as row}
+                <tr>
+                    {#each row.players as player}
+                        <td>{player}</td>
+                    {/each}
+                    <td>{row.winner}</td>
+                </tr>
+            {/each}
+        {/if}
     </tbody>
   </table>
