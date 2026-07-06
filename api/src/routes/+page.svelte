@@ -80,10 +80,12 @@
 <table>
     <thead>
       <tr>
-        {#each Array(rows.players.length) as _, i}
-            <th>Player {i + 1}</th>
-        {/each}
-        <th>Winner</th>
+        {#if rows.length > 0}
+            {#each Array(rows.players.length) as _, i}
+                <th>Player {i + 1}</th>
+            {/each}
+            <th>Winner</th>
+        {/if}
       </tr>
     </thead>
     <tbody>
