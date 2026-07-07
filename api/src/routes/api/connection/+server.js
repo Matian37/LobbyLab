@@ -3,8 +3,10 @@ import { json } from '@sveltejs/kit';
 import { Client } from 'pg';
 import { handleError } from '$lib/error_handler.js';
 
-export async function GET({request}){
-    const token =  request.headers.get('Token');
+export async function GET({cookies}){
+    const token = cookies.get('token')
+    if(token === undefined)
+        return json({sukces: false});
     
     const response = await getLoginFromToken(token);
     if(response.length == 0) 

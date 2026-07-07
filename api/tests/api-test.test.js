@@ -58,7 +58,11 @@ describe('logging in', () => {
             body: JSON.stringify({ login: 'user', password: '123' })
         });
 
-        const response = await loginAPI.POST({ request });
+        const response = await loginAPI.POST({ request,
+            cookies: {
+                set: vi.fn()
+            }
+         });
         const result = await response.json();
         expect(result.sukces).toBe(true);
     });
@@ -87,10 +91,14 @@ describe('registering', () => {
             body: JSON.stringify({ login: 'user', password: 'haslo' })
         });
 
-        const response = await registerAPI.POST({ request });
+        const response = await registerAPI.POST({ request,
+            cookies: {
+                set: vi.fn()
+            }
+         });
         const result = await response.json();
         expect(result.sukces).toBe(true);
-        expect(result.msg.length).toBe(16);
+        expect(result.msg).toBe(null);
     });
 });
 
@@ -98,63 +106,72 @@ describe('registering', () => {
 describe('waiting', () => {
     test('adding to waiting user with wrong token', async () => {
         db.getLoginFromToken.mockResolvedValueOnce([]);
-        const request = new Request('http://cos', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ token: '123456789' })
-        });
 
-        const response = await waitingAPI.POST({ request });
+        const response = await waitingAPI.POST({
+            cookies: {
+                get: (name) => {
+                    if (name === 'token') return '1234567';
+                    return undefined;
+                }
+            }
+         });
         const result = await response.json();
         expect(result.sukces).toBe(false);
     });
 
     test('adding to waiting already waiting user', async () => {
         db.addToWaiting.mockResolvedValueOnce(false);
-        const request = new Request('http://cos', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ token: '123456789' })
-        });
 
-        const response = await waitingAPI.POST({ request });
+        const response = await waitingAPI.POST({
+            cookies: {
+                get: (name) => {
+                    if (name === 'token') return '1234567';
+                    return undefined;
+                }
+            }
+         });
         const result = await response.json();
         expect(result.sukces).toBe(false);
     });
 
     test('adding to waiting correctly', async () => {
-        const request = new Request('http://cos', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ token: '123456789' })
-        });
-
-        const response = await waitingAPI.POST({ request });
+        const response = await waitingAPI.POST({
+            cookies: {
+                get: (name) => {
+                    if (name === 'token') return '1234567';
+                    return undefined;
+                }
+            }
+         });
         const result = await response.json();
         expect(result.sukces).toBe(true);
     });
 
     test('deleting from waiting user with no corresponding login to token', async () => {
         db.getLoginFromToken.mockResolvedValueOnce([]);
-        const request = new Request('http://cos', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ token: '123456789' })
-        });
 
-        const response = await waitingAPI.DELETE({ request });
+        const response = await waitingAPI.DELETE({
+            cookies: {
+                get: (name) => {
+                    if (name === 'token') return '1234567';
+                    return undefined;
+                }
+            }
+         });
         const result = await response.json();
         expect(result.sukces).toBe(false);
     });
 
     test('deleting from waiting', async () => {
-        const request = new Request('http://cos', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ token: '123456789' })
-        });
 
-        const response = await waitingAPI.DELETE({ request });
+        const response = await waitingAPI.DELETE({
+            cookies: {
+                get: (name) => {
+                    if (name === 'token') return '1234567';
+                    return undefined;
+                }
+            }
+         });
         const result = await response.json();
         expect(result.sukces).toBe(true);
     });
@@ -162,11 +179,14 @@ describe('waiting', () => {
 
 describe('statistics', () => {
     test('getting matches', async () => {
-        const request = new Request('http://cos', {
-            method: 'GET',
-            headers: { 'Token': '123456789' },
-        });
-        const response = await resultsAPI.GET( {request} );
+        const response = await resultsAPI.GET( {
+            cookies: {
+                get: (name) => {
+                    if (name === 'token') return '1234567';
+                    return undefined;
+                }
+            }
+        } );
         const result = await response.json();
         expect(result).toEqual({sukces: true, matches: [
             {players: ['albert', 'zbychu'], winner: 'albert'},
