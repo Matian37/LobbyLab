@@ -20,13 +20,11 @@ var (
 )
 
 type DatabaseConnection struct {
-	conn     *pgx.Conn
-	listener *pgx.Conn
-	config   *internal.EnvConfig
+	conn   *pgx.Conn
+	config *internal.EnvConfig
 
-	connOpened     bool
-	listenerOpened bool
-	closed         bool
+	connOpened bool
+	closed     bool
 }
 
 func NewDatabaseConnection(config *internal.EnvConfig) *DatabaseConnection {
@@ -60,9 +58,6 @@ func (dc *DatabaseConnection) Close() error {
 		return ErrDBConnAlreadyClosed
 	}
 
-	if dc.listener != nil {
-		_ = dc.listener.Close(context.Background())
-	}
 	if dc.conn != nil {
 		_ = dc.conn.Close(context.Background())
 	}
@@ -71,42 +66,7 @@ func (dc *DatabaseConnection) Close() error {
 	return nil
 }
 
-func (dc *DatabaseConnection) StartListening(ctx context.Context) error {
-	if dc.closed {
-		return ErrDBConnClosed
-	}
-	if dc.listenerOpened {
-		return ErrDBListenerAlreadyStarted
-	}
-
-	listener, err := pgx.Connect(ctx, dc.config.DatabaseURI)
-	if err != nil {
-		return err
-	}
-	dc.listener = listener
-
-	_, err = dc.listener.Exec(ctx, "LISTEN new_waiting_user")
-	if err != nil {
-		return err
-	}
-
-	dc.listenerOpened = true
-	return nil
-}
-
-func (dc *DatabaseConnection) ListenForQueueChange(ctx context.Context) error {
-	if dc.closed {
-		return ErrDBConnClosed
-	}
-	if !dc.listenerOpened {
-		return ErrDBNotListening
-	}
-
-	_, err := dc.listener.WaitForNotification(ctx)
-	return err
-}
-
-func (dc *DatabaseConnection) GetList(ctx context.Context) ([]internal.User, error) {
+func (dc *DatabaseConnection) GetMatchPlayers(ctx context.Context) ([]internal.User, error) {
 	if !dc.connOpened {
 		return nil, ErrDBConnNotOpen
 	}
@@ -114,19 +74,18 @@ func (dc *DatabaseConnection) GetList(ctx context.Context) ([]internal.User, err
 		return nil, ErrDBConnClosed
 	}
 
-	rows, err := dc.conn.Query(ctx, "SELECT * FROM waiting")
+	rows, err := dc.conn.Query(ctx, "SELECT login FROM waiting LIMIT $1", dc.config.PlayersPerRoom)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
 
-	var users []internal.User
-	for rows.Next() {
-		var u internal.User
-		if err := rows.Scan(&u.Login); err != nil {
-			return nil, err
-		}
-		users = append(users, u)
+	users, err := pgx.CollectRows(rows, pgx.RowToStructByName[internal.User])
+	if err != nil {
+		return nil, err
+	}
+
+	if len(users) < dc.config.PlayersPerRoom {
+		return nil, internal.ErrDBNotEnoughPlayers
 	}
 	return users, nil
 }
@@ -144,7 +103,18 @@ func (dc *DatabaseConnection) AddMatch(
 		return ErrDBConnClosed
 	}
 
-	_, err := dc.conn.Exec(
+	logins := make([]string, 0, len(users))
+	for _, user := range users {
+		logins = append(logins, user.Login)
+	}
+
+	tx, err := dc.conn.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	_, err = tx.Exec(
 		ctx,
 		"INSERT INTO matches (id, host, port) VALUES ($1, $2, $3)",
 		matchID,
@@ -155,12 +125,7 @@ func (dc *DatabaseConnection) AddMatch(
 		return err
 	}
 
-	logins := make([]string, 0, len(users))
-	for _, user := range users {
-		logins = append(logins, user.Login)
-	}
-
-	_, err = dc.conn.Exec(
+	_, err = tx.Exec(
 		ctx,
 		`
 		INSERT INTO user_matches (user_id, match_id)
@@ -173,13 +138,29 @@ func (dc *DatabaseConnection) AddMatch(
 		return err
 	}
 
-	_, err = dc.conn.Exec(
+	_, err = tx.Exec(
 		ctx,
 		"UPDATE users SET match_id = $1 WHERE login = ANY($2)",
 		matchID,
 		logins,
 	)
-	return err
+	if err != nil {
+		return err
+	}
+
+	res, err := tx.Exec(
+		ctx,
+		"DELETE FROM waiting WHERE login = ANY($1)",
+		logins,
+	)
+	if err != nil {
+		return err
+	}
+	if res.RowsAffected() != int64(len(users)) {
+		return internal.ErrDBWaitingUserDisconnected
+	}
+
+	return tx.Commit(ctx)
 }
 
 func (dc *DatabaseConnection) SaveMatchResults(ctx context.Context, details string, matchID int) error {

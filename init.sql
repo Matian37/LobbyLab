@@ -23,7 +23,7 @@ CREATE TABLE IF NOT EXISTS user_matches (
 );
 
 CREATE TABLE IF NOT EXISTS waiting(
-    login TEXT PRIMARY KEY
+    login TEXT PRIMARY KEY REFERENCES users(login) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS sessions(
@@ -58,17 +58,3 @@ AFTER UPDATE ON users
 FOR EACH ROW
 WHEN (OLD.match_id IS NULL AND NEW.match_id IS NOT NULL)
 EXECUTE FUNCTION notify_users_match_id();
-
-CREATE OR REPLACE FUNCTION notify_waiting()
-RETURNS trigger
-LANGUAGE plpgsql AS $$
-BEGIN
-    PERFORM pg_notify('new_waiting_user', '');
-    RETURN NEW;
-END;
-$$;
-
-CREATE OR REPLACE TRIGGER trg_waiting
-AFTER INSERT ON waiting
-FOR EACH ROW
-EXECUTE FUNCTION notify_waiting();

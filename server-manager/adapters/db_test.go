@@ -99,6 +99,7 @@ func newHelperConn(t *testing.T) *pgx.Conn {
 	return conn
 }
 
+// TODO: add ctx as argument or timeout
 func newDBConnWithOpen(t *testing.T) *DatabaseConnection {
 	d := NewDatabaseConnection(&internal.EnvConfig{DatabaseURI: dbConnString})
 	require.NoError(t, d.Open(context.Background()))
@@ -127,38 +128,8 @@ func TestIntegration_DatabaseConnection_Open(t *testing.T) {
 		d := NewDatabaseConnection(&internal.EnvConfig{DatabaseURI: dbConnString})
 		require.NoError(t, d.Open(ctx))
 
-		assert.Nil(t, d.listener)
-
 		require.NotNil(t, d.conn)
 		assert.NoError(t, d.conn.Ping(ctx))
-	})
-}
-
-func TestIntegration_DatabaseConnection_StartListening(t *testing.T) {
-	t.Run("closed", func(t *testing.T) {
-		dc := DatabaseConnection{closed: true, listenerOpened: true}
-		err := dc.StartListening(context.Background())
-		assert.ErrorIs(t, err, ErrDBConnClosed)
-	})
-
-	t.Run("already started", func(t *testing.T) {
-		dc := DatabaseConnection{listenerOpened: true}
-		err := dc.StartListening(context.Background())
-		assert.ErrorIs(t, err, ErrDBListenerAlreadyStarted)
-	})
-
-	t.Run("success", func(t *testing.T) {
-		dc := newDBConnWithOpen(t)
-
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-
-		require.NoError(t, dc.StartListening(ctx))
-
-		assert.True(t, dc.listenerOpened)
-
-		require.NotNil(t, dc.listener)
-		assert.NoError(t, dc.listener.Ping(ctx))
 	})
 }
 
@@ -176,116 +147,68 @@ func TestIntegration_DatabaseConnection_Close(t *testing.T) {
 	})
 
 	t.Run("success", func(t *testing.T) {
-		tests := []struct {
-			name           string
-			listenerOpened bool
-		}{
-			{name: "listener not opened", listenerOpened: false},
-			{name: "listener opened", listenerOpened: true},
-		}
-		for _, tt := range tests {
-			t.Run(tt.name, func(t *testing.T) {
-				restartDB(t)
-
-				ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-				defer cancel()
-
-				d := newDBConnWithOpen(t)
-
-				require.NoError(t, d.conn.Ping(ctx))
-				require.NoError(t, d.Close())
-				require.ErrorContains(t, d.conn.Ping(ctx), "closed")
-			})
-		}
-	})
-}
-
-func TestIntegration_DatabaseConnection_ListenForQueueChange(t *testing.T) {
-	t.Run("closed", func(t *testing.T) {
-		dc := DatabaseConnection{closed: true}
-		err := dc.ListenForQueueChange(context.Background())
-		assert.ErrorIs(t, err, ErrDBConnClosed)
-	})
-
-	t.Run("listener not started", func(t *testing.T) {
-		dc := DatabaseConnection{connOpened: true}
-		err := dc.ListenForQueueChange(context.Background())
-		assert.ErrorIs(t, err, ErrDBNotListening)
-	})
-
-	t.Run("context caneled", func(t *testing.T) {
-		restartDB(t)
-
-		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-		defer cancel()
-
-		d := newDBConnWithOpen(t)
-		require.NoError(t, d.StartListening(ctx))
-
-		done := make(chan error)
-		go func() {
-			err := d.ListenForQueueChange(ctx)
-			done <- err
-		}()
-
-		cancel()
-
-		select {
-		case res := <-done:
-			require.ErrorIs(t, res, ctx.Err())
-		case <-time.After(2 * time.Second):
-			t.Fatal("function didn't finish within timeout")
-		}
-	})
-
-	t.Run("success", func(t *testing.T) {
 		restartDB(t)
 
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 
 		d := newDBConnWithOpen(t)
-		require.NoError(t, d.StartListening(ctx))
 
-		_, err := d.conn.Exec(ctx, "INSERT INTO waiting (login) VALUES ($1)", "")
-		require.NoError(t, err)
-
-		done := make(chan error)
-		go func() {
-			err := d.ListenForQueueChange(context.Background())
-			done <- err
-		}()
-
-		select {
-		case res := <-done:
-			require.NoError(t, res)
-		case <-time.After(2 * time.Second):
-			t.Fatal("function didn't finish within timeout")
-		}
+		require.NoError(t, d.conn.Ping(ctx))
+		require.NoError(t, d.Close())
+		require.ErrorContains(t, d.conn.Ping(ctx), "closed")
 	})
 }
 
-func TestIntegration_DatabaseConnection_GetList(t *testing.T) {
+func TestIntegration_DatabaseConnection_GetMatchPlayers(t *testing.T) {
 	t.Run("not open", func(t *testing.T) {
 		dc := DatabaseConnection{}
-		_, err := dc.GetList(context.Background())
+		_, err := dc.GetMatchPlayers(context.Background())
 		assert.ErrorIs(t, err, ErrDBConnNotOpen)
 	})
 
 	t.Run("closed", func(t *testing.T) {
 		dc := DatabaseConnection{connOpened: true, closed: true}
-		_, err := dc.GetList(context.Background())
+		_, err := dc.GetMatchPlayers(context.Background())
 		assert.ErrorIs(t, err, ErrDBConnClosed)
 	})
 
 	t.Run("success", func(t *testing.T) {
 		tests := []struct {
-			name          string
-			expectedUsers []internal.User
+			name           string
+			playersPerRoom int
+			users          []internal.User
+			wantPlayers    []internal.User
+			wantErr        error
 		}{
-			{name: "empty", expectedUsers: nil},
-			{name: "one user", expectedUsers: []internal.User{{Login: "user1"}}},
-			{name: "multiple users", expectedUsers: []internal.User{{Login: "user1"}, {Login: "user2"}}},
+			{
+				name:           "empty",
+				playersPerRoom: 1,
+				users:          nil,
+				wantPlayers:    nil,
+				wantErr:        internal.ErrDBNotEnoughPlayers,
+			},
+			{
+				name:           "not enough users",
+				playersPerRoom: 2,
+				users:          []internal.User{{Login: "user1"}},
+				wantPlayers:    nil,
+				wantErr:        internal.ErrDBNotEnoughPlayers,
+			},
+			{
+				name:           "exact number of users",
+				playersPerRoom: 2,
+				users:          []internal.User{{Login: "user1"}, {Login: "user2"}},
+				wantPlayers:    []internal.User{{Login: "user1"}, {Login: "user2"}},
+				wantErr:        nil,
+			},
+			{
+				name:           "more than enough users",
+				playersPerRoom: 2,
+				users:          []internal.User{{Login: "user1"}, {Login: "user2"}, {Login: "user3"}, {Login: "user4"}},
+				wantPlayers:    []internal.User{{Login: "user1"}, {Login: "user2"}},
+				wantErr:        nil,
+			},
 		}
 
 		for _, test := range tests {
@@ -296,15 +219,20 @@ func TestIntegration_DatabaseConnection_GetList(t *testing.T) {
 				defer cancel()
 
 				hc := newHelperConn(t)
-				for _, user := range test.expectedUsers {
-					_, err := hc.Exec(ctx, "INSERT INTO waiting (login) VALUES ($1)", user.Login)
+				for _, user := range test.users {
+					_, err := hc.Exec(ctx, "INSERT INTO users (login, password) VALUES ($1, $2)", user.Login, "")
+					require.NoError(t, err)
+
+					_, err = hc.Exec(ctx, "INSERT INTO waiting (login) VALUES ($1)", user.Login)
 					require.NoError(t, err)
 				}
 
 				d := newDBConnWithOpen(t)
-				users, err := d.GetList(ctx)
-				require.NoError(t, err)
-				assert.Equal(t, users, test.expectedUsers)
+				d.config.PlayersPerRoom = test.playersPerRoom
+
+				users, err := d.GetMatchPlayers(ctx)
+				assert.ErrorIs(t, err, test.wantErr)
+				assert.Equal(t, users, test.wantPlayers)
 			})
 		}
 	})
@@ -329,9 +257,9 @@ func TestIntegration_DatabaseConnection_AddMatch(t *testing.T) {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 
-		users := []internal.User{{Login: "user1"}, {Login: "user2"}}
-
 		d := newDBConnWithOpen(t)
+
+		matchUsers := []internal.User{{Login: "user1"}, {Login: "user2"}}
 
 		_, err := d.conn.Exec(
 			ctx, `
@@ -341,8 +269,16 @@ func TestIntegration_DatabaseConnection_AddMatch(t *testing.T) {
 			`,
 		)
 		require.NoError(t, err)
+		_, err = d.conn.Exec(
+			ctx, `
+			INSERT INTO waiting (login)
+			VALUES ('user1'),
+				   ('user2')
+			`,
+		)
+		require.NoError(t, err)
 
-		err = d.AddMatch(ctx, users, internal.ServerInfo{Host: "someGameServerHost", Port: "1234/udp"}, 1)
+		err = d.AddMatch(ctx, matchUsers, internal.ServerInfo{Host: "someGameServerHost", Port: "1234/udp"}, 1)
 		require.NoError(t, err)
 
 		var matchID int
@@ -369,6 +305,57 @@ func TestIntegration_DatabaseConnection_AddMatch(t *testing.T) {
 
 		expectedMatches := []UserMatch{{UserID: "user1", MatchID: matchID}, {UserID: "user2", MatchID: matchID}}
 		require.Equal(t, expectedMatches, matches)
+	})
+
+	t.Run("waiting user disconnected", func(t *testing.T) {
+		restartDB(t)
+
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		d := newDBConnWithOpen(t)
+
+		matchUsers := []internal.User{{Login: "user1"}, {Login: "user2"}}
+
+		_, err := d.conn.Exec(
+			ctx, `
+			INSERT INTO users (login, password)
+			VALUES ('user1', ''),
+				   ('user2', '')
+			`,
+		)
+		require.NoError(t, err)
+		_, err = d.conn.Exec(
+			ctx, `
+			INSERT INTO waiting (login)
+			VALUES ('user2')
+			`,
+		)
+		require.NoError(t, err)
+
+		err = d.AddMatch(ctx, matchUsers, internal.ServerInfo{Host: "someGameServerHost", Port: "1234/udp"}, 1)
+		require.ErrorIs(t, err, internal.ErrDBWaitingUserDisconnected)
+
+		var matchCount int
+		err = d.conn.QueryRow(ctx, "SELECT COUNT(*) FROM matches").Scan(&matchCount)
+		require.NoError(t, err)
+		require.Zero(t, matchCount)
+
+		var userMatchCount int
+		err = d.conn.QueryRow(ctx, "SELECT COUNT(*) FROM user_matches").Scan(&userMatchCount)
+		require.NoError(t, err)
+		require.Zero(t, userMatchCount)
+
+		var noMatchAssigned bool
+		err = d.conn.QueryRow(ctx, `
+			SELECT NOT EXISTS (
+				SELECT 1
+				FROM users
+				WHERE match_id IS NOT NULL
+			)
+		`).Scan(&noMatchAssigned)
+		require.NoError(t, err)
+		require.True(t, noMatchAssigned)
 	})
 }
 

@@ -32,7 +32,7 @@ type Result struct {
 }
 
 type User struct {
-	Login string
+	Login string `json:"login"`
 }
 
 type ServerInfo struct {

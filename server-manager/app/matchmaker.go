@@ -23,6 +23,8 @@ type Matchmaker struct {
 	db            internal.DatabaseConnection
 	config        *internal.EnvConfig
 
+	dbPoolTimeout time.Duration
+
 	opened bool
 	closed bool
 
@@ -34,6 +36,7 @@ func NewMatchmaker(workerManager internal.WorkerManager, config *internal.EnvCon
 		workerManager: workerManager,
 		db:            adapters.NewDatabaseConnection(config),
 		config:        config,
+		dbPoolTimeout: 150 * time.Millisecond,
 	}
 }
 
@@ -49,11 +52,7 @@ func (m *Matchmaker) Start(ctx context.Context) error {
 		return err
 	}
 
-	if err := m.db.StartListening(ctx); err != nil {
-		return err
-	}
-
-	m.wg.Go(func() { m.listenLoop(ctx) })
+	m.wg.Go(func() { _ = m.matchmakingLoop(ctx) })
 
 	m.opened = true
 	return nil
@@ -74,61 +73,80 @@ func (m *Matchmaker) Shutdown() error {
 	return err
 }
 
-func (m *Matchmaker) createMatches(ctx context.Context, users []internal.User) error {
-	if len(users) < m.config.PlayersPerRoom {
-		return nil
-	}
-
-	for i := m.config.PlayersPerRoom; i <= len(users); i += m.config.PlayersPerRoom {
-		matchUsers := users[i-m.config.PlayersPerRoom : i]
-
-		gameConfig, err := json.Marshal(struct{ Players []internal.User }{Players: matchUsers})
-		if err != nil {
-			return err
-		}
-
-		matchId, err := m.db.GetNextMatchId(ctx)
-		if err != nil {
-			return err
-		}
-
-		matchConfig := internal.MatchConfig{
-			Config:  gameConfig,
-			MatchID: matchId,
-		}
-		serverInfo, err := m.workerManager.AssignMatch(ctx, matchConfig)
-		if err != nil {
-			return err
-		}
-
-		if err = m.db.AddMatch(ctx, matchUsers, serverInfo, matchId); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-func (m *Matchmaker) listenLoop(ctx context.Context) {
-	for {
-		_ = m.db.ListenForQueueChange(ctx)
-		if ctx.Err() != nil {
-			return
-		}
-
-		if err := m.runMatchmaking(ctx); err != nil {
-			slog.Error("failed to matchmake", "error", err)
-		}
-	}
-}
-
-func (m *Matchmaker) runMatchmaking(ctx context.Context) error {
-	ctxTimeout, cancelTimeout := context.WithTimeout(ctx, 10*time.Second)
-	defer cancelTimeout()
-
-	users, err := m.db.GetList(ctxTimeout)
+func (m *Matchmaker) createMatch(ctx context.Context, matchUsers []internal.User) error {
+	gameConfig, err := json.Marshal(struct {
+		Players []internal.User `json:"players"`
+	}{Players: matchUsers})
 	if err != nil {
 		return err
 	}
-	return m.createMatches(ctxTimeout, users)
+
+	ctxTimeout, cancelTimeout := context.WithTimeout(ctx, 10*time.Second)
+	defer cancelTimeout()
+
+	matchId, err := m.db.GetNextMatchId(ctxTimeout)
+	if err != nil {
+		return err
+	}
+
+	matchConfig := internal.MatchConfig{
+		Config:  gameConfig,
+		MatchID: matchId,
+	}
+	serverInfo, err := m.workerManager.AssignMatch(ctxTimeout, matchConfig)
+	if err != nil {
+		return err
+	}
+
+	// FIX: if add match fails then send cancel match job to worker
+	// 		this require creating cancel feature in game-server,
+	// 		so responsibility of stopping match is on actual game server side
+	return m.db.AddMatch(ctxTimeout, matchUsers, serverInfo, matchId)
+}
+
+func (m *Matchmaker) matchmakingLoop(ctx context.Context) error {
+	// TODO: add backoff
+	for {
+		m.workerManager.WaitForFreeWorker(ctx)
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+
+		users, err := m.waitForEnoughPlayers(ctx)
+		if err != nil {
+			// FIX: skip ctx errors
+			slog.Error("failed to wait for enough players", "error", err)
+			continue
+		}
+
+		if err := m.createMatch(ctx, users); err != nil {
+			// FIX: skip logging when somebody stopped waiting for a match
+			slog.Error("failed to matchmake", "error", err)
+			continue
+		}
+	}
+}
+
+func (m *Matchmaker) waitForEnoughPlayers(ctx context.Context) ([]internal.User, error) {
+	ticker := time.NewTicker(m.dbPoolTimeout)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		}
+
+		// FIX: make func name understandable
+		users, err := m.db.GetMatchPlayers(ctx)
+		if err != nil {
+			if errors.Is(err, internal.ErrDBNotEnoughPlayers) {
+				continue
+			}
+			return nil, err
+		}
+
+		return users, nil
+	}
 }

@@ -354,19 +354,19 @@ func (mr *MockDatabaseConnectionMockRecorder) Close() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Close", reflect.TypeOf((*MockDatabaseConnection)(nil).Close))
 }
 
-// GetList mocks base method.
-func (m *MockDatabaseConnection) GetList(ctx context.Context) ([]internal.User, error) {
+// GetMatchPlayers mocks base method.
+func (m *MockDatabaseConnection) GetMatchPlayers(ctx context.Context) ([]internal.User, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetList", ctx)
+	ret := m.ctrl.Call(m, "GetMatchPlayers", ctx)
 	ret0, _ := ret[0].([]internal.User)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// GetList indicates an expected call of GetList.
-func (mr *MockDatabaseConnectionMockRecorder) GetList(ctx any) *gomock.Call {
+// GetMatchPlayers indicates an expected call of GetMatchPlayers.
+func (mr *MockDatabaseConnectionMockRecorder) GetMatchPlayers(ctx any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetList", reflect.TypeOf((*MockDatabaseConnection)(nil).GetList), ctx)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetMatchPlayers", reflect.TypeOf((*MockDatabaseConnection)(nil).GetMatchPlayers), ctx)
 }
 
 // GetNextMatchId mocks base method.
@@ -382,20 +382,6 @@ func (m *MockDatabaseConnection) GetNextMatchId(ctx context.Context) (int, error
 func (mr *MockDatabaseConnectionMockRecorder) GetNextMatchId(ctx any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetNextMatchId", reflect.TypeOf((*MockDatabaseConnection)(nil).GetNextMatchId), ctx)
-}
-
-// ListenForQueueChange mocks base method.
-func (m *MockDatabaseConnection) ListenForQueueChange(ctx context.Context) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ListenForQueueChange", ctx)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// ListenForQueueChange indicates an expected call of ListenForQueueChange.
-func (mr *MockDatabaseConnectionMockRecorder) ListenForQueueChange(ctx any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListenForQueueChange", reflect.TypeOf((*MockDatabaseConnection)(nil).ListenForQueueChange), ctx)
 }
 
 // Open mocks base method.
@@ -424,20 +410,6 @@ func (m *MockDatabaseConnection) SaveMatchResults(ctx context.Context, details s
 func (mr *MockDatabaseConnectionMockRecorder) SaveMatchResults(ctx, details, matchID any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SaveMatchResults", reflect.TypeOf((*MockDatabaseConnection)(nil).SaveMatchResults), ctx, details, matchID)
-}
-
-// StartListening mocks base method.
-func (m *MockDatabaseConnection) StartListening(ctx context.Context) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "StartListening", ctx)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// StartListening indicates an expected call of StartListening.
-func (mr *MockDatabaseConnectionMockRecorder) StartListening(ctx any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StartListening", reflect.TypeOf((*MockDatabaseConnection)(nil).StartListening), ctx)
 }
 
 // MockMessage is a mock of Message interface.
