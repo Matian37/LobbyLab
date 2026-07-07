@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs';
 import { json } from '@sveltejs/kit';
 import { handleError } from '$lib/error_handler.js';
 import { generateToken } from '$lib/helpers.js';
+import { url } from 'node:inspector';
 
 export async function POST({request})
 {
@@ -33,8 +34,8 @@ export async function DELETE({request}){
     return json({sukces: true});
 }
 
-export async function GET({url}){
-    const token = url.searchParams.get('token');
+export async function GET({request}){
+    const token = request.headers.get('Token');
     
     if((await tokenExists(token)).length == 0) return json({sukces: false});
     return json({sukces: true});

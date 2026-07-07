@@ -9,7 +9,6 @@
     }
 
     async function submit(){
-        console.log("kliklemmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm");
         let data = {login: login, password: password};
         const response = await fetch('/api/login', {
             method: 'POST',

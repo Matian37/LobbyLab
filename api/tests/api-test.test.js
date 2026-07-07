@@ -162,8 +162,11 @@ describe('waiting', () => {
 
 describe('statistics', () => {
     test('getting matches', async () => {
-        const url = new URL("http://cos.pl/api/results?token=dahsbjdh123");
-        const response = await resultsAPI.GET( {url} );
+        const request = new Request('http://cos', {
+            method: 'GET',
+            headers: { 'Token': '123456789' },
+        });
+        const response = await resultsAPI.GET( {request} );
         const result = await response.json();
         expect(result).toEqual({sukces: true, matches: [
             {players: ['albert', 'zbychu'], winner: 'albert'},

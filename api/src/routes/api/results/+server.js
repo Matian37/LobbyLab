@@ -2,8 +2,8 @@ import { getMatchResults, getLoginFromToken } from '$lib/db.js';
 import { handleError } from '$lib/error_handler.js';
 import { json } from '@sveltejs/kit';
 
-export async function GET({url}){
-    const token = url.searchParams.get('token')
+export async function GET({request}){
+    const token = request.headers.get('Token')
     const dbLogin = await getLoginFromToken(token);
     if(dbLogin.length == 0) 
     {

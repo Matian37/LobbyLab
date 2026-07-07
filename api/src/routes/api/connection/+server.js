@@ -3,8 +3,9 @@ import { json } from '@sveltejs/kit';
 import { Client } from 'pg';
 import { handleError } from '$lib/error_handler.js';
 
-export async function GET({url}){
-    const token = url.searchParams.get('token');
+export async function GET({request}){
+    const token =  request.headers.get('Token');
+    
     const response = await getLoginFromToken(token);
     if(response.length == 0) 
     {

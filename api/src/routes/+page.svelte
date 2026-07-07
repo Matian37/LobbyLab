@@ -19,7 +19,12 @@
     }
 
     async function LoadMatches(token){
-        const query = await fetch(`/api/results?token=${token}`);
+        const query = await fetch(`/api/results`, {
+            method: 'GET',
+            headers: {
+                'Token': token
+            }
+        });
         const response = await query.json();
         if(!response.sukces)
             return;
@@ -27,7 +32,6 @@
     }
 
     export function changePage(path) {
-        console.log("KLIKKKK");
         goto(path);
     }
 
@@ -60,7 +64,13 @@
 
     async function isInWaitingList(token)
     {
-        let response = await fetch(`/api/waiting?token=${token}`);
+        let response = await fetch(`/api/waiting`, {
+            method: 'GET',
+            headers: {
+                'Token': token
+            },
+        }
+        );
         let wynik = await response.json();
         return wynik.sukces;
     }
