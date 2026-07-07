@@ -90,7 +90,7 @@ describe('statistics', () => {
             }
         }
         for(let i = 0; i < matches.length; i++){
-            let q = await sql`INSERT INTO matches (host, port, results) VALUES ('hoscik', 1233, ${JSON.stringify(matches[i])}) RETURNING id`;
+            let q = await sql`INSERT INTO matches (host, port, results) VALUES ('hoscik', 1233, ${sql.json(matches[i])}) RETURNING id`;
             const match_id = q[0].id;
             for(let j = 0; j < matches[i].players.length; j++){
                 await sql`INSERT INTO user_matches (user_id, match_id) VALUES (${matches[i].players[j]}, ${match_id})`

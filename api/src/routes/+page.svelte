@@ -1,6 +1,7 @@
 <script>
     import { goto } from "$app/navigation";
     import { getData, resetData } from "$lib/user_data";
+    import { onMount } from "svelte";
     let title = $state('Zaloguj sie');
     let buttonText = $state('Play');
     let user = false;

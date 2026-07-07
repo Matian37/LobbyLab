@@ -2,10 +2,11 @@ import postgres from "postgres";
 import { handleError } from "./error_handler";
 
 let DATABASE_URL = process.env.DATABASE_URL;
-if(!DATABASE_URL && process.env.VITEST)
-    DATABASE_URL = 'postgresql://postgres:123@localhost:5432/postgres';
+//if(!DATABASE_URL && process.env.VITEST)
+//let DATABASE_URL = 'postgresql://postgres:123@localhost:5432/postgres';
 
 export const sql = postgres(DATABASE_URL);
+
 
 export async function findUserByLogin(login){
     const q = await sql`
@@ -110,7 +111,7 @@ export async function getMatchResults(login){
     const q1 = await sql`
         SELECT results FROM matches WHERE id = ANY(${matchIds}::int[])
     `
-    const matches = q1.map(result => JSON.parse(result.results));
+    const matches = q1.map(result => result.results);
     return matches;
 }
 
