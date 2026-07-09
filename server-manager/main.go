@@ -20,6 +20,7 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
+	// FIX: don't log context errors
 	if err := app.Run(ctx, config); err != nil {
 		slog.Error("application failed", "error", err)
 		os.Exit(1)

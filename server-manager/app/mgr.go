@@ -203,7 +203,18 @@ func (wm *WorkerManager) WaitForFreeWorker(ctx context.Context) {
 	wm.mu.Lock()
 	defer wm.mu.Unlock()
 
+	stop := context.AfterFunc(ctx, func() {
+		wm.mu.Lock()
+		defer wm.mu.Unlock()
+		wm.newfreeWorker.Signal()
+	})
+	defer stop()
+
 	for wm.getFreeWorker() == nil {
+		if ctx.Err() != nil {
+			return
+		}
+
 		wm.newfreeWorker.Wait()
 	}
 }
