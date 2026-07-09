@@ -192,6 +192,9 @@ func (dc *DockerConnection) containerCreateOptions(portMap network.PortMap) clie
 		Image: dc.config.Image,
 		Config: &container.Config{
 			ExposedPorts: dc.config.ExposePorts,
+			Labels: map[string]string{
+				"com.github.multiplayer-asset.worker": "true",
+			},
 		},
 		HostConfig: &container.HostConfig{
 			PortBindings: portMap,
