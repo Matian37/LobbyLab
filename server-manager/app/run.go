@@ -14,7 +14,7 @@ func Run(ctx context.Context, config *internal.EnvConfig) error {
 
 	matchmaker := NewMatchmaker(wm, config)
 	defer func() { _ = matchmaker.Shutdown() }()
-	if err := wm.Start(ctx); err != nil {
+	if err := matchmaker.Start(ctx); err != nil {
 		return err
 	}
 
