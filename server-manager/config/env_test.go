@@ -22,6 +22,7 @@ func setAllEnvExcept(t *testing.T, except ...string) *internal.EnvConfig {
 		{"NATS_URI", "nats://localhost:4222"},
 		{"PUBLIC_HOST", "127.0.0.1"},
 		{"PLAYERS_PER_ROOM", "2"},
+		{"DATABASE_URI", "postgresql://a:b@localhost:5432/c"},
 	} {
 		skip := false
 		for _, x := range except {
@@ -42,10 +43,11 @@ func setAllEnvExcept(t *testing.T, except ...string) *internal.EnvConfig {
 			network.MustParsePort("80"):      {},
 			network.MustParsePort("443/udp"): {},
 		},
-		ClientPort:             network.MustParsePort("80"),
-		BrokerURI:              "nats://localhost:4222",
-		PublicHost:             "127.0.0.1",
-		TestMakeContainerDummy: false,
+		ClientPort:     network.MustParsePort("80"),
+		BrokerURI:      "nats://localhost:4222",
+		PublicHost:     "127.0.0.1",
+		PlayersPerRoom: 2,
+		DatabaseURI:    "postgresql://a:b@localhost:5432/c",
 	}
 }
 
@@ -148,6 +150,7 @@ func TestReadConfig(t *testing.T) {
 			"NATS_URI",
 			"PUBLIC_HOST",
 			"PLAYERS_PER_ROOM",
+			"DATABASE_URI",
 		} {
 			t.Run(field, func(t *testing.T) {
 				setAllEnvExcept(t, field)
@@ -165,6 +168,7 @@ func TestReadConfig(t *testing.T) {
 			"GAME_SERVER_CLIENT_PORT",
 			"NATS_URI",
 			"PUBLIC_HOST",
+			"DATABASE_URI",
 		} {
 			t.Run(field, func(t *testing.T) {
 				setAllEnvExcept(t)

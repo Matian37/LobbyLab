@@ -24,6 +24,7 @@ type parsedConfig struct {
 	BrokerURI      string   `env:"NATS_URI,required,notEmpty"`
 	PublicHost     string   `env:"PUBLIC_HOST,required,notEmpty"`
 	PlayersPerRoom int      `env:"PLAYERS_PER_ROOM,required"`
+	DatabaseURI    string   `env:"DATABASE_URI,required,notEmpty"`
 }
 
 func parsePorts(ports []string) (network.PortSet, error) {
@@ -70,11 +71,13 @@ func ReadConfig() (*internal.EnvConfig, error) {
 	}
 
 	return &internal.EnvConfig{
-		Image:       config.Image,
-		Workercount: config.WorkerCount,
-		ExposePorts: exposePorts,
-		ClientPort:  clientPort,
-		BrokerURI:   config.BrokerURI,
-		PublicHost:  config.PublicHost,
+		Image:          config.Image,
+		Workercount:    config.WorkerCount,
+		ExposePorts:    exposePorts,
+		ClientPort:     clientPort,
+		BrokerURI:      config.BrokerURI,
+		PublicHost:     config.PublicHost,
+		PlayersPerRoom: config.PlayersPerRoom,
+		DatabaseURI:    config.DatabaseURI,
 	}, nil
 }

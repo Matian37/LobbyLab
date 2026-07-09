@@ -64,6 +64,7 @@ services:
       GAME_SERVER_CLIENT_PORT: "7777/udp"
       PUBLIC_HOST: ${PUBLIC_HOST}
       PLAYERS_PER_ROOM: 2
+      DATABASE_URI: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
     networks:
       - db-net
       - nats-net
