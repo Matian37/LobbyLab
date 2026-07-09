@@ -50,6 +50,8 @@ type WorkerManager struct {
 
 	saveResultChan chan internal.Result
 	newfreeWorker  *sync.Cond
+	// whether the manager is waiting for a free worker (tests only)
+	waiting bool
 
 	mu sync.Mutex
 	wg sync.WaitGroup
@@ -214,6 +216,10 @@ func (wm *WorkerManager) WaitForFreeWorker(ctx context.Context) {
 		if ctx.Err() != nil {
 			return
 		}
+
+		// adds extra info for tests
+		wm.waiting = true
+		defer func() { wm.waiting = false }()
 
 		wm.newfreeWorker.Wait()
 	}

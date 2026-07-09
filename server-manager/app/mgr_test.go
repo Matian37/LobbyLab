@@ -600,6 +600,35 @@ func TestWorkerManager_healthCheck(t *testing.T) {
 }
 
 func TestWorkerManager_WaitForFreeWorker(t *testing.T) {
+	t.Run("context canceled", func(t *testing.T) {
+		workers := []*Worker{NewWorker("worker-1", 3, 30*time.Second)}
+		workers[0].SetOccupied(1)
+
+		_, _, _, wm := newMockWorkerManagerWithInit(t, workers)
+
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		done := make(chan struct{})
+		go func() {
+			wm.WaitForFreeWorker(ctx)
+			close(done)
+		}()
+
+		require.Eventually(t, func() bool {
+			wm.mu.Lock()
+			defer wm.mu.Unlock()
+			return wm.waiting
+		}, 1*time.Second, 100*time.Millisecond)
+		cancel()
+
+		select {
+		case <-done:
+		case <-time.After(1 * time.Second):
+			t.Fatal("expected WaitForFreeWorker to return")
+		}
+	})
+
 	t.Run("success", func(t *testing.T) {
 		workers := []*Worker{NewWorker("worker-1", 3, 30*time.Second)}
 		workers[0].SetOccupied(1)
