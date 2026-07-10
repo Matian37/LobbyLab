@@ -7,10 +7,18 @@ import (
 	"os/signal"
 	"server-manager/app"
 	"server-manager/config"
+	"server-manager/internal"
 	"syscall"
 )
 
 func main() {
+	baseHandler := slog.NewJSONHandler(
+		os.Stdout,
+		&slog.HandlerOptions{Level: slog.LevelInfo},
+	)
+	handler := internal.NewContextErrorHandler(baseHandler)
+	slog.SetDefault(slog.New(handler))
+
 	config, err := config.ReadConfig()
 	if err != nil {
 		slog.Error("failed to read config", "error", err)
@@ -20,7 +28,6 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	// FIX: don't log context errors
 	if err := app.Run(ctx, config); err != nil {
 		slog.Error("application failed", "error", err)
 		os.Exit(1)

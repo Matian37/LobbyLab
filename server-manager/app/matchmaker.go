@@ -117,7 +117,6 @@ func (m *Matchmaker) matchmakingLoop(ctx context.Context) error {
 
 		users, err := m.waitForEnoughPlayers(ctx)
 		if err != nil {
-			// FIX: skip ctx errors
 			slog.Error("failed to wait for enough players", "error", err)
 			time.Sleep(backoff.NextBackOff())
 			continue
