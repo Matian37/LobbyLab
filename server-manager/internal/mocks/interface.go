@@ -354,19 +354,19 @@ func (mr *MockDatabaseConnectionMockRecorder) Close() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Close", reflect.TypeOf((*MockDatabaseConnection)(nil).Close))
 }
 
-// GetMatchPlayers mocks base method.
-func (m *MockDatabaseConnection) GetMatchPlayers(ctx context.Context) ([]internal.User, error) {
+// GatherMatchPlayers mocks base method.
+func (m *MockDatabaseConnection) GatherMatchPlayers(ctx context.Context) ([]internal.User, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetMatchPlayers", ctx)
+	ret := m.ctrl.Call(m, "GatherMatchPlayers", ctx)
 	ret0, _ := ret[0].([]internal.User)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// GetMatchPlayers indicates an expected call of GetMatchPlayers.
-func (mr *MockDatabaseConnectionMockRecorder) GetMatchPlayers(ctx any) *gomock.Call {
+// GatherMatchPlayers indicates an expected call of GatherMatchPlayers.
+func (mr *MockDatabaseConnectionMockRecorder) GatherMatchPlayers(ctx any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetMatchPlayers", reflect.TypeOf((*MockDatabaseConnection)(nil).GetMatchPlayers), ctx)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GatherMatchPlayers", reflect.TypeOf((*MockDatabaseConnection)(nil).GatherMatchPlayers), ctx)
 }
 
 // GetNextMatchId mocks base method.

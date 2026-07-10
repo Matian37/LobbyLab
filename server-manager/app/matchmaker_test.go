@@ -115,8 +115,8 @@ func TestMatchmaker_waitForEnoughPlayers(t *testing.T) {
 		_, db, m := newMockMatchmakerWithStart(t)
 
 		gomock.InOrder(
-			db.EXPECT().GetMatchPlayers(ctx).Return(nil, internal.ErrDBNotEnoughPlayers),
-			db.EXPECT().GetMatchPlayers(ctx).Return(nil, ctx.Err()),
+			db.EXPECT().GatherMatchPlayers(ctx).Return(nil, internal.ErrDBNotEnoughPlayers),
+			db.EXPECT().GatherMatchPlayers(ctx).Return(nil, ctx.Err()),
 		)
 
 		done := make(chan error)
@@ -140,7 +140,7 @@ func TestMatchmaker_waitForEnoughPlayers(t *testing.T) {
 		_, db, m := newMockMatchmakerWithStart(t)
 
 		wantErr := errors.New("")
-		db.EXPECT().GetMatchPlayers(ctx).Return(nil, wantErr)
+		db.EXPECT().GatherMatchPlayers(ctx).Return(nil, wantErr)
 
 		done := make(chan error)
 		go func() {
@@ -165,9 +165,9 @@ func TestMatchmaker_waitForEnoughPlayers(t *testing.T) {
 		wantUsers := []internal.User{{Login: "1"}, {Login: "2"}}
 
 		gomock.InOrder(
-			db.EXPECT().GetMatchPlayers(ctx).Return(nil, internal.ErrDBNotEnoughPlayers),
-			db.EXPECT().GetMatchPlayers(ctx).Return(nil, internal.ErrDBNotEnoughPlayers),
-			db.EXPECT().GetMatchPlayers(ctx).Return(wantUsers, nil),
+			db.EXPECT().GatherMatchPlayers(ctx).Return(nil, internal.ErrDBNotEnoughPlayers),
+			db.EXPECT().GatherMatchPlayers(ctx).Return(nil, internal.ErrDBNotEnoughPlayers),
+			db.EXPECT().GatherMatchPlayers(ctx).Return(wantUsers, nil),
 		)
 
 		type response struct {
@@ -229,8 +229,8 @@ func TestMatchmaker_matchmakingLoop(t *testing.T) {
 
 		gomock.InOrder(
 			wm.EXPECT().WaitForFreeWorker(ctx),
-			db.EXPECT().GetMatchPlayers(ctx).Return(nil, internal.ErrDBNotEnoughPlayers),
-			db.EXPECT().GetMatchPlayers(ctx).Return(matchUsers, nil),
+			db.EXPECT().GatherMatchPlayers(ctx).Return(nil, internal.ErrDBNotEnoughPlayers),
+			db.EXPECT().GatherMatchPlayers(ctx).Return(matchUsers, nil),
 			db.EXPECT().GetNextMatchId(gomock.Any()).Return(matchConfig.MatchID, nil),
 			wm.EXPECT().AssignMatch(gomock.Any(), matchConfig).Return(internal.ServerInfo{}, nil),
 			db.EXPECT().AddMatch(gomock.Any(), matchUsers, internal.ServerInfo{}, matchConfig.MatchID).Return(nil),

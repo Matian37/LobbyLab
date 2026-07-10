@@ -99,7 +99,6 @@ func newHelperConn(t *testing.T) *pgx.Conn {
 	return conn
 }
 
-// TODO: add ctx as argument or timeout
 func newDBConnWithOpen(t *testing.T) *DatabaseConnection {
 	d := NewDatabaseConnection(&internal.EnvConfig{DatabaseURI: dbConnString})
 	require.NoError(t, d.Open(context.Background()))
@@ -163,13 +162,13 @@ func TestIntegration_DatabaseConnection_Close(t *testing.T) {
 func TestIntegration_DatabaseConnection_GetMatchPlayers(t *testing.T) {
 	t.Run("not open", func(t *testing.T) {
 		dc := DatabaseConnection{}
-		_, err := dc.GetMatchPlayers(context.Background())
+		_, err := dc.GatherMatchPlayers(context.Background())
 		assert.ErrorIs(t, err, ErrDBConnNotOpen)
 	})
 
 	t.Run("closed", func(t *testing.T) {
 		dc := DatabaseConnection{connOpened: true, closed: true}
-		_, err := dc.GetMatchPlayers(context.Background())
+		_, err := dc.GatherMatchPlayers(context.Background())
 		assert.ErrorIs(t, err, ErrDBConnClosed)
 	})
 
@@ -230,7 +229,7 @@ func TestIntegration_DatabaseConnection_GetMatchPlayers(t *testing.T) {
 				d := newDBConnWithOpen(t)
 				d.config.PlayersPerRoom = test.playersPerRoom
 
-				users, err := d.GetMatchPlayers(ctx)
+				users, err := d.GatherMatchPlayers(ctx)
 				assert.ErrorIs(t, err, test.wantErr)
 				assert.Equal(t, users, test.wantPlayers)
 			})

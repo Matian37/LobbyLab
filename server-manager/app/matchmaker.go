@@ -138,8 +138,7 @@ func (m *Matchmaker) waitForEnoughPlayers(ctx context.Context) ([]internal.User,
 			return nil, ctx.Err()
 		}
 
-		// FIX: make func name understandable
-		users, err := m.db.GetMatchPlayers(ctx)
+		users, err := m.db.GatherMatchPlayers(ctx)
 		if err != nil {
 			if errors.Is(err, internal.ErrDBNotEnoughPlayers) {
 				continue

@@ -66,7 +66,7 @@ func (dc *DatabaseConnection) Close() error {
 	return nil
 }
 
-func (dc *DatabaseConnection) GetMatchPlayers(ctx context.Context) ([]internal.User, error) {
+func (dc *DatabaseConnection) GatherMatchPlayers(ctx context.Context) ([]internal.User, error) {
 	if !dc.connOpened {
 		return nil, ErrDBConnNotOpen
 	}
