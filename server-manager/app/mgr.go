@@ -149,7 +149,7 @@ func (wm *WorkerManager) saveLoop(ctx context.Context) error {
 			if err != nil {
 				slog.Error("failed to save result", "error", err)
 			}
-			handleBackoff(ctx, b, err)
+			HandleBackoff(ctx, b, err)
 		}
 	}
 }
@@ -173,7 +173,7 @@ func (wm *WorkerManager) resultLoop(ctx context.Context) error {
 			if err != nil {
 				slog.Error("result loop error", "error", err)
 			}
-			handleBackoff(ctx, b, err)
+			HandleBackoff(ctx, b, err)
 		}
 	}
 }
@@ -348,15 +348,4 @@ func (wm *WorkerManager) getFreeWorker() *Worker {
 		}
 	}
 	return nil
-}
-
-func handleBackoff(ctx context.Context, b backoff.BackOff, err error) {
-	if err == nil {
-		b.Reset()
-		return
-	}
-	select {
-	case <-ctx.Done():
-	case <-time.After(b.NextBackOff()):
-	}
 }

@@ -654,34 +654,6 @@ func TestWorkerManager_WaitForFreeWorker(t *testing.T) {
 	})
 }
 
-func Test_handleBackoff(t *testing.T) {
-	t.Run("no error", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-
-		ctrl := gomock.NewController(t)
-		b := mocks.NewMockBackOff(ctrl)
-		b.EXPECT().Reset()
-
-		start := time.Now()
-		handleBackoff(ctx, b, nil)
-		require.Less(t, time.Since(start), 30*time.Millisecond)
-	})
-
-	t.Run("error", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-
-		ctrl := gomock.NewController(t)
-		b := mocks.NewMockBackOff(ctrl)
-		b.EXPECT().NextBackOff().Return(0 * time.Second)
-
-		start := time.Now()
-		handleBackoff(ctx, b, errors.New(""))
-		require.Less(t, time.Since(start), 30*time.Millisecond)
-	})
-}
-
 func TestWorkerManager_SaveLoop(t *testing.T) {
 	t.Run("not initialized", func(t *testing.T) {
 		_, _, _, wm := newMockWorkerManager(t, 1)

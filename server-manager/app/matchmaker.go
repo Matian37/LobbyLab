@@ -9,6 +9,8 @@ import (
 	"server-manager/internal"
 	"sync"
 	"time"
+
+	"github.com/cenkalti/backoff/v6"
 )
 
 var (
@@ -105,7 +107,8 @@ func (m *Matchmaker) createMatch(ctx context.Context, matchUsers []internal.User
 }
 
 func (m *Matchmaker) matchmakingLoop(ctx context.Context) error {
-	// TODO: add backoff
+	backoff := backoff.NewExponentialBackOff()
+
 	for {
 		m.workerManager.WaitForFreeWorker(ctx)
 		if ctx.Err() != nil {
@@ -116,14 +119,19 @@ func (m *Matchmaker) matchmakingLoop(ctx context.Context) error {
 		if err != nil {
 			// FIX: skip ctx errors
 			slog.Error("failed to wait for enough players", "error", err)
+			time.Sleep(backoff.NextBackOff())
 			continue
 		}
 
 		if err := m.createMatch(ctx, users); err != nil {
-			// FIX: skip logging when somebody stopped waiting for a match
+			// FIX: skip sleep and logging when match creation failed due to waiting queue
+			// 		then reset backoff
 			slog.Error("failed to matchmake", "error", err)
+			time.Sleep(backoff.NextBackOff())
 			continue
 		}
+
+		backoff.Reset()
 	}
 }
 
