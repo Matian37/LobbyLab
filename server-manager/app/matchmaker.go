@@ -123,8 +123,10 @@ func (m *Matchmaker) matchmakingLoop(ctx context.Context) error {
 		}
 
 		if err := m.createMatch(ctx, users); err != nil {
-			// FIX: skip sleep and logging when match creation failed due to waiting queue
-			// 		then reset backoff
+			if errors.Is(err, internal.ErrDBNotEnoughPlayers) {
+				backoff.Reset()
+				continue
+			}
 			slog.Error("failed to matchmake", "error", err)
 			time.Sleep(backoff.NextBackOff())
 			continue
