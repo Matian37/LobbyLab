@@ -5,6 +5,7 @@ CREATE TABLE IF NOT EXISTS matches(
     host TEXT NOT NULL,
     port INT NOT NULL,
     active BOOLEAN NOT NULL DEFAULT true,
+    canceled BOOLEAN NOT NULL DEFAULT false,
     results JSONB
 );
 
@@ -40,10 +41,10 @@ DECLARE
     payload TEXT;
 BEGIN
     SELECT json_build_object(
-        'username', NEW.login, 
-        'host', m.host, 
+        'username', NEW.login,
+        'host', m.host,
         'port', m.port
-    )::TEXT 
+    )::TEXT
     INTO payload
     FROM matches m
     WHERE m.id = NEW.match_id;
