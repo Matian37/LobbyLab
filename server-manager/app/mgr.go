@@ -145,7 +145,7 @@ func (wm *WorkerManager) saveLoop(ctx context.Context) error {
 		case <-ctx.Done():
 			return ctx.Err()
 		case res := <-wm.saveResultChan:
-			err := wm.dbConn.SaveMatchResults(ctx, string(res.Details), res.MatchID)
+			err := wm.dbConn.SaveMatchResults(ctx, res)
 			if err != nil {
 				slog.Error("failed to save result", "error", err)
 			}
@@ -302,6 +302,14 @@ func (wm *WorkerManager) healthCheck(ctx context.Context) error {
 			continue
 		}
 
+		if worker.State == WorkerOccupied {
+			wm.saveResultChan <- internal.Result{
+				MatchID: worker.matchID,
+				Success: false,
+				Details: []byte("{}"),
+			}
+		}
+
 		stateID := worker.SetRestarting()
 
 		wm.wg.Go(func() { _ = wm.restartWorker(ctx, worker, stateID, worker.ID) })
@@ -311,7 +319,6 @@ func (wm *WorkerManager) healthCheck(ctx context.Context) error {
 }
 
 func (wm *WorkerManager) restartWorker(ctx context.Context, worker *Worker, restartStateID int, workerID string) error {
-	// TODO: make match canceled in DB
 	err := wm.dockerConn.RestartContainer(ctx, workerID)
 	if err != nil {
 		slog.Error("failed to restart worker", "id", workerID, "error", err)

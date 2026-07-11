@@ -361,13 +361,13 @@ func TestIntegration_DatabaseConnection_AddMatch(t *testing.T) {
 func TestIntegration_DatabaseConnection_SaveMatchResults(t *testing.T) {
 	t.Run("not open", func(t *testing.T) {
 		dc := DatabaseConnection{}
-		err := dc.SaveMatchResults(context.Background(), "", 0)
+		err := dc.SaveMatchResults(context.Background(), internal.Result{})
 		assert.ErrorIs(t, err, ErrDBConnNotOpen)
 	})
 
 	t.Run("closed", func(t *testing.T) {
 		dc := DatabaseConnection{connOpened: true, closed: true}
-		err := dc.SaveMatchResults(context.Background(), "", 0)
+		err := dc.SaveMatchResults(context.Background(), internal.Result{})
 		assert.ErrorIs(t, err, ErrDBConnClosed)
 	})
 
@@ -379,7 +379,7 @@ func TestIntegration_DatabaseConnection_SaveMatchResults(t *testing.T) {
 
 		d := newDBConnWithOpen(t)
 
-		require.ErrorIs(t, d.SaveMatchResults(ctx, "{}", 123), ErrDBMatchNotFound)
+		require.ErrorIs(t, d.SaveMatchResults(ctx, internal.Result{MatchID: 123, Details: []byte("{}")}), ErrDBMatchNotFound)
 	})
 
 	t.Run("success", func(t *testing.T) {
@@ -389,18 +389,52 @@ func TestIntegration_DatabaseConnection_SaveMatchResults(t *testing.T) {
 		defer cancel()
 
 		conn := newHelperConn(t)
-		_, err := conn.Exec(ctx, "INSERT INTO matches (id, host, port) VALUES ($1, $2, $3)", 1, "", "")
+		_, err := conn.Exec(ctx, "INSERT INTO matches (id, host, port) VALUES (1, '', ''), (2, '', '')")
 		require.NoError(t, err)
 
-		d := newDBConnWithOpen(t)
+		tests := []struct {
+			Name    string
+			MatchID int
+			Success bool
+			Details []byte
+		}{
+			{
+				Name:    "successful match",
+				MatchID: 1,
+				Success: true,
+				Details: []byte(`{"example": {"id": 1}}`),
+			},
+			{
+				Name:    "canceled match",
+				MatchID: 2,
+				Success: false,
+				Details: []byte(`{"example": {"id": 2}}`),
+			},
+		}
+		for _, test := range tests {
+			t.Run(test.Name, func(t *testing.T) {
+				d := newDBConnWithOpen(t)
 
-		wantJSON := `{"example": {"id": 1}}`
-		require.NoError(t, d.SaveMatchResults(ctx, string(wantJSON), 1))
+				matchResult := internal.Result{
+					Success: test.Success,
+					MatchID: test.MatchID,
+					Details: test.Details,
+				}
+				require.NoError(t, d.SaveMatchResults(ctx, matchResult))
 
-		var json string
-		err = d.conn.QueryRow(ctx, "SELECT results FROM matches WHERE id = $1", 1).Scan(&json)
-		require.NoError(t, err)
-		require.Equal(t, wantJSON, json)
+				var json string
+				var canceled bool
+				err = d.conn.QueryRow(
+					ctx,
+					"SELECT results, canceled FROM matches WHERE id = $1",
+					test.MatchID,
+				).Scan(&json, &canceled)
+				require.NoError(t, err)
+
+				assert.JSONEq(t, string(test.Details), json)
+				assert.Equal(t, !test.Success, canceled)
+			})
+		}
 	})
 }
 

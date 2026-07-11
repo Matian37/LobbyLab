@@ -163,7 +163,7 @@ func (dc *DatabaseConnection) AddMatch(
 	return tx.Commit(ctx)
 }
 
-func (dc *DatabaseConnection) SaveMatchResults(ctx context.Context, details string, matchID int) error {
+func (dc *DatabaseConnection) SaveMatchResults(ctx context.Context, results internal.Result) error {
 	if !dc.connOpened {
 		return ErrDBConnNotOpen
 	}
@@ -173,15 +173,16 @@ func (dc *DatabaseConnection) SaveMatchResults(ctx context.Context, details stri
 
 	res, err := dc.conn.Exec(
 		ctx,
-		"UPDATE matches SET results = $1 WHERE id = $2",
-		details,
-		matchID,
+		"UPDATE matches SET results = $1, canceled = $2 WHERE id = $3",
+		results.Details,
+		!results.Success,
+		results.MatchID,
 	)
 	if err != nil {
 		return err
 	}
 	if res.RowsAffected() == 0 {
-		return fmt.Errorf("%w id=%d", ErrDBMatchNotFound, matchID)
+		return fmt.Errorf("%w id=%d", ErrDBMatchNotFound, results.MatchID)
 	}
 	return nil
 }

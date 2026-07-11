@@ -5,6 +5,7 @@ CREATE TABLE IF NOT EXISTS matches(
     host TEXT NOT NULL,
     port TEXT NOT NULL,
     active BOOLEAN NOT NULL DEFAULT true,
+    canceled BOOLEAN NOT NULL DEFAULT false,
     results JSONB
 );
 

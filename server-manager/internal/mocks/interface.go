@@ -400,17 +400,17 @@ func (mr *MockDatabaseConnectionMockRecorder) Open(ctx any) *gomock.Call {
 }
 
 // SaveMatchResults mocks base method.
-func (m *MockDatabaseConnection) SaveMatchResults(ctx context.Context, details string, matchID int) error {
+func (m *MockDatabaseConnection) SaveMatchResults(ctx context.Context, results internal.Result) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SaveMatchResults", ctx, details, matchID)
+	ret := m.ctrl.Call(m, "SaveMatchResults", ctx, results)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // SaveMatchResults indicates an expected call of SaveMatchResults.
-func (mr *MockDatabaseConnectionMockRecorder) SaveMatchResults(ctx, details, matchID any) *gomock.Call {
+func (mr *MockDatabaseConnectionMockRecorder) SaveMatchResults(ctx, results any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SaveMatchResults", reflect.TypeOf((*MockDatabaseConnection)(nil).SaveMatchResults), ctx, details, matchID)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SaveMatchResults", reflect.TypeOf((*MockDatabaseConnection)(nil).SaveMatchResults), ctx, results)
 }
 
 // MockMessage is a mock of Message interface.

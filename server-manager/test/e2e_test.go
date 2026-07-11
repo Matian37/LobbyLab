@@ -537,12 +537,29 @@ func TestE2E_WorkerFailureAndRestart(t *testing.T) {
 	_, err = dbConn.Exec(ctx, "INSERT INTO waiting (login) VALUES ($1),($2)", "user3", "user4")
 	require.NoError(t, err)
 
+	require.Eventually(t,
+		func() bool {
+			var canceled bool
+			err := dbConn.QueryRow(
+				ctx,
+				"SELECT canceled FROM matches WHERE id = $1",
+				matchID,
+			).Scan(&canceled)
+			return err == nil && canceled
+		},
+		30*time.Second,
+		100*time.Millisecond,
+		"should cancel match",
+	)
+
 	var secondMatchID int
-	require.Eventually(t, func() bool {
-		err := dbConn.QueryRow(ctx, "SELECT id FROM matches WHERE id != $1", matchID).Scan(&secondMatchID)
-		return err == nil
-	}, 60*time.Second, 500*time.Millisecond,
-		"should restart worker and create second match (health check runs every 5s, maxPingRetries=3)")
+	require.Eventually(t,
+		func() bool {
+			err := dbConn.QueryRow(ctx, "SELECT id FROM matches WHERE id != $1", matchID).Scan(&secondMatchID)
+			return err == nil
+		}, 30*time.Second, 500*time.Millisecond,
+		"should restart worker and create second match (health check runs every 5s, maxPingRetries=3)",
+	)
 
 	var waitingCount int
 	err = dbConn.QueryRow(ctx, "SELECT COUNT(*) FROM waiting").Scan(&waitingCount)

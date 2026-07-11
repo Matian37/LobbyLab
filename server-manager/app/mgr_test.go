@@ -597,6 +597,56 @@ func TestWorkerManager_healthCheck(t *testing.T) {
 		assert.Equal(t, WorkerRestarting, wm.workers[1].State)
 		assert.Equal(t, 1, wm.workers[1].stateID)
 	})
+
+	t.Run("match cancel on WorkerOccupied state", func(t *testing.T) {
+		ctx := context.Background()
+
+		workers := []*Worker{
+			NewWorker("worker-1", 1, 10*time.Second),
+			NewWorker("worker-2", 1, -1*time.Second),
+		}
+		workers[0].SetOccupied(123)
+		workers[0].failCount = 2
+		workers[1].failCount = 2
+
+		wg := sync.WaitGroup{}
+		wg.Add(2)
+		doneFunc := func(ctx context.Context, name string) { wg.Done() }
+
+		docker, broker, _, wm := newMockWorkerManagerWithInit(t, workers)
+		wantErr := errors.New("test force error")
+
+		broker.EXPECT().GetWorkersPong(ctx, wm.workerPongTimeout).Return(internal.Responders{}, nil)
+		docker.EXPECT().RestartContainer(ctx, "worker-1").Do(doneFunc).Return(wantErr)
+		docker.EXPECT().RestartContainer(ctx, "worker-2").Do(doneFunc).Return(wantErr)
+
+		err := wm.healthCheck(ctx)
+		require.NoError(t, err)
+
+		done := make(chan struct{})
+		go func() {
+			wg.Wait()
+			close(done)
+		}()
+
+		select {
+		case <-done:
+		case <-time.After(1 * time.Second):
+			t.Fatal(t, "restart container should be called")
+		}
+
+		select {
+		case res := <-wm.saveResultChan:
+			require.Equal(t, 123, res.MatchID, "incorrect match canceled")
+		default:
+			t.Fatal(t, "should cancel match 123")
+		}
+		select {
+		case <-wm.saveResultChan:
+			t.Fatal(t, "only one match should be canceled")
+		default:
+		}
+	})
 }
 
 func TestWorkerManager_WaitForFreeWorker(t *testing.T) {
@@ -688,8 +738,8 @@ func TestWorkerManager_SaveLoop(t *testing.T) {
 		_, _, db, wm := newMockWorkerManagerWithInit(t, []*Worker{})
 		res := internal.Result{Success: true, MatchID: 42}
 
-		db.EXPECT().SaveMatchResults(ctx, string(res.Details), res.MatchID).DoAndReturn(
-			func(context.Context, string, int) error {
+		db.EXPECT().SaveMatchResults(ctx, res).DoAndReturn(
+			func(any, any) error {
 				cancel()
 				return ctx.Err()
 			})
@@ -910,8 +960,8 @@ func TestWorkerManager_LifeCycle(t *testing.T) {
 		broker.EXPECT().GetResult(ctx).Return(msg, nil)
 		msg.EXPECT().Data().Return(payload)
 		msg.EXPECT().Ack().Return(nil)
-		db.EXPECT().SaveMatchResults(ctx, string(res.Details), res.MatchID).
-			DoAndReturn(func(ctx context.Context, details string, matchID int) error {
+		db.EXPECT().SaveMatchResults(ctx, res).
+			DoAndReturn(func(ctx any, result any) error {
 				cancel()
 				return nil
 			})
