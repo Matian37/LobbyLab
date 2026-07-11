@@ -28,7 +28,7 @@ type BrokerConnection interface {
 
 type WorkerManager interface {
 	Start(ctx context.Context) error
-	Shutdown() error
+	Shutdown()
 	WaitForFreeWorker(ctx context.Context)
 	AssignMatch(ctx context.Context, config MatchConfig) (ServerInfo, error)
 }

@@ -14,10 +14,9 @@ import (
 )
 
 var (
-	ErrNotEnoughUsers            = errors.New("not enough users")
-	ErrMatchmakerClosed          = errors.New("matchmaker closed")
-	ErrMatchmakerAlreadyOpen     = errors.New("matchmaker already open")
-	ErrMatchmakerAlreadyShutdown = errors.New("matchmaker already shutdown")
+	ErrNotEnoughUsers        = errors.New("not enough users")
+	ErrMatchmakerClosed      = errors.New("matchmaker closed")
+	ErrMatchmakerAlreadyOpen = errors.New("matchmaker already open")
 )
 
 type Matchmaker struct {
@@ -60,19 +59,16 @@ func (m *Matchmaker) Start(ctx context.Context) error {
 	return nil
 }
 
-func (m *Matchmaker) Shutdown() error {
+func (m *Matchmaker) Shutdown() {
 	if m.closed {
-		return ErrMatchmakerAlreadyShutdown
+		return
 	}
 
-	var err error
 	if m.db != nil {
-		err = m.db.Close()
+		_ = m.db.Close()
 	}
 	m.wg.Wait()
-
 	m.closed = true
-	return err
 }
 
 func (m *Matchmaker) createMatch(ctx context.Context, matchUsers []internal.User) error {

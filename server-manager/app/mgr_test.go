@@ -192,10 +192,10 @@ func TestWorkerManager_Start(t *testing.T) {
 
 func TestWorkerManager_Shutdown(t *testing.T) {
 	t.Run("already closed", func(t *testing.T) {
-		wm := WorkerManager{closed: true}
-
-		err := wm.Shutdown()
-		require.ErrorIs(t, err, ErrMgrAlreadyClosed)
+		_, _, _, wm := newMockWorkerManagerWithInit(t, []*Worker{})
+		wm.closed = true
+		assert.NotPanics(t, wm.Shutdown)
+		assert.True(t, wm.closed)
 	})
 
 	t.Run("success", func(t *testing.T) {
@@ -209,8 +209,7 @@ func TestWorkerManager_Shutdown(t *testing.T) {
 			db.EXPECT().Close().Return(nil),
 		)
 
-		err := wm.Shutdown()
-		require.NoError(t, err)
+		wm.Shutdown()
 		assert.True(t, wm.closed)
 	})
 }

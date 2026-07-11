@@ -255,27 +255,16 @@ func TestMatchmaker_matchmakingLoop(t *testing.T) {
 
 func TestMatchmaker_Shutdown(t *testing.T) {
 	t.Run("already closed", func(t *testing.T) {
-		m := Matchmaker{closed: true}
-		require.ErrorIs(t, m.Shutdown(), ErrMatchmakerAlreadyShutdown)
+		_, _, m := newMockMatchmaker(t)
+		m.closed = true
+		assert.NotPanics(t, m.Shutdown)
+		assert.True(t, m.closed)
 	})
 
 	t.Run("success", func(t *testing.T) {
 		_, db, m := newMockMatchmaker(t)
 		db.EXPECT().Close().Return(nil)
-
-		require.NoError(t, m.Shutdown())
-		assert.True(t, m.closed)
-	})
-
-	t.Run("partially opened", func(t *testing.T) {
-		_, db, m := newMockMatchmaker(t)
-		db.EXPECT().Open(context.Background()).Return(errors.New(""))
-		db.EXPECT().Close().Return(nil)
-
-		require.Error(t, db.Open(context.Background()))
-		assert.False(t, m.closed)
-
-		require.NoError(t, m.Shutdown())
+		m.Shutdown()
 		assert.True(t, m.closed)
 	})
 }

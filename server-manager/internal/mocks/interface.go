@@ -264,11 +264,9 @@ func (mr *MockWorkerManagerMockRecorder) AssignMatch(ctx, config any) *gomock.Ca
 }
 
 // Shutdown mocks base method.
-func (m *MockWorkerManager) Shutdown() error {
+func (m *MockWorkerManager) Shutdown() {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Shutdown")
-	ret0, _ := ret[0].(error)
-	return ret0
+	m.ctrl.Call(m, "Shutdown")
 }
 
 // Shutdown indicates an expected call of Shutdown.

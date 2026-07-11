@@ -111,9 +111,9 @@ func (wm *WorkerManager) Start(ctx context.Context) error {
 }
 
 // TODO: error logging
-func (wm *WorkerManager) Shutdown() error {
+func (wm *WorkerManager) Shutdown() {
 	if wm.closed {
-		return ErrMgrAlreadyClosed
+		return
 	}
 
 	for _, worker := range wm.workers {
@@ -127,7 +127,6 @@ func (wm *WorkerManager) Shutdown() error {
 	wm.wg.Wait()
 
 	wm.closed = true
-	return nil
 }
 
 func (wm *WorkerManager) saveLoop(ctx context.Context) error {
