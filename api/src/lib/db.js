@@ -109,10 +109,12 @@ export async function getMatchResults(login){
     const matchIds = q.map(row => row.match_id);
 
     const q1 = await sql`
-        SELECT results FROM matches WHERE id = ANY(${matchIds}::int[])
+        SELECT results, canceled FROM matches WHERE id = ANY(${matchIds}::int[])
     `
-    const matches = q1.map(result => result.results);
-    return matches;
+    return q1.map(row => ({
+        details: row.results,
+        canceled: row.canceled,
+    }));
 }
 
 

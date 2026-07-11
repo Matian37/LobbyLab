@@ -18,8 +18,8 @@ vi.mock('$lib/db.js', () => {
         addToWaiting: vi.fn().mockResolvedValue(true),
         deleteFromWaiting: vi.fn().mockResolvedValue(true),
         getMatchResults: vi.fn().mockResolvedValue([
-            {players: ['albert', 'zbychu'], winner: 'albert'},
-            {players: ['user1', 'albert'], winner: 'user1'},
+            {details: {players: ['albert', 'zbychu'], winner: 'albert'}, canceled: false},
+            {details: {players: ['user1', 'albert'], winner: 'user1'}, canceled: true},
         ]),
     }
 })
@@ -166,8 +166,8 @@ describe('statistics', () => {
         const response = await resultsAPI.GET( {url} );
         const result = await response.json();
         expect(result).toEqual({sukces: true, matches: [
-            {players: ['albert', 'zbychu'], winner: 'albert'},
-            {players: ['user1', 'albert'], winner: 'user1'},
+            {details: {players: ['albert', 'zbychu'], winner: 'albert'}, canceled: false},
+            {details: {players: ['user1', 'albert'], winner: 'user1'}, canceled: true},
         ]});
     });
 });
