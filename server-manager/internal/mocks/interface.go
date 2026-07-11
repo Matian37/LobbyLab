@@ -13,6 +13,7 @@ import (
 	context "context"
 	reflect "reflect"
 	internal "server-manager/internal"
+	time "time"
 
 	gomock "go.uber.org/mock/gomock"
 )
@@ -195,18 +196,18 @@ func (mr *MockBrokerConnectionMockRecorder) GetResult(ctx any) *gomock.Call {
 }
 
 // GetWorkersPong mocks base method.
-func (m *MockBrokerConnection) GetWorkersPong(ctx context.Context) (internal.Responders, error) {
+func (m *MockBrokerConnection) GetWorkersPong(ctx context.Context, pongTimeout time.Duration) (internal.Responders, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetWorkersPong", ctx)
+	ret := m.ctrl.Call(m, "GetWorkersPong", ctx, pongTimeout)
 	ret0, _ := ret[0].(internal.Responders)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GetWorkersPong indicates an expected call of GetWorkersPong.
-func (mr *MockBrokerConnectionMockRecorder) GetWorkersPong(ctx any) *gomock.Call {
+func (mr *MockBrokerConnectionMockRecorder) GetWorkersPong(ctx, pongTimeout any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetWorkersPong", reflect.TypeOf((*MockBrokerConnection)(nil).GetWorkersPong), ctx)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetWorkersPong", reflect.TypeOf((*MockBrokerConnection)(nil).GetWorkersPong), ctx, pongTimeout)
 }
 
 // Open mocks base method.

@@ -53,7 +53,6 @@ func TestIntegration_NewNATSConnection(t *testing.T) {
 
 	assert.NotNil(t, conn)
 	assert.Equal(t, 5*time.Second, conn.assignJobTimeout)
-	assert.Equal(t, 3*time.Second, conn.pongTimeout)
 	assert.Equal(t, 5*time.Second, conn.openTimeout)
 
 	assert.Nil(t, conn.conn)
@@ -202,13 +201,13 @@ func TestIntegration_NATSConnection_AssignJob(t *testing.T) {
 func TestIntegration_NATSConnection_PingWorkers(t *testing.T) {
 	t.Run("not open", func(t *testing.T) {
 		conn := NATSConnection{}
-		_, err := conn.GetWorkersPong(context.Background())
+		_, err := conn.GetWorkersPong(context.Background(), time.Nanosecond)
 		assert.ErrorIs(t, err, ErrNATSConnNotOpen)
 	})
 
 	t.Run("closed", func(t *testing.T) {
 		conn := NATSConnection{opened: true, closed: true}
-		_, err := conn.GetWorkersPong(context.Background())
+		_, err := conn.GetWorkersPong(context.Background(), time.Nanosecond)
 		assert.ErrorIs(t, err, ErrNATSConnClosed)
 	})
 
@@ -219,12 +218,10 @@ func TestIntegration_NATSConnection_PingWorkers(t *testing.T) {
 		err := conn.Open(context.Background(), &internal.EnvConfig{BrokerURI: addr})
 		require.NoError(t, err)
 
-		conn.pongTimeout = 150 * time.Millisecond
-
 		ctx, cancel := context.WithCancel(context.Background())
 		cancel()
 
-		_, err = conn.GetWorkersPong(ctx)
+		_, err = conn.GetWorkersPong(ctx, 150*time.Millisecond)
 		require.ErrorIs(t, err, ctx.Err())
 	})
 
@@ -234,8 +231,6 @@ func TestIntegration_NATSConnection_PingWorkers(t *testing.T) {
 		conn := NewNATSConnection()
 		err := conn.Open(context.Background(), &internal.EnvConfig{BrokerURI: addr})
 		require.NoError(t, err)
-
-		conn.pongTimeout = 150 * time.Millisecond
 
 		nc, err := nats.Connect(addr)
 		require.NoError(t, err)
@@ -248,7 +243,7 @@ func TestIntegration_NATSConnection_PingWorkers(t *testing.T) {
 		require.NoError(t, err)
 		nc.Flush()
 
-		responders, err := conn.GetWorkersPong(context.Background())
+		responders, err := conn.GetWorkersPong(context.Background(), 150*time.Millisecond)
 		require.NoError(t, err)
 
 		_, ok := responders[workerID]

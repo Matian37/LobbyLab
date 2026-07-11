@@ -95,9 +95,9 @@ func TestRace_ServerManager_LifeCycle(t *testing.T) {
 					matchChan <- config.MatchID
 					return nil
 				})
-			broker.EXPECT().GetWorkersPong(gomock.Any()).
+			broker.EXPECT().GetWorkersPong(gomock.Any(), gomock.Any()).
 				AnyTimes().
-				DoAndReturn(func(ctx any) (map[string]struct{}, error) {
+				DoAndReturn(func(ctx any, pongTimeout any) (map[string]struct{}, error) {
 					if rand.Intn(test.failRate) == 0 {
 						return nil, errors.New("")
 					}

@@ -527,7 +527,7 @@ func TestWorkerManager_healthCheck(t *testing.T) {
 
 		_, broker, _, wm := newMockWorkerManagerWithInit(t, []*Worker{})
 		wantErr := errors.New("ping failed")
-		broker.EXPECT().GetWorkersPong(ctx).Return(internal.Responders{}, wantErr)
+		broker.EXPECT().GetWorkersPong(ctx, wm.workerPongTimeout).Return(internal.Responders{}, wantErr)
 
 		err := wm.healthCheck(ctx)
 		require.ErrorIs(t, err, ErrHealthPingFailed)
@@ -542,7 +542,7 @@ func TestWorkerManager_healthCheck(t *testing.T) {
 		workers[0].failCount = 1
 
 		_, broker, _, wm := newMockWorkerManagerWithInit(t, workers)
-		broker.EXPECT().GetWorkersPong(ctx).Return(responders, nil)
+		broker.EXPECT().GetWorkersPong(ctx, wm.workerPongTimeout).Return(responders, nil)
 
 		err := wm.healthCheck(ctx)
 		require.NoError(t, err)
@@ -572,7 +572,7 @@ func TestWorkerManager_healthCheck(t *testing.T) {
 		docker, broker, _, wm := newMockWorkerManagerWithInit(t, workers)
 		wantErr := errors.New("test force error")
 
-		broker.EXPECT().GetWorkersPong(ctx).Return(responders, nil)
+		broker.EXPECT().GetWorkersPong(ctx, wm.workerPongTimeout).Return(responders, nil)
 		docker.EXPECT().RestartContainer(ctx, "worker-1").Do(doneFunc).Return(wantErr)
 		docker.EXPECT().RestartContainer(ctx, "worker-2").Do(doneFunc).Return(wantErr)
 
@@ -799,10 +799,11 @@ func TestWorkerManager_HealthLoop(t *testing.T) {
 		_, broker, _, wm := newMockWorkerManagerWithInit(t, []*Worker{NewWorker("worker-1", 3, 30*time.Second)})
 		wm.healthCheckTick = 20 * time.Millisecond
 
-		broker.EXPECT().GetWorkersPong(ctx).DoAndReturn(func(ctx context.Context) (internal.Responders, error) {
-			cancel()
-			return internal.Responders{}, ctx.Err()
-		})
+		broker.EXPECT().GetWorkersPong(ctx, wm.workerPongTimeout).
+			DoAndReturn(func(ctx context.Context, pongTimeout time.Duration) (internal.Responders, error) {
+				cancel()
+				return internal.Responders{}, ctx.Err()
+			})
 
 		done := make(chan error, 1)
 		go func() {
@@ -828,7 +829,7 @@ func TestWorkerManager_LifeCycle(t *testing.T) {
 		config := internal.MatchConfig{MatchID: 41}
 
 		docker, broker, _, wm := newMockWorkerManagerWithInit(t, workers)
-		broker.EXPECT().GetWorkersPong(ctx).Return(internal.Responders{"worker-2": {}}, nil)
+		broker.EXPECT().GetWorkersPong(ctx, wm.workerPongTimeout).Return(internal.Responders{"worker-2": {}}, nil)
 		docker.EXPECT().GetGamePort(ctx, "worker-2").Return("8080/udp", nil)
 		broker.EXPECT().AssignJob(ctx, "worker-2", config).Return(nil)
 
@@ -875,7 +876,7 @@ func TestWorkerManager_LifeCycle(t *testing.T) {
 			<-blockRestart
 			wg.Done()
 		}
-		broker.EXPECT().GetWorkersPong(ctx).Return(internal.Responders{"worker-1": {}}, nil)
+		broker.EXPECT().GetWorkersPong(ctx, wm.workerPongTimeout).Return(internal.Responders{"worker-1": {}}, nil)
 		docker.EXPECT().RestartContainer(ctx, "worker-2").Do(block).Return(nil)
 		docker.EXPECT().RestartContainer(ctx, "worker-3").Do(block).Return(errors.New(""))
 

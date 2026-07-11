@@ -46,6 +46,7 @@ type WorkerManager struct {
 	workerCount          int
 	workerMaxPingRetries int
 	workerRestartTimeout time.Duration
+	workerPongTimeout    time.Duration
 
 	saveResultChan chan internal.Result
 	newfreeWorker  *sync.Cond
@@ -56,18 +57,18 @@ type WorkerManager struct {
 	wg sync.WaitGroup
 }
 
-// TODO: add ability to customize mgr settings
 func NewWorkerManager(config *internal.EnvConfig) *WorkerManager {
 	return &WorkerManager{
 		dockerConn:           adapters.NewDockerConnection(),
 		brokerConn:           adapters.NewNATSConnection(),
 		dbConn:               adapters.NewDatabaseConnection(config),
 		config:               config,
-		healthCheckTick:      5 * time.Second,
+		healthCheckTick:      3 * time.Second,
 		resultChanSize:       8192,
 		workerCount:          config.Workercount,
 		workerMaxPingRetries: 3,
 		workerRestartTimeout: 30 * time.Second,
+		workerPongTimeout:    2 * time.Second,
 	}
 }
 
@@ -285,7 +286,7 @@ func (wm *WorkerManager) handleResults(ctx context.Context) error {
 }
 
 func (wm *WorkerManager) healthCheck(ctx context.Context) error {
-	responders, err := wm.brokerConn.GetWorkersPong(ctx)
+	responders, err := wm.brokerConn.GetWorkersPong(ctx, wm.workerPongTimeout)
 	if err != nil {
 		return fmt.Errorf("%w: %w", ErrHealthPingFailed, err)
 	}

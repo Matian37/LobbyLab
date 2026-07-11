@@ -34,7 +34,6 @@ type NATSConnection struct {
 	resultConsumer jetstream.Consumer
 
 	openTimeout      time.Duration
-	pongTimeout      time.Duration
 	assignJobTimeout time.Duration
 
 	opened bool
@@ -44,7 +43,6 @@ type NATSConnection struct {
 func NewNATSConnection() *NATSConnection {
 	return &NATSConnection{
 		assignJobTimeout: 5 * time.Second,
-		pongTimeout:      3 * time.Second,
 		openTimeout:      5 * time.Second,
 	}
 }
@@ -121,7 +119,7 @@ func (nc *NATSConnection) AssignJob(ctx context.Context, workerID string, config
 	return err
 }
 
-func (nc *NATSConnection) GetWorkersPong(ctx context.Context) (internal.Responders, error) {
+func (nc *NATSConnection) GetWorkersPong(ctx context.Context, pongTimeout time.Duration) (internal.Responders, error) {
 	if !nc.opened {
 		return nil, ErrNATSConnNotOpen
 	}
@@ -152,7 +150,7 @@ func (nc *NATSConnection) GetWorkersPong(ctx context.Context) (internal.Responde
 	select {
 	case <-ctx.Done():
 		return nil, ctx.Err()
-	case <-time.After(nc.pongTimeout):
+	case <-time.After(pongTimeout):
 	}
 
 	return responders, nil

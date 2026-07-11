@@ -2,7 +2,10 @@
 
 package internal
 
-import "context"
+import (
+	"context"
+	"time"
+)
 
 type DockerConnection interface {
 	Open(config *EnvConfig) error
@@ -19,7 +22,7 @@ type BrokerConnection interface {
 	AssignJob(ctx context.Context, workerID string, config MatchConfig) error
 	// GetWorkersPong broadcasts a ping to all active workers
 	// and returns those that respond before the timeout.
-	GetWorkersPong(ctx context.Context) (Responders, error)
+	GetWorkersPong(ctx context.Context, pongTimeout time.Duration) (Responders, error)
 	GetResult(ctx context.Context) (Message, error)
 }
 
