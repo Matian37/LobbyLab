@@ -93,7 +93,9 @@ func TestMatchmaker_createMatch(t *testing.T) {
 			db.EXPECT().AddMatch(gomock.Any(), users, serverInfo, 1).Return(nil),
 		)
 
-		require.NoError(t, m.createMatch(context.Background(), users))
+		matchID, err := m.createMatch(context.Background(), users)
+		assert.NoError(t, err)
+		assert.Equal(t, 1, matchID)
 	})
 }
 

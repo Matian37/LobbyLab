@@ -87,36 +87,35 @@ func (m *Matchmaker) Shutdown() {
 	m.logger.Debug("shutdown complete")
 }
 
-// TODO: return id for logs
-func (m *Matchmaker) createMatch(ctx context.Context, matchUsers []internal.User) error {
+func (m *Matchmaker) createMatch(ctx context.Context, matchUsers []internal.User) (int, error) {
 	gameConfig, err := json.Marshal(struct {
 		Players []internal.User `json:"players"`
 	}{Players: matchUsers})
 	if err != nil {
-		return err
+		return 0, err
 	}
 
 	ctxTimeout, cancelTimeout := context.WithTimeout(ctx, 10*time.Second)
 	defer cancelTimeout()
 
-	matchId, err := m.db.GetNextMatchId(ctxTimeout)
+	matchID, err := m.db.GetNextMatchId(ctxTimeout)
 	if err != nil {
-		return err
+		return 0, err
 	}
 
 	matchConfig := internal.MatchConfig{
 		Config:  gameConfig,
-		MatchID: matchId,
+		MatchID: matchID,
 	}
 	serverInfo, err := m.workerManager.AssignMatch(ctxTimeout, matchConfig)
 	if err != nil {
-		return err
+		return 0, err
 	}
 
 	// FIX: if add match fails then send cancel match job to worker
 	// 		this require creating cancel feature in game-server,
 	// 		so responsibility of stopping match is on actual game server side
-	return m.db.AddMatch(ctxTimeout, matchUsers, serverInfo, matchId)
+	return matchID, m.db.AddMatch(ctxTimeout, matchUsers, serverInfo, matchID)
 }
 
 func (m *Matchmaker) matchmakingLoop(ctx context.Context) error {
@@ -141,7 +140,8 @@ func (m *Matchmaker) matchmakingLoop(ctx context.Context) error {
 		}
 
 		m.logger.Info("creating a match for users", "users", users)
-		if err := m.createMatch(ctx, users); err != nil {
+		matchID, err := m.createMatch(ctx, users)
+		if err != nil {
 			if errors.Is(err, internal.ErrDBNotEnoughPlayers) {
 				m.logger.Info("match creation failed due to decrease in number of players")
 				iterationErr = nil
@@ -152,7 +152,7 @@ func (m *Matchmaker) matchmakingLoop(ctx context.Context) error {
 			continue
 		}
 
-		m.logger.Info("match created successfully")
+		m.logger.Info("match created successfully", "matchID", matchID)
 		iterationErr = nil
 	}
 }
