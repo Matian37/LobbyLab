@@ -119,11 +119,13 @@ func (m *Matchmaker) createMatch(ctx context.Context, matchUsers []internal.User
 	return m.db.AddMatch(ctxTimeout, matchUsers, serverInfo, matchId)
 }
 
-// TODO: use HandleBackoff
 func (m *Matchmaker) matchmakingLoop(ctx context.Context) error {
 	backoff := backoff.NewExponentialBackOff()
 
+	var iterationErr error
 	for {
+		HandleBackoff(ctx, backoff, iterationErr)
+
 		m.logger.Debug("waiting for a free worker")
 		m.workerManager.WaitForFreeWorker(ctx)
 		if ctx.Err() != nil {
@@ -134,7 +136,7 @@ func (m *Matchmaker) matchmakingLoop(ctx context.Context) error {
 		users, err := m.waitForEnoughPlayers(ctx)
 		if err != nil {
 			m.logger.Error("failed to wait for enough players", "error", err)
-			time.Sleep(backoff.NextBackOff())
+			iterationErr = err
 			continue
 		}
 
@@ -142,16 +144,16 @@ func (m *Matchmaker) matchmakingLoop(ctx context.Context) error {
 		if err := m.createMatch(ctx, users); err != nil {
 			if errors.Is(err, internal.ErrDBNotEnoughPlayers) {
 				m.logger.Info("match creation failed due to decrease in number of players")
-				backoff.Reset()
-				continue
+				iterationErr = nil
+			} else {
+				m.logger.Error("failed to matchmake", "error", err)
+				iterationErr = err
 			}
-			m.logger.Error("failed to matchmake", "error", err)
-			time.Sleep(backoff.NextBackOff())
 			continue
 		}
-		m.logger.Info("match created successfully")
 
-		backoff.Reset()
+		m.logger.Info("match created successfully")
+		iterationErr = nil
 	}
 }
 
