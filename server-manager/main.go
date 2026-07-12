@@ -17,19 +17,19 @@ func main() {
 		&slog.HandlerOptions{Level: slog.LevelInfo},
 	)
 	handler := internal.NewContextErrorHandler(baseHandler)
-	slog.SetDefault(slog.New(handler))
+	logger := slog.New(handler)
 
 	config, err := config.ReadConfig()
 	if err != nil {
-		slog.Error("failed to read config", "error", err)
+		logger.Error("failed to read config", "error", err)
 		os.Exit(1)
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	if err := app.Run(ctx, config); err != nil {
-		slog.Error("application failed", "error", err)
+	if err := app.Run(ctx, config, logger); err != nil {
+		logger.Error("application failed", "error", err)
 		os.Exit(1)
 	}
 }

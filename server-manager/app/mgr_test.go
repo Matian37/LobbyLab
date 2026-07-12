@@ -5,6 +5,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
+	"log/slog"
 	"sync"
 	"testing"
 	"time"
@@ -33,7 +35,10 @@ func newMockWorkerManager(
 	broker := mocks.NewMockBrokerConnection(ctrl)
 	db := mocks.NewMockDatabaseConnection(ctrl)
 
-	wm := NewWorkerManager(&internal.EnvConfig{Workercount: workerCount, PublicHost: "public-host"})
+	wm := NewWorkerManager(
+		&internal.EnvConfig{Workercount: workerCount, PublicHost: "public-host"},
+		slog.New(slog.NewTextHandler(io.Discard, nil)),
+	)
 
 	wm.dockerConn = docker
 	wm.brokerConn = broker
@@ -59,7 +64,7 @@ func newMockWorkerManagerWithInit(
 
 func TestNewWorkerManager(t *testing.T) {
 	config := &internal.EnvConfig{}
-	wm := NewWorkerManager(config)
+	wm := NewWorkerManager(config, slog.New(slog.NewTextHandler(io.Discard, nil)))
 
 	require.NotNil(t, wm)
 	assert.Same(t, config, wm.config)
@@ -357,7 +362,7 @@ func TestWorkerManager_handleResults(t *testing.T) {
 		msg := mocks.NewMockMessage(gomock.NewController(t))
 
 		broker.EXPECT().GetResult(ctx).Return(msg, nil)
-		msg.EXPECT().Data().Return([]byte("not json"))
+		msg.EXPECT().Data().Times(2).Return([]byte("not json"))
 
 		err := wm.handleResults(ctx)
 		require.ErrorIs(t, err, ErrFailedToUnmarshalResult)
@@ -379,7 +384,7 @@ func TestWorkerManager_handleResults(t *testing.T) {
 
 		gomock.InOrder(
 			broker.EXPECT().GetResult(ctx).Return(msg, nil),
-			msg.EXPECT().Data().Return(payload),
+			msg.EXPECT().Data().Times(2).Return(payload),
 			msg.EXPECT().Ack().Return(wantErr),
 		)
 
@@ -410,7 +415,7 @@ func TestWorkerManager_handleResults(t *testing.T) {
 
 		gomock.InOrder(
 			broker.EXPECT().GetResult(ctx).Return(msg, nil),
-			msg.EXPECT().Data().Return(payload),
+			msg.EXPECT().Data().Times(2).Return(payload),
 			msg.EXPECT().Ack().Return(nil),
 		)
 
@@ -462,9 +467,7 @@ func TestWorkerManager_restartWorker(t *testing.T) {
 
 		docker.EXPECT().RestartContainer(ctx, "").Return(wantErr)
 
-		err := wm.restartWorker(ctx, nil, 0, "")
-		assert.ErrorIs(t, err, ErrWorkerRestartFailed)
-		assert.ErrorIs(t, err, wantErr)
+		assert.ErrorIs(t, wm.restartWorker(ctx, nil, 0, ""), wantErr)
 	})
 
 	t.Run("worker changed state", func(t *testing.T) {
@@ -797,7 +800,7 @@ func TestWorkerManager_ResultLoop(t *testing.T) {
 		require.NoError(t, err)
 
 		broker.EXPECT().GetResult(ctx).Return(msg, nil)
-		msg.EXPECT().Data().Return(payload)
+		msg.EXPECT().Data().Times(2).Return(payload)
 		msg.EXPECT().Ack().Do(cancel).Return(nil)
 
 		done := make(chan error, 1)
@@ -957,7 +960,7 @@ func TestWorkerManager_LifeCycle(t *testing.T) {
 		require.NoError(t, err)
 
 		broker.EXPECT().GetResult(ctx).Return(msg, nil)
-		msg.EXPECT().Data().Return(payload)
+		msg.EXPECT().Data().Times(2).Return(payload)
 		msg.EXPECT().Ack().Return(nil)
 		db.EXPECT().SaveMatchResults(ctx, res).
 			DoAndReturn(func(ctx any, result any) error {

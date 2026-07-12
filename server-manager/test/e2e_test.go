@@ -6,6 +6,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
+	"log/slog"
 	"net"
 	"os"
 	"sync/atomic"
@@ -221,7 +223,7 @@ func TestE2E_GracefulShutdown(t *testing.T) {
 
 	appResult := make(chan error, 1)
 	go func() {
-		err := app.Run(ctx, cfg)
+		err := app.Run(ctx, cfg, slog.New(slog.NewTextHandler(io.Discard, nil)))
 		appResult <- err
 	}()
 
@@ -260,7 +262,7 @@ func TestE2E_AppLifecycle(t *testing.T) {
 
 	appResult := make(chan error, 1)
 	go func() {
-		err := app.Run(ctx, cfg)
+		err := app.Run(ctx, cfg, slog.New(slog.NewTextHandler(io.Discard, nil)))
 		appResult <- err
 	}()
 
@@ -381,7 +383,7 @@ func TestE2E_WorkersOverloadWithMatches(t *testing.T) {
 
 	appResult := make(chan error, 1)
 	go func() {
-		appResult <- app.Run(ctx, cfg)
+		appResult <- app.Run(ctx, cfg, slog.New(slog.NewTextHandler(io.Discard, nil)))
 	}()
 
 	dbConn, err := pgx.Connect(ctx, dbConnString)
@@ -495,7 +497,7 @@ func TestE2E_WorkerFailureAndRestart(t *testing.T) {
 
 	appResult := make(chan error, 1)
 	go func() {
-		appResult <- app.Run(ctx, cfg)
+		appResult <- app.Run(ctx, cfg, slog.New(slog.NewTextHandler(io.Discard, nil)))
 	}()
 
 	dbConn, err := pgx.Connect(ctx, dbConnString)
@@ -599,7 +601,7 @@ func TestE2E_NoMatchWithoutEnoughPlayers(t *testing.T) {
 
 	appResult := make(chan error, 1)
 	go func() {
-		appResult <- app.Run(ctx, cfg)
+		appResult <- app.Run(ctx, cfg, slog.New(slog.NewTextHandler(io.Discard, nil)))
 	}()
 
 	dbConn, err := pgx.Connect(ctx, dbConnString)

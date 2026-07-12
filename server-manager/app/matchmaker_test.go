@@ -3,6 +3,8 @@ package app
 import (
 	"context"
 	"errors"
+	"io"
+	"log/slog"
 	"server-manager/internal"
 	"server-manager/internal/mocks"
 	"testing"
@@ -18,7 +20,7 @@ func newMockMatchmaker(t *testing.T) (*mocks.MockWorkerManager, *mocks.MockDatab
 	wm := mocks.NewMockWorkerManager(ctrl)
 	db := mocks.NewMockDatabaseConnection(ctrl)
 
-	m := NewMatchmaker(wm, &internal.EnvConfig{PlayersPerRoom: 2})
+	m := NewMatchmaker(wm, &internal.EnvConfig{PlayersPerRoom: 2}, slog.New(slog.NewTextHandler(io.Discard, nil)))
 	m.db = db
 	m.dbPoolTimeout = 100 * time.Microsecond
 
@@ -34,7 +36,7 @@ func newMockMatchmakerWithStart(t *testing.T) (*mocks.MockWorkerManager, *mocks.
 func TestNewMatchmaker(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		config := &internal.EnvConfig{}
-		m := NewMatchmaker(nil, config)
+		m := NewMatchmaker(nil, config, slog.New(slog.NewTextHandler(io.Discard, nil)))
 
 		require.NotNil(t, m)
 		assert.Same(t, config, m.config)

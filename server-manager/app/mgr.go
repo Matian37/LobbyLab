@@ -25,7 +25,6 @@ var (
 	ErrFailedToAckResult       = errors.New("failed to ack result")
 	ErrHealthPingFailed        = errors.New("health ping failed")
 	ErrNoFreeWorker            = errors.New("free worker not found")
-	ErrWorkerRestartFailed     = errors.New("failed to restart worker")
 	ErrWorkerStateChanged      = errors.New("worker changed state during restart")
 )
 
@@ -53,11 +52,13 @@ type WorkerManager struct {
 	// whether the manager is waiting for a free worker (tests only)
 	waiting bool
 
+	logger *slog.Logger
+
 	mu sync.Mutex
 	wg sync.WaitGroup
 }
 
-func NewWorkerManager(config *internal.EnvConfig) *WorkerManager {
+func NewWorkerManager(config *internal.EnvConfig, logger *slog.Logger) *WorkerManager {
 	return &WorkerManager{
 		dockerConn:           adapters.NewDockerConnection(),
 		brokerConn:           adapters.NewNATSConnection(),
@@ -69,6 +70,7 @@ func NewWorkerManager(config *internal.EnvConfig) *WorkerManager {
 		workerMaxPingRetries: 3,
 		workerRestartTimeout: 30 * time.Second,
 		workerPongTimeout:    2 * time.Second,
+		logger:               logger.With("service", "workerManager"),
 	}
 }
 
@@ -81,13 +83,13 @@ func (wm *WorkerManager) Start(ctx context.Context) error {
 	}
 
 	if err := wm.dockerConn.Open(wm.config); err != nil {
-		return err
+		return fmt.Errorf("failed to open docker connection: %w", err)
 	}
 	if err := wm.brokerConn.Open(ctx, wm.config); err != nil {
-		return err
+		return fmt.Errorf("failed to open broker connection: %w", err)
 	}
 	if err := wm.dbConn.Open(ctx); err != nil {
-		return err
+		return fmt.Errorf("failed to open database connection: %w", err)
 	}
 
 	for range wm.workerCount {
@@ -103,30 +105,53 @@ func (wm *WorkerManager) Start(ctx context.Context) error {
 
 	wm.initialized = true
 
-	wm.wg.Go(func() { _ = wm.saveLoop(ctx) })
-	wm.wg.Go(func() { _ = wm.resultLoop(ctx) })
-	wm.wg.Go(func() { _ = wm.healthLoop(ctx) })
+	attachLogging := func(ctx context.Context, loop func(context.Context) error, loopName string) func() {
+		return func() {
+			wm.logger.Debug("starting loop", "loop", loopName)
+			err := loop(ctx)
+			// nil check not required loop shouldn't return it as error
+			// context errors will be hidden by handler accordingly
+			wm.logger.Error("loop exited", "loop", loopName, "error", err)
+		}
+	}
+
+	wm.wg.Go(attachLogging(ctx, wm.saveLoop, "saveLoop"))
+	wm.wg.Go(attachLogging(ctx, wm.resultLoop, "resultLoop"))
+	wm.wg.Go(attachLogging(ctx, wm.healthLoop, "healthLoop"))
 
 	return nil
 }
 
-// TODO: error logging
 func (wm *WorkerManager) Shutdown() {
 	if wm.closed {
+		wm.logger.Warn("already closed")
 		return
 	}
 
 	for _, worker := range wm.workers {
-		_ = wm.dockerConn.KillContainer(context.Background(), worker.ID)
+		wm.logger.Debug("killing worker", "worker", worker.ID)
+		err := wm.dockerConn.KillContainer(context.Background(), worker.ID)
+		if err != nil {
+			wm.logger.Error("failed to kill worker", "worker", worker.ID, "error", err)
+		}
 	}
 
-	_ = wm.dockerConn.Close()
-	_ = wm.brokerConn.Close()
-	_ = wm.dbConn.Close()
+	if err := wm.dockerConn.Close(); err != nil {
+		wm.logger.Error("failed to close docker connection", "error", err)
+	}
+	if err := wm.brokerConn.Close(); err != nil {
+		wm.logger.Error("failed to close broker connection", "error", err)
+	}
+	if err := wm.dbConn.Close(); err != nil {
+		wm.logger.Error("failed to close database connection", "error", err)
+	}
+
+	wm.logger.Debug("waiting to finish remaining tasks")
 
 	wm.wg.Wait()
-
 	wm.closed = true
+
+	wm.logger.Debug("shutdown complete")
 }
 
 func (wm *WorkerManager) saveLoop(ctx context.Context) error {
@@ -144,10 +169,15 @@ func (wm *WorkerManager) saveLoop(ctx context.Context) error {
 		case <-ctx.Done():
 			return ctx.Err()
 		case res := <-wm.saveResultChan:
+			wm.logger.Debug("received save request", "result", res)
+
 			err := wm.dbConn.SaveMatchResults(ctx, res)
 			if err != nil {
-				slog.Error("failed to save result", "error", err)
+				wm.logger.Error("failed to save result", "error", err)
+			} else {
+				wm.logger.Debug("match result saved", "result", res)
 			}
+
 			HandleBackoff(ctx, b, err)
 		}
 	}
@@ -170,7 +200,9 @@ func (wm *WorkerManager) resultLoop(ctx context.Context) error {
 		default:
 			err := wm.handleResults(ctx)
 			if err != nil {
-				slog.Error("result loop error", "error", err)
+				wm.logger.Error("result loop error", "error", err)
+			} else {
+				wm.logger.Debug("match results handled")
 			}
 			HandleBackoff(ctx, b, err)
 		}
@@ -194,7 +226,9 @@ func (wm *WorkerManager) healthLoop(ctx context.Context) error {
 			return ctx.Err()
 		case <-ticker.C:
 			if err := wm.healthCheck(ctx); err != nil {
-				slog.Error("failed to do health check for workers", "error", err)
+				wm.logger.Error("failed to do health check workers", "error", err)
+			} else {
+				wm.logger.Debug("workers health check completed")
 			}
 		}
 	}
@@ -259,6 +293,7 @@ func (wm *WorkerManager) handleResults(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("%w: %w", ErrFailedToGetResult, err)
 	}
+	wm.logger.Debug("received match result", "data", string(msg.Data()))
 
 	var res internal.Result
 	if err := json.Unmarshal(msg.Data(), &res); err != nil {
@@ -268,6 +303,7 @@ func (wm *WorkerManager) handleResults(ctx context.Context) error {
 	if err := msg.Ack(); err != nil {
 		return fmt.Errorf("%w: %w", ErrFailedToAckResult, err)
 	}
+	wm.logger.Debug("result acked")
 
 	wm.saveResultChan <- res
 
@@ -279,6 +315,9 @@ func (wm *WorkerManager) handleResults(ctx context.Context) error {
 	if worker != nil {
 		worker.SetFree()
 		wm.newfreeWorker.Signal()
+		wm.logger.Info("worker ready to handle matches", "worker", worker.ID)
+	} else {
+		wm.logger.Debug("worker not found for match", "matchID", res.MatchID)
 	}
 
 	return nil
@@ -289,6 +328,7 @@ func (wm *WorkerManager) healthCheck(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("%w: %w", ErrHealthPingFailed, err)
 	}
+	wm.logger.Debug("health check completed", "responders", responders)
 
 	wm.mu.Lock()
 	defer wm.mu.Unlock()
@@ -301,17 +341,27 @@ func (wm *WorkerManager) healthCheck(ctx context.Context) error {
 			continue
 		}
 
+		wm.logger.Info("worker unhealthy, restarting", "worker", worker.ID)
+
 		if worker.State == WorkerOccupied {
+			wm.logger.Info("canceling match due to worker's health", "worker", worker.ID, "matchID", worker.matchID)
 			wm.saveResultChan <- internal.Result{
 				MatchID: worker.matchID,
 				Success: false,
 				Details: []byte("{}"),
 			}
+		} else {
+			wm.logger.Debug("worker not running any match, skipping match cancelation", "worker", worker.ID)
 		}
 
 		stateID := worker.SetRestarting()
 
-		wm.wg.Go(func() { _ = wm.restartWorker(ctx, worker, stateID, worker.ID) })
+		wm.wg.Go(func() {
+			err := wm.restartWorker(ctx, worker, stateID, worker.ID)
+			if err != nil && !errors.Is(err, ErrWorkerStateChanged) {
+				wm.logger.Error("failed to restart worker", "worker", worker.ID, "error", err)
+			}
+		})
 	}
 
 	return nil
@@ -320,8 +370,7 @@ func (wm *WorkerManager) healthCheck(ctx context.Context) error {
 func (wm *WorkerManager) restartWorker(ctx context.Context, worker *Worker, restartStateID int, workerID string) error {
 	err := wm.dockerConn.RestartContainer(ctx, workerID)
 	if err != nil {
-		slog.Error("failed to restart worker", "id", workerID, "error", err)
-		return fmt.Errorf("%w: %w", ErrWorkerRestartFailed, err)
+		return err
 	}
 
 	wm.mu.Lock()
