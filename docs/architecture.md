@@ -3,70 +3,69 @@
 ## Components
 
 ### Frontend + API
-- Stateless. Serves the website and exposes API endpoints.
-- Manages user connections waiting for matchmaking; stores their state in the
-  DB.
-- On match creation, informs users.
+- SvelteKit.
+- Serves the website and exposes REST endpoints.
+- Manages user connections waiting for matchmaking and stores their state in the DB.
 
 ### DB
+- PostgreSQL.
 - Stores all persistent data (users, queue, matches, etc.).
+- Notification channel for match assignment.
 
 ### Server Manager
-- Creates matches from the database queue.
-- Assigns game servers to run a match with a specific config.
-- Creates and manages game server containers.
+- Go.
+- Creates matches from the DB queue, assigns workers, and manages containers.
+- Consumes JetStream results and saves them to the DB.
 
 ### Game Server
-- Runs the actual game server.
-- Wrapped by a Go script that communicates with the server manager through NATS
-  and manages game server process.
+- Go wrapper.
+- Runs the actual game server process.
+- Responds to health pings and assignments via NATS.
+- Publishes results to NATS.
 
 ### NATS
-- Messaging system for communication between server manager and game servers.
+- JetStream with stream `RESULT` on `workers.results` (LimitsPolicy, FileStorage, S2).
+- Messaging backbone between server manager and game servers.
 
 ## NATS subjects
 
 - `workers.health`
-  - Type: pub/sub
-  - Direction: server manager -> workers
-  - Purpose: health check ping. Every worker subscribes to this subject.
-- `workers.health.<container_id>`
-  - Type: pub/sub
-  - Direction: worker -> server manager
-  - Purpose: health check pong. A worker replies on its container-specific subject.
+  - Type: request/reply
+  - Direction: server manager → workers
+  - Purpose: health check ping. Workers reply with their container ID.
 - `workers.assign.<container_id>`
   - Type: request/reply
-  - Direction: server manager -> worker
-  - Purpose: match start request. The message body is the match config. The
-    worker acknowledges the assignment by publishing an empty response to the
-    NATS reply subject.
+  - Direction: server manager → worker
+  - Purpose: match assignment with match config. Worker acknowledges by reply.
 - `workers.results`
   - Type: JetStream
-  - Direction: worker -> server manager
-  - Purpose: durable match result event stream. Workers publish one event when
-    a match finishes successfully or is cancelled.
+  - Direction: worker → server manager
+  - Purpose: durable match result stream.
 
-Result event payload:
+Assign payload:
 
 ```json
-{
-  "success": true,
-  "details": {}
-}
+{"matchID": 1234, "config": {}}
 ```
 
-- `success`: `true` when the match completed and produced a result, `false`
-  when the match was cancelled.
-- `details`: match-specific result data. For cancellation events this is an
-  empty object.
+- `matchID`: unique identifier of the match.
+- `config`: match-specific config data used by the actual game server.
+
+Result payload:
+
+```json
+{"success": true, "matchID": 1234, "details": {}}
+```
+
+- `success`: `true` when the match completed, `false` when cancelled.
+- `matchID`: unique identifier of the match.
+- `details`: match-specific result data. Empty object on cancellation.
 
 ## Matchmaking flow
 
-1. User connects to the frontend/API and waits.
-2. API creates a WebSocket connection with the user and keeps it alive. It also
-   saves the user in the DB queue.
-3. Server manager waits for any game server to become free, then creates a
-   match if possible.
-4. Game server receives the match config and starts running the server.
-5. At the end of the game, the game server sends the match result to the server
-   manager and waits for further jobs.
+1. User registers, logs in, clicks Play. API adds them to the DB waiting queue and opens an SSE connection.
+2. Server manager waits for a free worker.
+3. Server manager polls the DB for enough players, gets a match ID, and looks up the worker's game port via Docker.
+4. Server manager sends the match config to `workers.assign.<container_id>` and saves the match in the DB.
+5. Game server receives the config, starts the game server process, and waits for it to exit.
+6. Game server publishes the result to `workers.results`. Server manager saves to DB, and marks the worker and users free.
