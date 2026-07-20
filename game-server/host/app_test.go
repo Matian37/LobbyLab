@@ -94,12 +94,13 @@ func TestApp_Init(t *testing.T) {
 
 func TestApp_sendResult(t *testing.T) {
 	result := []byte(`{"result":345}`)
+	matchID := 1
 
 	t.Run("success", func(t *testing.T) {
 		mockConn, _, app := newMockApp(t)
-		mockConn.EXPECT().SendResult(gomock.Any(), result).Return(nil)
+		mockConn.EXPECT().SendResult(gomock.Any(), matchID, result).Return(nil)
 
-		err := app.sendResult(context.Background(), result)
+		err := app.sendResult(context.Background(), matchID, result)
 		assert.NoError(t, err)
 	})
 
@@ -107,8 +108,8 @@ func TestApp_sendResult(t *testing.T) {
 		mockConn, _, app := newMockApp(t)
 		app.sendResultTimeout = 5 * time.Millisecond
 		mockConn.EXPECT().
-			SendResult(gomock.Any(), result).
-			DoAndReturn(func(ctx context.Context, _ []byte) error {
+			SendResult(gomock.Any(), gomock.Any(), gomock.Any()).
+			DoAndReturn(func(ctx context.Context, _ int, _ []byte) error {
 				deadline, ok := ctx.Deadline()
 				assert.True(t, ok)
 				assert.WithinDuration(t, time.Now().Add(5*time.Millisecond), deadline, 50*time.Millisecond)
@@ -117,7 +118,7 @@ func TestApp_sendResult(t *testing.T) {
 				return ctx.Err()
 			})
 
-		err := app.sendResult(context.Background(), result)
+		err := app.sendResult(context.Background(), matchID, result)
 		assert.ErrorIs(t, err, context.DeadlineExceeded)
 	})
 
@@ -126,12 +127,12 @@ func TestApp_sendResult(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		cancel()
 		mockConn.EXPECT().
-			SendResult(gomock.Any(), result).
-			DoAndReturn(func(ctx context.Context, _ []byte) error {
+			SendResult(gomock.Any(), gomock.Any(), gomock.Any()).
+			DoAndReturn(func(ctx context.Context, _ int, _ []byte) error {
 				return ctx.Err()
 			})
 
-		err := app.sendResult(ctx, result)
+		err := app.sendResult(ctx, matchID, result)
 		assert.ErrorIs(t, err, context.Canceled)
 	})
 }
@@ -139,15 +140,16 @@ func TestApp_sendResult(t *testing.T) {
 func TestApp_sendCancel(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		mockConn, _, app := newMockApp(t)
-		mockConn.EXPECT().SendCancel(gomock.Any()).Return(nil)
+		matchID := 1
+		mockConn.EXPECT().SendCancel(gomock.Any(), matchID).Return(nil)
 
-		app.sendCancel()
+		app.sendCancel(matchID)
 	})
 
 	t.Run("timeout", func(t *testing.T) {
 		mockConn, _, app := newMockApp(t)
 		app.sendCancelTimeout = 5 * time.Millisecond
-		mockConn.EXPECT().SendCancel(gomock.Any()).DoAndReturn(func(ctx context.Context) error {
+		mockConn.EXPECT().SendCancel(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, _ int) error {
 			deadline, ok := ctx.Deadline()
 			assert.True(t, ok)
 			assert.WithinDuration(t, time.Now().Add(5*time.Millisecond), deadline, 50*time.Millisecond)
@@ -156,7 +158,7 @@ func TestApp_sendCancel(t *testing.T) {
 			return ctx.Err()
 		})
 
-		app.sendCancel()
+		app.sendCancel(1)
 	})
 }
 
@@ -244,7 +246,7 @@ func TestApp_runMatch(t *testing.T) {
 		mockSrv.EXPECT().Start(string(config.Config), app.cmdArgs).Return(nil)
 		mockSrv.EXPECT().GetResult(ctx).Return(result, nil)
 		mockSrv.EXPECT().Stop(gomock.Any()).Return(nil)
-		mockConn.EXPECT().SendResult(gomock.Any(), result).Return(nil)
+		mockConn.EXPECT().SendResult(gomock.Any(), config.MatchID, result).Return(nil)
 
 		err := app.runMatch(ctx)
 		assert.NoError(t, err)
@@ -265,7 +267,7 @@ func TestApp_runMatch(t *testing.T) {
 
 		mockConn.EXPECT().GetMatchConfig(ctx).Return(internal.MatchConfig{}, nil)
 		mockSrv.EXPECT().Start(gomock.Any(), app.cmdArgs).Return(errors.New(""))
-		mockConn.EXPECT().SendCancel(gomock.Any()).Return(nil)
+		mockConn.EXPECT().SendCancel(gomock.Any(), gomock.Any()).Return(nil)
 
 		err := app.runMatch(ctx)
 		assert.Error(t, err)
@@ -273,16 +275,15 @@ func TestApp_runMatch(t *testing.T) {
 
 	t.Run("sendResult failed", func(t *testing.T) {
 		mockConn, mockSrv, app := newMockApp(t)
-		ctx := newUniqueCtx(t)
 
-		mockConn.EXPECT().GetMatchConfig(ctx).Return(internal.MatchConfig{}, nil)
+		mockConn.EXPECT().GetMatchConfig(gomock.Any()).Return(internal.MatchConfig{}, nil)
 		mockSrv.EXPECT().Start(gomock.Any(), app.cmdArgs).Return(nil)
-		mockSrv.EXPECT().GetResult(ctx).Return([]byte{}, nil)
+		mockSrv.EXPECT().GetResult(gomock.Any()).Return([]byte{}, nil)
 		mockSrv.EXPECT().Stop(gomock.Any()).Return(nil)
-		mockConn.EXPECT().SendResult(gomock.Any(), []byte{}).Return(errors.New(""))
-		mockConn.EXPECT().SendCancel(gomock.Any()).Return(nil)
+		mockConn.EXPECT().SendResult(gomock.Any(), gomock.Any(), gomock.Any()).Return(errors.New(""))
+		mockConn.EXPECT().SendCancel(gomock.Any(), gomock.Any()).Return(nil)
 
-		err := app.runMatch(ctx)
+		err := app.runMatch(context.Background())
 		assert.Error(t, err)
 	})
 }
@@ -314,7 +315,7 @@ func TestApp_Run(t *testing.T) {
 		mockSrv.EXPECT().Start(gomock.Any(), app.cmdArgs).Return(nil)
 		mockSrv.EXPECT().GetResult(ctx).Return([]byte{}, nil)
 		mockSrv.EXPECT().Stop(gomock.Any()).Return(nil)
-		mockConn.EXPECT().SendResult(gomock.Any(), gomock.Any()).Return(nil)
+		mockConn.EXPECT().SendResult(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
 
 		mockConn.EXPECT().GetMatchConfig(gomock.Any()).
 			DoAndReturn(func(_ context.Context) (internal.MatchConfig, error) {

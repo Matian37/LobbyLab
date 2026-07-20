@@ -81,7 +81,7 @@ func (app *App) runMatch(ctx context.Context) error {
 
 	result, err := app.runServer(ctx, string(config.Config))
 	if err != nil {
-		app.sendCancel()
+		app.sendCancel(config.MatchID)
 		return fmt.Errorf("server execution failed: %w", err)
 	}
 
@@ -90,8 +90,8 @@ func (app *App) runMatch(ctx context.Context) error {
 		slog.Debug("match result", "result", string(result))
 	}
 
-	if err := app.sendResult(ctx, result); err != nil {
-		app.sendCancel()
+	if err := app.sendResult(ctx, config.MatchID, result); err != nil {
+		app.sendCancel(config.MatchID)
 		return fmt.Errorf("failed to send result: %w", err)
 	}
 	return nil
@@ -124,21 +124,21 @@ func (app *App) stopServer(ctx context.Context) {
 	}
 }
 
-func (app *App) sendCancel() {
+func (app *App) sendCancel(matchID int) {
 	slog.Warn("sending match cancel...")
 
 	ctx, cancel := context.WithTimeout(context.Background(), app.sendCancelTimeout)
 	defer cancel()
 
-	if err := app.conn.SendCancel(ctx); err != nil {
+	if err := app.conn.SendCancel(ctx, matchID); err != nil {
 		slog.Error("send match cancel failed", "error", err)
 	}
 }
 
-func (app *App) sendResult(ctx context.Context, result []byte) error {
+func (app *App) sendResult(ctx context.Context, matchID int, result []byte) error {
 	slog.Info("sending match result...")
 
 	timeoutCtx, cancel := context.WithTimeout(ctx, app.sendResultTimeout)
 	defer cancel()
-	return app.conn.SendResult(timeoutCtx, result)
+	return app.conn.SendResult(timeoutCtx, matchID, result)
 }
