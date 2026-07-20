@@ -175,7 +175,7 @@ func (dc *DatabaseConnection) SaveMatchResults(ctx context.Context, results inte
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	_, err = tx.Exec(
 		ctx,
