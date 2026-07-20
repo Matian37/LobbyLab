@@ -1,3 +1,5 @@
+name: multiplayer-asset
+
 services:
   db:
     image: postgres:18.4-alpine
@@ -6,7 +8,8 @@ services:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     healthcheck:
-      test: ["CMD", "pg_isready", "-U", "${POSTGRES_USER}", "-d", "${POSTGRES_DB}"]
+      test:
+        ["CMD", "pg_isready", "-U", "${POSTGRES_USER}", "-d", "${POSTGRES_DB}"]
       interval: 5s
       retries: 10
       timeout: 2s
@@ -32,7 +35,7 @@ services:
       start_period: 5s
 
   api:
-    build: 
+    build:
       context: ./api
       dockerfile: Dockerfile
     environment:
@@ -49,12 +52,21 @@ services:
         condition: service_healthy
 
   server-manager:
-    image: golang:1.26-alpine
+    build:
+      context: ./server-manager
+      dockerfile: Dockerfile
     environment:
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       NATS_URI: ${NATS_URI}
+      GAME_SERVER_IMAGE: "game-server:latest"
+      GAME_SERVER_COUNT: 2
+      GAME_SERVER_EXPOSE_PORTS: "7777/udp,8080"
+      GAME_SERVER_CLIENT_PORT: "7777/udp"
+      PUBLIC_HOST: ${PUBLIC_HOST}
+      PLAYERS_PER_ROOM: 2
+      DATABASE_URI: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
     networks:
       - db-net
       - nats-net
@@ -67,8 +79,7 @@ services:
 networks:
   db-net:
     driver: bridge
-    #internal: true
+    internal: true
   nats-net:
     driver: bridge
     internal: true
-
