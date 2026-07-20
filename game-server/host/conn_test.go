@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
+	"server/internal"
 	"testing"
 	"time"
 
@@ -126,40 +127,9 @@ func TestNATSConnection_subscribeHealth(t *testing.T) {
 		require.NoError(t, err)
 		t.Cleanup(func() { pub.Close() })
 
-		pongSubject := healthSubject + "." + c.containerID
-		pong, err := pub.SubscribeSync(pongSubject)
+		msg, err := pub.Request(healthSubject, []byte{}, time.Second)
 		require.NoError(t, err)
-		pub.Flush()
-
-		err = pub.Publish(healthSubject, []byte{})
-		require.NoError(t, err)
-
-		msg, err := pong.NextMsg(150 * time.Millisecond)
-		require.NoError(t, err)
-		assert.Empty(t, msg.Data)
-	})
-}
-
-func TestNATSConnection_HealthPing(t *testing.T) {
-	t.Run("success", func(t *testing.T) {
-		addr := newNATSServer(t)
-
-		c := NewConnection(addr, "a")
-		err := c.Open(150 * time.Millisecond)
-		require.NoError(t, err)
-
-		nc, err := nats.Connect(addr)
-		require.NoError(t, err)
-		t.Cleanup(func() { nc.Close() })
-
-		pong, err := nc.SubscribeSync(healthSubject + "." + c.containerID)
-		require.NoError(t, err)
-		nc.Flush()
-
-		require.NoError(t, nc.Publish(healthSubject, []byte{}))
-		msg, err := pong.NextMsg(1 * time.Second)
-		require.NoError(t, err)
-		assert.Empty(t, msg.Data)
+		assert.Equal(t, []byte(c.containerID), msg.Data)
 	})
 }
 
@@ -305,7 +275,9 @@ func TestNATSConnection_GetMatchConfig(t *testing.T) {
 		require.NoError(t, err)
 		t.Cleanup(func() { nc.Close() })
 
-		expectedConfig := `{"config": 123}`
+		expectedConfig := internal.MatchConfig{MatchID: 1, Config: []byte(`{"gameconfig": 123}`)}
+		expectedConfigJSON, err := json.Marshal(expectedConfig)
+		require.NoError(t, err)
 
 		doneChan := make(chan struct{})
 		go func() {
@@ -313,7 +285,7 @@ func TestNATSConnection_GetMatchConfig(t *testing.T) {
 
 			msg, err := nc.Request(
 				assignSubject+"."+containerID,
-				[]byte(expectedConfig),
+				[]byte(expectedConfigJSON),
 				1*time.Second,
 			)
 			require.NoError(t, err)
@@ -322,7 +294,8 @@ func TestNATSConnection_GetMatchConfig(t *testing.T) {
 
 		config, err := c.GetMatchConfig(context.Background())
 		require.NoError(t, err)
-		assert.Equal(t, string(expectedConfig), config)
+		assert.Equal(t, expectedConfig.MatchID, config.MatchID)
+		assert.JSONEq(t, string(expectedConfig.Config), string(config.Config))
 
 		<-doneChan
 	})

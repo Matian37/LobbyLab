@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"server/internal"
 	"server/internal/mocks"
 	"testing"
 	"time"
@@ -236,11 +237,11 @@ func TestApp_runMatch(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		mockConn, mockSrv, app := newMockApp(t)
 		ctx := newUniqueCtx(t)
-		config := `{"config":123}`
+		config := internal.MatchConfig{MatchID: 1, Config: []byte(`{"config":123}`)}
 		result := []byte(`{"result":345}`)
 
 		mockConn.EXPECT().GetMatchConfig(ctx).Return(config, nil)
-		mockSrv.EXPECT().Start(config, app.cmdArgs).Return(nil)
+		mockSrv.EXPECT().Start(string(config.Config), app.cmdArgs).Return(nil)
 		mockSrv.EXPECT().GetResult(ctx).Return(result, nil)
 		mockSrv.EXPECT().Stop(gomock.Any()).Return(nil)
 		mockConn.EXPECT().SendResult(gomock.Any(), result).Return(nil)
@@ -252,7 +253,7 @@ func TestApp_runMatch(t *testing.T) {
 	t.Run("GetMatchConfig failed", func(t *testing.T) {
 		mockConn, _, app := newMockApp(t)
 		ctx := newUniqueCtx(t)
-		mockConn.EXPECT().GetMatchConfig(ctx).Return("", errors.New(""))
+		mockConn.EXPECT().GetMatchConfig(ctx).Return(internal.MatchConfig{}, errors.New(""))
 
 		err := app.runMatch(ctx)
 		assert.Error(t, err)
@@ -261,10 +262,9 @@ func TestApp_runMatch(t *testing.T) {
 	t.Run("runServer failed", func(t *testing.T) {
 		mockConn, mockSrv, app := newMockApp(t)
 		ctx := newUniqueCtx(t)
-		config := `{"config":123}`
 
-		mockConn.EXPECT().GetMatchConfig(ctx).Return(config, nil)
-		mockSrv.EXPECT().Start(config, app.cmdArgs).Return(errors.New(""))
+		mockConn.EXPECT().GetMatchConfig(ctx).Return(internal.MatchConfig{}, nil)
+		mockSrv.EXPECT().Start(gomock.Any(), app.cmdArgs).Return(errors.New(""))
 		mockConn.EXPECT().SendCancel(gomock.Any()).Return(nil)
 
 		err := app.runMatch(ctx)
@@ -274,14 +274,12 @@ func TestApp_runMatch(t *testing.T) {
 	t.Run("sendResult failed", func(t *testing.T) {
 		mockConn, mockSrv, app := newMockApp(t)
 		ctx := newUniqueCtx(t)
-		config := `{"config":123}`
-		result := []byte(`{"result":345}`)
 
-		mockConn.EXPECT().GetMatchConfig(ctx).Return(config, nil)
-		mockSrv.EXPECT().Start(config, app.cmdArgs).Return(nil)
-		mockSrv.EXPECT().GetResult(ctx).Return(result, nil)
+		mockConn.EXPECT().GetMatchConfig(ctx).Return(internal.MatchConfig{}, nil)
+		mockSrv.EXPECT().Start(gomock.Any(), app.cmdArgs).Return(nil)
+		mockSrv.EXPECT().GetResult(ctx).Return([]byte{}, nil)
 		mockSrv.EXPECT().Stop(gomock.Any()).Return(nil)
-		mockConn.EXPECT().SendResult(gomock.Any(), result).Return(errors.New(""))
+		mockConn.EXPECT().SendResult(gomock.Any(), []byte{}).Return(errors.New(""))
 		mockConn.EXPECT().SendCancel(gomock.Any()).Return(nil)
 
 		err := app.runMatch(ctx)
@@ -312,19 +310,16 @@ func TestApp_Run(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
-		config := `{"config":123}`
-		result := []byte(`{"result":345}`)
-
-		mockConn.EXPECT().GetMatchConfig(ctx).Return(config, nil)
-		mockSrv.EXPECT().Start(config, app.cmdArgs).Return(nil)
-		mockSrv.EXPECT().GetResult(ctx).Return(result, nil)
+		mockConn.EXPECT().GetMatchConfig(ctx).Return(internal.MatchConfig{}, nil)
+		mockSrv.EXPECT().Start(gomock.Any(), app.cmdArgs).Return(nil)
+		mockSrv.EXPECT().GetResult(ctx).Return([]byte{}, nil)
 		mockSrv.EXPECT().Stop(gomock.Any()).Return(nil)
-		mockConn.EXPECT().SendResult(gomock.Any(), result).Return(nil)
+		mockConn.EXPECT().SendResult(gomock.Any(), gomock.Any()).Return(nil)
 
 		mockConn.EXPECT().GetMatchConfig(gomock.Any()).
-			DoAndReturn(func(_ context.Context) (string, error) {
+			DoAndReturn(func(_ context.Context) (internal.MatchConfig, error) {
 				cancel()
-				return "", context.Canceled
+				return internal.MatchConfig{}, context.Canceled
 			})
 
 		err := app.Run(ctx)
@@ -338,11 +333,11 @@ func TestApp_Run(t *testing.T) {
 		defer cancel()
 
 		mockConn.EXPECT().GetMatchConfig(gomock.Any()).
-			Return("", errors.New(""))
+			Return(internal.MatchConfig{}, errors.New(""))
 		mockConn.EXPECT().GetMatchConfig(gomock.Any()).
-			DoAndReturn(func(_ context.Context) (string, error) {
+			DoAndReturn(func(_ context.Context) (internal.MatchConfig, error) {
 				cancel()
-				return "", context.Canceled
+				return internal.MatchConfig{}, context.Canceled
 			})
 
 		err := app.Run(ctx)

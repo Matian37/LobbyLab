@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"server/internal/domain"
+	"server/internal"
 	"time"
 )
 
@@ -15,8 +15,8 @@ var (
 )
 
 type App struct {
-	conn        domain.BrokerConnection
-	server      domain.Server
+	conn        internal.BrokerConnection
+	server      internal.Server
 	cmdArgs     []string
 	initialized bool
 
@@ -76,10 +76,10 @@ func (app *App) runMatch(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("get match config failed: %w", err)
 	}
-	slog.Info("received match config", "configLen", len(config))
+	slog.Info("received match config", "matchID", config.MatchID, "configLen", len(config.Config))
 	slog.Debug("match config", "config", config)
 
-	result, err := app.runServer(ctx, config)
+	result, err := app.runServer(ctx, string(config.Config))
 	if err != nil {
 		app.sendCancel()
 		return fmt.Errorf("server execution failed: %w", err)
@@ -89,6 +89,7 @@ func (app *App) runMatch(ctx context.Context) error {
 	if slog.Default().Enabled(context.Background(), slog.LevelDebug) {
 		slog.Debug("match result", "result", string(result))
 	}
+
 	if err := app.sendResult(ctx, result); err != nil {
 		app.sendCancel()
 		return fmt.Errorf("failed to send result: %w", err)
