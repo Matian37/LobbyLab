@@ -1,11 +1,12 @@
 import postgres from "postgres";
 import { handleError } from "./error_handler";
-let DATABASE_URL = process.env.DATABASE_URL;
-if(process.env.VITEST)
-    DATABASE_URL = 'postgresql://postgres:123@localhost:5432/postgres';
 
-const sql = postgres(DATABASE_URL);
-console.debug(DATABASE_URL + "<-- moj link do bazy");
+let DATABASE_URL = process.env.DATABASE_URL;
+//if(!DATABASE_URL && process.env.VITEST)
+//let DATABASE_URL = 'postgresql://postgres:123@localhost:5432/postgres';
+
+export const sql = postgres(DATABASE_URL);
+
 
 export async function findUserByLogin(login){
     const q = await sql`
@@ -23,7 +24,7 @@ export async function addUser(login, password){
     }
     catch (err){
         handleError(-1, err);
-        return false;   
+        return false;
     }
 }
 
@@ -101,6 +102,22 @@ export async function tokenExists(token){
     return q;
 }
 
+export async function getMatchResults(login){
+    const q = await sql`
+        SELECT match_id FROM user_matches WHERE user_id = ${login}
+    `
+    const matchIds = q.map(row => row.match_id);
+
+    const q1 = await sql`
+        SELECT results, canceled FROM matches WHERE id = ANY(${matchIds}::int[])
+    `
+    return q1.map(row => ({
+        details: row.results,
+        canceled: row.canceled,
+    }));
+}
+
+
 async function deleteOldSessions(){
     await sql`
         DELETE FROM sessions WHERE date < NOW() - INTERVAL '3 months'
@@ -119,15 +136,3 @@ export async function healthCheck(){
 }
 
 setInterval(deleteOldSessions, 1000 * 60 * 60 * 24);
-
-export async function truncateEverything(){
-    await sql`
-        TRUNCATE TABLE users RESTART IDENTITY CASCADE;
-    `
-    await sql`
-        TRUNCATE TABLE waiting RESTART IDENTITY CASCADE;
-    `
-    await sql`
-        TRUNCATE TABLE sessions RESTART IDENTITY CASCADE;
-    `
-}

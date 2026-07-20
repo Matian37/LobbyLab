@@ -1,7 +1,7 @@
 CREATE SEQUENCE matches_id_seq;
 
 CREATE TABLE IF NOT EXISTS matches(
-    id BIGINT PRIMARY KEY,
+    id SERIAL PRIMARY KEY,
     host TEXT NOT NULL,
     port TEXT NOT NULL,
     active BOOLEAN NOT NULL DEFAULT true,
@@ -26,7 +26,7 @@ CREATE TABLE IF NOT EXISTS user_matches (
 );
 
 CREATE TABLE IF NOT EXISTS waiting(
-    login TEXT PRIMARY KEY REFERENCES users(login) ON DELETE CASCADE
+    login TEXT PRIMARY KEY
 );
 
 CREATE TABLE IF NOT EXISTS sessions(

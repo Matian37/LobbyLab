@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"server/internal/domain"
+	"server/internal"
 	"time"
 )
 
@@ -15,8 +15,8 @@ var (
 )
 
 type App struct {
-	conn        domain.BrokerConnection
-	server      domain.Server
+	conn        internal.BrokerConnection
+	server      internal.Server
 	cmdArgs     []string
 	initialized bool
 
@@ -76,12 +76,12 @@ func (app *App) runMatch(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("get match config failed: %w", err)
 	}
-	slog.Info("received match config", "configLen", len(config))
+	slog.Info("received match config", "matchID", config.MatchID, "configLen", len(config.Config))
 	slog.Debug("match config", "config", config)
 
-	result, err := app.runServer(ctx, config)
+	result, err := app.runServer(ctx, string(config.Config))
 	if err != nil {
-		app.sendCancel()
+		app.sendCancel(config.MatchID)
 		return fmt.Errorf("server execution failed: %w", err)
 	}
 
@@ -89,8 +89,9 @@ func (app *App) runMatch(ctx context.Context) error {
 	if slog.Default().Enabled(context.Background(), slog.LevelDebug) {
 		slog.Debug("match result", "result", string(result))
 	}
-	if err := app.sendResult(ctx, result); err != nil {
-		app.sendCancel()
+
+	if err := app.sendResult(ctx, config.MatchID, result); err != nil {
+		app.sendCancel(config.MatchID)
 		return fmt.Errorf("failed to send result: %w", err)
 	}
 	return nil
@@ -123,21 +124,21 @@ func (app *App) stopServer(ctx context.Context) {
 	}
 }
 
-func (app *App) sendCancel() {
+func (app *App) sendCancel(matchID int) {
 	slog.Warn("sending match cancel...")
 
 	ctx, cancel := context.WithTimeout(context.Background(), app.sendCancelTimeout)
 	defer cancel()
 
-	if err := app.conn.SendCancel(ctx); err != nil {
+	if err := app.conn.SendCancel(ctx, matchID); err != nil {
 		slog.Error("send match cancel failed", "error", err)
 	}
 }
 
-func (app *App) sendResult(ctx context.Context, result []byte) error {
+func (app *App) sendResult(ctx context.Context, matchID int, result []byte) error {
 	slog.Info("sending match result...")
 
 	timeoutCtx, cancel := context.WithTimeout(ctx, app.sendResultTimeout)
 	defer cancel()
-	return app.conn.SendResult(timeoutCtx, result)
+	return app.conn.SendResult(timeoutCtx, matchID, result)
 }
