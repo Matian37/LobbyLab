@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"server/internal"
 	"time"
 
 	"github.com/nats-io/nats.go"
@@ -24,7 +25,6 @@ var (
 	ErrConnectionClosed        = errors.New("connection already closed")
 )
 
-// Note: closed connection cannot be reopened
 type NATSConnection struct {
 	brokerURI   string
 	containerID string
@@ -51,6 +51,10 @@ func (c *NATSConnection) Open(timeout time.Duration) error {
 		return ErrConnectionNotReopenable
 	}
 
+	// check whether the result stream exists
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
 	conn, err := nats.Connect(c.brokerURI, nats.Timeout(timeout))
 	if err != nil {
 		return err
@@ -64,9 +68,6 @@ func (c *NATSConnection) Open(timeout time.Duration) error {
 	}
 	c.js = js
 
-	// check whether the result stream exists
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
 	if _, err := c.js.StreamNameBySubject(ctx, resultSubject); err != nil {
 		c.Close()
 		return err
@@ -97,47 +98,59 @@ func (c *NATSConnection) Close() error {
 	return c.conn.Drain()
 }
 
-func (c *NATSConnection) GetMatchConfig(ctx context.Context) (string, error) {
+func (c *NATSConnection) GetMatchConfig(ctx context.Context) (internal.MatchConfig, error) {
 	if !c.opened {
-		return "", ErrConnectionNotOpen
+		return internal.MatchConfig{}, ErrConnectionNotOpen
 	}
 	if c.closed {
-		return "", ErrConnectionClosed
+		return internal.MatchConfig{}, ErrConnectionClosed
 	}
 
 	msg, err := c.requestSub.NextMsgWithContext(ctx)
 	if err != nil {
-		return "", err
+		return internal.MatchConfig{}, err
+	}
+
+	var matchConfig internal.MatchConfig
+	if err := json.Unmarshal(msg.Data, &matchConfig); err != nil {
+		return internal.MatchConfig{}, err
 	}
 
 	// acknowledge request
 	if err := c.conn.Publish(msg.Reply, []byte{}); err != nil {
-		return "", err
+		return internal.MatchConfig{}, err
 	}
-	return string(msg.Data), nil
+	return matchConfig, nil
 }
 
 type Result struct {
 	Success bool            `json:"success"`
+	MatchID int             `json:"matchID"`
 	Details json.RawMessage `json:"details"`
 }
 
-func (c *NATSConnection) SendCancel(ctx context.Context) error {
+func (c *NATSConnection) SendCancel(ctx context.Context, matchID int) error {
 	if !c.opened {
 		return ErrConnectionNotOpen
 	}
 	if c.closed {
 		return ErrConnectionClosed
 	}
-	_, err := c.js.Publish(
-		ctx,
-		resultSubject,
-		[]byte(`{"success": false, "details":{}}`),
-	)
+
+	payload, err := json.Marshal(Result{
+		Success: false,
+		MatchID: matchID,
+		Details: []byte(`{}`),
+	})
+	if err != nil {
+		return errors.New("failed to marshal cancel result")
+	}
+
+	_, err = c.js.Publish(ctx, resultSubject, payload)
 	return err
 }
 
-func (c *NATSConnection) SendResult(ctx context.Context, result []byte) error {
+func (c *NATSConnection) SendResult(ctx context.Context, matchID int, result []byte) error {
 	if !c.opened {
 		return ErrConnectionNotOpen
 	}
@@ -147,6 +160,7 @@ func (c *NATSConnection) SendResult(ctx context.Context, result []byte) error {
 
 	payload, err := json.Marshal(Result{
 		Success: true,
+		MatchID: matchID,
 		Details: result,
 	})
 	if err != nil {
@@ -176,21 +190,20 @@ func (c *NATSConnection) subscribeHealth() error {
 	sub, err := c.conn.Subscribe(healthSubject, func(msg *nats.Msg) {
 		slog.Debug("received ping, sending pong...")
 
-		responseErr := c.conn.Publish(healthSubject+"."+c.containerID, []byte{})
-		if responseErr != nil {
-			slog.Error("failed to publish health response", "error", responseErr)
+		if pongErr := c.conn.Publish(msg.Reply, []byte(c.containerID)); pongErr != nil {
+			slog.Error("failed to publish health response", "error", pongErr)
+		} else {
+			slog.Debug("pong sent successfuly")
 		}
-
-		slog.Debug("pong sent successfuly")
 	})
 	if err != nil {
 		return err
 	}
+
 	if err := sub.SetPendingLimits(1, -1); err != nil {
 		return err
 	}
 	c.healthSub = sub
 
-	// it doesnt make sense to store more than one ping msg
 	return nil
 }

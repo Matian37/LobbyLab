@@ -1,18 +1,18 @@
-package domain
+package internal
 
 import (
 	"context"
 	"time"
 )
 
-//go:generate go run go.uber.org/mock/mockgen -source=./interfaces.go -destination=../mocks/mocks.go -package=mocks
+//go:generate go run go.uber.org/mock/mockgen -source=./interfaces.go -destination=./mocks/mocks.go -package=mocks
 
 type BrokerConnection interface {
 	Open(timeout time.Duration) error
 	Close() error
-	GetMatchConfig(ctx context.Context) (string, error)
-	SendCancel(ctx context.Context) error
-	SendResult(ctx context.Context, result []byte) error
+	GetMatchConfig(ctx context.Context) (MatchConfig, error)
+	SendCancel(ctx context.Context, matchID int) error
+	SendResult(ctx context.Context, matchID int, result []byte) error
 }
 
 type Server interface {
