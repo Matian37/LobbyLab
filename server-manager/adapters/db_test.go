@@ -383,58 +383,117 @@ func TestIntegration_DatabaseConnection_SaveMatchResults(t *testing.T) {
 	})
 
 	t.Run("success", func(t *testing.T) {
-		restartDB(t)
-
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 
-		conn := newHelperConn(t)
-		_, err := conn.Exec(ctx, "INSERT INTO matches (id, host, port) VALUES (1, '', ''), (2, '', '')")
-		require.NoError(t, err)
+		type userRow struct {
+			Login   string `db:"login"`
+			MatchID *int   `db:"match_id"`
+		}
 
 		tests := []struct {
-			Name    string
-			MatchID int
-			Success bool
-			Details []byte
+			Name      string
+			MatchID   int
+			Success   bool
+			Details   []byte
+			WantUsers []userRow
 		}{
 			{
 				Name:    "successful match",
 				MatchID: 1,
 				Success: true,
 				Details: []byte(`{"example": {"id": 1}}`),
+				WantUsers: []userRow{
+					{Login: "match1_user1", MatchID: nil},
+					{Login: "match1_user2", MatchID: nil},
+					{Login: "match2_user1", MatchID: new(2)},
+					{Login: "unrelated", MatchID: nil},
+				},
 			},
 			{
 				Name:    "canceled match",
 				MatchID: 2,
 				Success: false,
 				Details: []byte(`{"example": {"id": 2}}`),
+				WantUsers: []userRow{
+					{Login: "match1_user1", MatchID: new(1)},
+					{Login: "match1_user2", MatchID: new(1)},
+					{Login: "match2_user1", MatchID: nil},
+					{Login: "unrelated", MatchID: nil},
+				},
 			},
 		}
 		for _, test := range tests {
 			t.Run(test.Name, func(t *testing.T) {
-				d := newDBConnWithOpen(t)
+				restartDB(t)
 
-				matchResult := internal.Result{
+				conn := newHelperConn(t)
+				_, err := conn.Exec(ctx, "INSERT INTO matches (id, host, port) VALUES (1, '', ''), (2, '', '')")
+				require.NoError(t, err)
+				_, err = conn.Exec(ctx, `
+					INSERT INTO users (login, password, match_id)
+					VALUES ('match1_user1', '', 1),
+						   ('match1_user2', '', 1),
+						   ('match2_user1', '', 2),
+						   ('unrelated', '', NULL)
+				`)
+				require.NoError(t, err)
+
+				d := newDBConnWithOpen(t)
+				require.NoError(t, d.SaveMatchResults(ctx, internal.Result{
 					Success: test.Success,
 					MatchID: test.MatchID,
 					Details: test.Details,
-				}
-				require.NoError(t, d.SaveMatchResults(ctx, matchResult))
+				}))
 
 				var json string
 				var canceled bool
 				err = d.conn.QueryRow(
-					ctx,
-					"SELECT results, canceled FROM matches WHERE id = $1",
-					test.MatchID,
+					ctx, "SELECT results, canceled FROM matches WHERE id = $1", test.MatchID,
 				).Scan(&json, &canceled)
 				require.NoError(t, err)
-
 				assert.JSONEq(t, string(test.Details), json)
 				assert.Equal(t, !test.Success, canceled)
+
+				rows, err := d.conn.Query(ctx, "SELECT login, match_id FROM users ORDER BY login")
+				require.NoError(t, err)
+				userRows, err := pgx.CollectRows(rows, pgx.RowToStructByName[userRow])
+				require.NoError(t, err)
+				require.Equal(t, test.WantUsers, userRows)
 			})
 		}
+	})
+
+	t.Run("rollback", func(t *testing.T) {
+		restartDB(t)
+
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		conn := newHelperConn(t)
+		_, err := conn.Exec(ctx,
+			"INSERT INTO matches (id, host, port) VALUES (1, '', '')",
+		)
+		require.NoError(t, err)
+
+		_, err = conn.Exec(ctx,
+			"INSERT INTO users (login, password, match_id) VALUES ('player1', '', 1)",
+		)
+		require.NoError(t, err)
+
+		d := newDBConnWithOpen(t)
+
+		err = d.SaveMatchResults(ctx, internal.Result{
+			Success: true,
+			MatchID: 999,
+			Details: []byte("{}"),
+		})
+		require.ErrorIs(t, err, ErrDBMatchNotFound)
+
+		var matchID int
+		err = d.conn.QueryRow(ctx, "SELECT match_id FROM users WHERE login = 'player1'").Scan(&matchID)
+		require.NoError(t, err)
+		assert.Equal(t, 1, matchID, "user match_id should be preserved after rollback")
 	})
 }
 

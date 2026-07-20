@@ -171,7 +171,22 @@ func (dc *DatabaseConnection) SaveMatchResults(ctx context.Context, results inte
 		return ErrDBConnClosed
 	}
 
-	res, err := dc.conn.Exec(
+	tx, err := dc.conn.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	_, err = tx.Exec(
+		ctx,
+		"UPDATE users SET match_id = NULL WHERE match_id = $1",
+		results.MatchID,
+	)
+	if err != nil {
+		return err
+	}
+
+	res, err := tx.Exec(
 		ctx,
 		"UPDATE matches SET results = $1, canceled = $2 WHERE id = $3",
 		results.Details,
@@ -184,7 +199,8 @@ func (dc *DatabaseConnection) SaveMatchResults(ctx context.Context, results inte
 	if res.RowsAffected() == 0 {
 		return fmt.Errorf("%w id=%d", ErrDBMatchNotFound, results.MatchID)
 	}
-	return nil
+
+	return tx.Commit(ctx)
 }
 
 func (dc *DatabaseConnection) GetNextMatchId(ctx context.Context) (int, error) {

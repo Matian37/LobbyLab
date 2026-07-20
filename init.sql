@@ -14,9 +14,11 @@ ALTER SEQUENCE matches_id_seq OWNED BY matches.id;
 CREATE TABLE IF NOT EXISTS users(
     login TEXT PRIMARY KEY,
     password TEXT NOT NULL,
-    match_id BIGINT REFERENCES matches(id)
+    match_id BIGINT REFERENCES matches(id) ON DELETE SET NULL
 );
+CREATE INDEX IF NOT EXISTS idx_users_match_id ON users(match_id);
 
+-- Stores matches in which users have participated
 CREATE TABLE IF NOT EXISTS user_matches (
     user_id TEXT NOT NULL REFERENCES users(login) ON DELETE CASCADE,
     match_id BIGINT NOT NULL REFERENCES matches(id) ON DELETE CASCADE,
