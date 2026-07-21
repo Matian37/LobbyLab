@@ -74,7 +74,7 @@ func (dc *DatabaseConnection) GatherMatchPlayers(ctx context.Context) ([]interna
 		return nil, ErrDBConnClosed
 	}
 
-	rows, err := dc.conn.Query(ctx, "SELECT login FROM users WHERE last_active > NOW() - INTERVAL '5 seconds' LIMIT $1", dc.config.PlayersPerRoom)
+	rows, err := dc.conn.Query(ctx, "SELECT login FROM users WHERE last_active > NOW() - INTERVAL '5 seconds' AND match_id IS NULL LIMIT $1", dc.config.PlayersPerRoom)
 	if err != nil {
 		return nil, err
 	}
