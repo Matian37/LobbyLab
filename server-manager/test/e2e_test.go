@@ -287,7 +287,7 @@ func TestE2E_AppLifecycle(t *testing.T) {
 	}, 10*time.Second, 100*time.Millisecond, "should matchmake users and create match")
 
 	var waitingCount int
-	err = dbConn.QueryRow(ctx, "SELECT COUNT(*) FROM users WHERE last_active > NOW() - INTERVAL '5 seconds' AND match_id = NULL").Scan(&waitingCount)
+	err = dbConn.QueryRow(ctx, "SELECT COUNT(*) FROM users WHERE last_active > NOW() - INTERVAL '5 seconds' AND match_id IS NULL").Scan(&waitingCount)
 	require.NoError(t, err)
 	assert.Zero(t, waitingCount)
 
@@ -415,7 +415,7 @@ func TestE2E_WorkersOverloadWithMatches(t *testing.T) {
 	time.Sleep(2 * time.Second)
 
 	var waitingCount int
-	err = dbConn.QueryRow(ctx, "SELECT COUNT(*) FROM users WHERE last_active > NOW() - INTERVAL '5 seconds' AND match_id = NULL").Scan(&waitingCount)
+	err = dbConn.QueryRow(ctx, "SELECT COUNT(*) FROM users WHERE last_active > NOW() - INTERVAL '5 seconds' AND match_id IS NULL").Scan(&waitingCount)
 	require.NoError(t, err)
 	assert.Equal(t, 2, waitingCount, "users 5,6 should still wait when all workers occupied")
 
@@ -441,7 +441,7 @@ func TestE2E_WorkersOverloadWithMatches(t *testing.T) {
 		return err == nil && matchCount == 3
 	}, 10*time.Second, 100*time.Millisecond, "should create 3rd match after result frees a worker")
 
-	err = dbConn.QueryRow(ctx, "SELECT COUNT(*) FROM users WHERE last_active > NOW() - INTERVAL '5 seconds' AND match_id = NULL").Scan(&waitingCount)
+	err = dbConn.QueryRow(ctx, "SELECT COUNT(*) FROM users WHERE last_active > NOW() - INTERVAL '5 seconds' AND match_id IS NULL").Scan(&waitingCount)
 	require.NoError(t, err)
 	assert.Zero(t, waitingCount, "all users should be matched")
 
@@ -537,7 +537,7 @@ func TestE2E_WorkerFailureAndRestart(t *testing.T) {
 	)
 
 	var waitingCount int
-	err = dbConn.QueryRow(ctx, "SELECT COUNT(*) FROM users WHERE last_active > NOW() - INTERVAL '5 seconds' AND match_id = NULL").Scan(&waitingCount)
+	err = dbConn.QueryRow(ctx, "SELECT COUNT(*) FROM users WHERE last_active > NOW() - INTERVAL '5 seconds' AND match_id IS NULL").Scan(&waitingCount)
 	require.NoError(t, err)
 	assert.Zero(t, waitingCount, "all users should be matched")
 
