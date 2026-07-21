@@ -3,7 +3,7 @@ import bcrypt from 'bcryptjs';
 import { json } from '@sveltejs/kit';
 import { generateToken } from '$lib/helpers.js';
 
-export async function POST({request})
+export async function POST({request, cookies})
 {
     const {login, password} = await request.json();
     const hashed = await bcrypt.hash(password, 10);
@@ -15,9 +15,16 @@ export async function POST({request})
         });
     }
     else{
+        const token = await generateToken(login);
+        cookies.set('token', token, {
+            path: '/',
+            httpOnly: true,
+            secure: true,
+            sameSite: 'strict'
+        });
         return json({
             sukces: true,
-            msg: await generateToken(login)
+            msg: null
         });
     }
 }

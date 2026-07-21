@@ -1,6 +1,5 @@
 <script>
     import { goto } from "$app/navigation";
-    import { updateData } from "$lib/user_data.js";
 
     let login = $state(''), password = $state(''), tekstBledu = $state("");
     
@@ -9,7 +8,6 @@
     }
 
     async function submit(){
-        console.log("kliklemmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm");
         let data = {login: login, password: password};
         const response = await fetch('/api/login', {
             method: 'POST',
@@ -23,7 +21,6 @@
         const sukces = await response.json();
         if(sukces.sukces){
             console.log("poprawnie zalogowano");
-            updateData({token: sukces.msg, login: login});
             tekstBledu = "";
             changePage('/')
         }

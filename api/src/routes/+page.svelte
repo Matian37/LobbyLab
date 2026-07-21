@@ -1,25 +1,24 @@
 <script>
     import { goto } from "$app/navigation";
-    import { getData, resetData } from "$lib/user_data";
     import { onMount } from "svelte";
-    let title = $state('Zaloguj sie');
+    import { page } from '$app/stores';
+    import { invalidateAll } from '$app/navigation';
     let buttonText = $state('Play');
-    let user = false;
     let rows = $state([]);
+    let user = $derived($page.data);
+    let title = $derived(!user.login ? 'Zaloguj sie' : user.login);
+    
+    onMount(async () => {
+        invalidateAll();
+        LoadMatches();
+    });
 
-    LoadUser();
-    async function LoadUser(){
-        let data = await getData();
-        if(!data || data == undefined) title = "Zaloguj sie";
-        else{
-            user = {login: data.login, token: data.token};
-            title = data.login;
-            LoadMatches(data.token);
-        } 
-    }
-
-    async function LoadMatches(token){
-        const query = await fetch(`/api/results?token=${token}`);
+    async function LoadMatches(){
+        if(!user)
+            return;
+        const query = await fetch(`/api/results`, {
+            method: 'GET'
+        });
         const response = await query.json();
         if(!response.sukces)
             return;
@@ -27,19 +26,13 @@
     }
 
     export function changePage(path) {
-        console.log("KLIKKKK");
         goto(path);
     }
 
     async function logout(){
         if(!user) return;
-        resetData();
         const response = await fetch('/api/login', {
-            method: 'DELETE',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({token: user.token})
+            method: 'DELETE'
         });
         user = null;
 
@@ -52,15 +45,19 @@
             console.debug('zaloguj sie~!!');
             return;
         }
-        if(await isInWaitingList(user.token)){
+        if(await isInWaitingList()){
             console.debug('jestes juz w kolejce');
             return;
         }
+        
     }
 
-    async function isInWaitingList(token)
+    async function isInWaitingList()
     {
-        let response = await fetch(`/api/waiting?token=${token}`);
+        let response = await fetch(`/api/waiting`, {
+            method: 'GET',
+        }
+        );
         let wynik = await response.json();
         return wynik.sukces;
     }

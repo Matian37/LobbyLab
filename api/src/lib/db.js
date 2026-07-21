@@ -7,7 +7,6 @@ let DATABASE_URL = process.env.DATABASE_URL;
 
 export const sql = postgres(DATABASE_URL);
 
-
 export async function findUserByLogin(login){
     const q = await sql`
         SELECT * FROM users WHERE login = ${login}
@@ -134,5 +133,3 @@ export async function healthCheck(){
         return false;
     }
 }
-
-setInterval(deleteOldSessions, 1000 * 60 * 60 * 24);

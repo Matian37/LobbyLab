@@ -1,6 +1,5 @@
 <script>
     import { goto } from "$app/navigation";
-    import { updateData } from "$lib/user_data";
 
     let login = $state(''), password = $state(''), errorText = $state('');
     function changePage(path){
@@ -27,7 +26,6 @@
         }
         else{
             console.debug("poprawnie zarejestrowano");
-            updateData({token: result.msg, login: login});
             changePage('/');
         }
     }

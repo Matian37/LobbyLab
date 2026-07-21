@@ -4,7 +4,7 @@ import { json } from '@sveltejs/kit';
 import { handleError } from '$lib/error_handler.js';
 import { generateToken } from '$lib/helpers.js';
 
-export async function POST({request})
+export async function POST({request, cookies})
 {
     const {login, password} = await request.json();
     const result = await findUserByLogin(login);
@@ -13,9 +13,16 @@ export async function POST({request})
     }
     
     if(await bcrypt.compare(password, result[0].password)){
+        const token = await generateToken(login);
+        cookies.set('token', token, {
+            path: '/',
+            httpOnly: true,
+            secure: true,
+            sameSite: 'strict'
+        });
         return json({
             sukces: true,
-            msg: generateToken(login)
+            msg: null
         });
     }
     else{
@@ -26,15 +33,20 @@ export async function POST({request})
     }
 }
 
-export async function DELETE({request}){
-    const {token} = await request.json();
+export async function DELETE({cookies}){
+    const token = cookies.get('token');
+    if(token == undefined)
+        return json({sukces: false});
 
     await deleteSession(token);
+    cookies.delete('token', { path: '/' });
     return json({sukces: true});
 }
 
-export async function GET({url}){
-    const token = url.searchParams.get('token');
+export async function GET({cookies}){
+    const token = cookies.get('token');
+    if(token == undefined)
+        return json({sukces: false});
     
     if((await tokenExists(token)).length == 0) return json({sukces: false});
     return json({sukces: true});

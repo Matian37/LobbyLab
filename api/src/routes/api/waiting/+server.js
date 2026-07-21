@@ -2,8 +2,10 @@ import { findWaitingByLogin, addToWaiting, deleteFromWaiting, getLoginFromToken 
 import { json } from '@sveltejs/kit';
 import { handleError } from '$lib/error_handler.js';
 
-export async function POST({request}){   
-    const {token} = await request.json();
+export async function POST({cookies}){   
+    const token = cookies.get('token');
+    if(token == undefined)
+        return json({sukces: false});
     const response = await getLoginFromToken(token);
     if(response.length == 0) 
     {
@@ -20,8 +22,10 @@ export async function POST({request}){
     return json({sukces: true});
 }
 
-export async function DELETE({request}){
-    const {token} = await request.json();
+export async function DELETE({cookies}){
+    const token = cookies.get('token');
+    if(token == undefined)
+        return json({sukces: false});
     const response = await getLoginFromToken(token);
     if(response.length == 0) 
     {
@@ -33,8 +37,10 @@ export async function DELETE({request}){
     return json({sukces: true});
 }
 
-export async function GET({url}){
-    const token = url.searchParams.get('token');
+export async function GET({cookies}){
+    const token = cookies.get('token');
+    if(token == undefined)
+        return json({sukces: false});
     const response = await getLoginFromToken(token);
     if(response.length == 0)
         return json({sukces: false});
