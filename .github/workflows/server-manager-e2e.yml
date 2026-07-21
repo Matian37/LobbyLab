@@ -1,7 +1,6 @@
 name: server-manager e2e
 
 on:
-  workflow_dispatch:
   pull_request:
     branches: ["main"]
     paths:
