@@ -39,7 +39,7 @@ func setupLoggerWithWriter(writer io.Writer) {
 
 func ParseArgs(args []string) ([]string, error) {
 	if len(args) != 2 {
-		return []string{}, fmt.Errorf("Expected 1 argument, got %v", len(args)-1)
+		return []string{}, fmt.Errorf("expected 1 argument, got %v", len(args)-1)
 	}
 
 	cmdArgs, err := shlex.Split(args[1])
