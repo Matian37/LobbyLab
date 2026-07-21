@@ -111,4 +111,4 @@ Password <input bind:value={password} type="password" data-testid="password-inpu
       font-size: 0.9rem;
       margin-top: 1rem;
     }
-  </style>
+</style>
