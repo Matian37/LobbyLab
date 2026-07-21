@@ -2,10 +2,18 @@ import postgres from "postgres";
 import { handleError } from "./error_handler";
 
 let DATABASE_URL = process.env.DATABASE_URL;
-//if(!DATABASE_URL && process.env.VITEST)
 //let DATABASE_URL = 'postgresql://postgres:123@localhost:5432/postgres';
 
 export const sql = postgres(DATABASE_URL);
+
+/*await addUser('adam', '');
+await addUser('kacper', '');
+await sql`
+    INSERT INTO matches (host, port, results) VALUES ('http://host.com', 1235, ${sql.json({players: ['adam', 'kacper'], winner: 'kacper'})})
+`
+await sql`
+    INSERT INTO user_matches (user_id, match_id) VALUES ('adam', 1), ('kacper', 1)
+`*/
 
 export async function findUserByLogin(login){
     const q = await sql`

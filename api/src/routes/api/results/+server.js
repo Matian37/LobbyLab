@@ -13,6 +13,9 @@ export async function GET({cookies}){
         return json({sukces: false, matches: null});
     }
     const login = dbLogin[0].login;
+    //matches -> array of objects (.details[.players{array of str}, .winner{str}], .canceled[bool])
     const matches = await getMatchResults(login)
+
+    //const matches = await getMatchResults('adam');
     return json({sukces: true, matches: matches})
 }
