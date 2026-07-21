@@ -197,6 +197,9 @@ func (dc *DockerConnection) containerCreateOptions(portMap network.PortMap) clie
 			},
 		},
 		HostConfig: &container.HostConfig{
+			// init is required for game-server to reap abandoned child processes
+			// in case when actual game-server fails to exit gracefully
+			Init:         new(true),
 			PortBindings: portMap,
 			RestartPolicy: container.RestartPolicy{
 				Name:              container.RestartPolicyDisabled,
@@ -207,8 +210,6 @@ func (dc *DockerConnection) containerCreateOptions(portMap network.PortMap) clie
 
 	if dc.config.TestMakeContainerDummy {
 		options.Config.Cmd = []string{"sleep", "inf"}
-		options.HostConfig.Init = new(bool)
-		*options.HostConfig.Init = true
 	}
 
 	return options
