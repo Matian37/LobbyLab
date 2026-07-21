@@ -63,22 +63,22 @@ func (c *NATSConnection) Open(timeout time.Duration) error {
 
 	js, err := jetstream.New(conn)
 	if err != nil {
-		c.Close()
+		_ = c.Close()
 		return err
 	}
 	c.js = js
 
 	if _, err := c.js.StreamNameBySubject(ctx, resultSubject); err != nil {
-		c.Close()
+		_ = c.Close()
 		return err
 	}
 
 	if err := c.subscribeAssign(); err != nil {
-		c.Close()
+		_ = c.Close()
 		return err
 	}
 	if err := c.subscribeHealth(); err != nil {
-		c.Close()
+		_ = c.Close()
 		return err
 	}
 	c.opened = true
@@ -174,11 +174,15 @@ func (c *NATSConnection) SendResult(ctx context.Context, matchID int, result []b
 func (c *NATSConnection) subscribeAssign() error {
 	sub, err := c.conn.SubscribeSync(assignSubject + "." + c.containerID)
 	if err != nil {
-		c.Close()
+		if err := c.Close(); err != nil {
+			slog.Warn("failed to close connection", "err", err)
+		}
 		return err
 	}
 	if err := sub.SetPendingLimits(1, -1); err != nil {
-		c.Close()
+		if err := c.Close(); err != nil {
+			slog.Warn("failed to close connection", "err", err)
+		}
 		return err
 	}
 	c.requestSub = sub

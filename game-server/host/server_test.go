@@ -77,7 +77,7 @@ func TestGameServer_StartWait(t *testing.T) {
 		server := GameServer{}
 		require.NoError(t, server.Start("", []string{"echo"}))
 
-		require.NoError(t, server.startWait())
+		server.startWait()
 		require.NotNil(t, server.waitChannel)
 
 		assert.NoError(t, server.Stop(context.Background()))
@@ -228,21 +228,19 @@ func TestGameServer_Stop(t *testing.T) {
 		server := GameServer{}
 
 		cmd := []string{"sh", "-c", "sleep inf & exit"}
-		err := server.Start("", cmd)
-		require.NoError(t, err)
+		require.NoError(t, server.Start("", cmd))
 
 		pgid := server.cmd.Process.Pid
-		server.cmd.Wait()
+		require.NoError(t, server.cmd.Wait())
 
 		// assert child is alive
 		assert.NoError(t, syscall.Kill(-pgid, 0))
 
-		err = server.Stop(context.Background())
-		require.NoError(t, err)
+		require.NoError(t, server.Stop(context.Background()))
 
 		// wait for the process group to be gone
 		assert.Eventually(t, func() bool {
-			err = syscall.Kill(-pgid, 0)
+			err := syscall.Kill(-pgid, 0)
 			return errors.Is(err, syscall.ESRCH)
 		}, 1*time.Second, 20*time.Millisecond)
 	})
@@ -272,7 +270,7 @@ func TestGameServer_GetResult(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			server := GameServer{}
 			require.NoError(t, server.Start("", []string{"echo"}))
-			defer server.Stop(context.Background())
+			defer func() { require.NoError(t, server.Stop(context.Background())) }()
 
 			n, err := server.resultFile.Write(test.payload)
 			require.NoError(t, err)
@@ -288,7 +286,7 @@ func TestGameServer_GetResult(t *testing.T) {
 	t.Run("context canceled", func(t *testing.T) {
 		server := GameServer{}
 		require.NoError(t, server.Start("config", []string{"sleep", "inf"}))
-		defer server.Stop(context.Background())
+		defer func() { require.NoError(t, server.Stop(context.Background())) }()
 
 		ctx, cancel := context.WithCancel(context.Background())
 		cancel()
