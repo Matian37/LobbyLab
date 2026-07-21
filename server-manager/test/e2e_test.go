@@ -184,7 +184,7 @@ func isContainerMine(t *testing.T, c *container.Summary) bool {
 
 func waitForAppStart(t *testing.T, started *atomic.Bool) {
 	t.Helper()
-	require.Eventually(t, func() bool { return started.Load() }, 30*time.Second, 100*time.Millisecond)
+	require.Eventually(t, func() bool { return started.Load() }, 10*time.Second, 100*time.Millisecond)
 }
 
 // check if all specified users are assigned to the match
