@@ -27,37 +27,23 @@ export async function addUser(login, password){
     }
 }
 
+export async function setUserStatus(login){
+    try{
+        await sql`
+            UPDATE users SET last_active = NOW() WHERE login = ${login}
+        `
+        return true;
+    }
+    catch{
+        return false;
+    }
+}
+
 export async function findWaitingByLogin(login){
     const q = await sql`
-        SELECT * FROM waiting WHERE login = ${login}
+        SELECT * FROM users WHERE login = ${login} AND last_active > NOW() - INTERVAL '5 seconds'
     `
     return q;
-}
-
-export async function addToWaiting(login){
-    try{
-        await sql`
-            INSERT INTO waiting (login) VALUES(${login})
-        `
-        return true;
-    }
-    catch (err){
-        handleError(-1, err);
-        return false;
-    }
-}
-
-export async function deleteFromWaiting(login){
-    try{
-        await sql`
-            DELETE FROM waiting WHERE login=${login}
-        `
-        return true;
-    }
-    catch (err){
-        handleError(-1, err);
-        return false;
-    }
 }
 
 export async function getLoginFromToken(token){

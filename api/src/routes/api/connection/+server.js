@@ -1,4 +1,4 @@
-import { deleteFromWaiting, getLoginFromToken } from '$lib/db.js';
+import { getLoginFromToken, setUserStatus } from '$lib/db.js';
 import { json } from '@sveltejs/kit';
 import { Client } from 'pg';
 import { handleError } from '$lib/error_handler.js';
@@ -16,20 +16,23 @@ export async function GET({cookies}){
     }
     const login = response[0].login;
     
-    let interval;
+    let interval, dbInterval;
     return new Response(
         new ReadableStream({
             start(controller){
-                //listen(login, controller);
+                await listen(login, controller);
                 interval = setInterval(()=>{
                     console.debug("wysylam ping");
                     controller.enqueue('data: ping\n\n');
                 }, 10000);
+
+                dbInterval = setInverval(()=>{
+                    setUserStatus(login);
+                }, 1000);
             },
             async cancel(){
                 clearInterval(interval);
                 handleError(3);
-                await deleteFromWaiting(login);
             }
         }),
         {
