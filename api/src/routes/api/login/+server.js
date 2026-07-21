@@ -35,7 +35,7 @@ export async function POST({request, cookies})
 
 export async function DELETE({cookies}){
     const token = cookies.get('token');
-    if(token === undefined)
+    if(token == undefined)
         return json({sukces: false});
 
     await deleteSession(token);
@@ -45,7 +45,7 @@ export async function DELETE({cookies}){
 
 export async function GET({cookies}){
     const token = cookies.get('token');
-    if(token === undefined)
+    if(token == undefined)
         return json({sukces: false});
     
     if((await tokenExists(token)).length == 0) return json({sukces: false});

@@ -5,7 +5,7 @@ import { handleError } from '$lib/error_handler.js';
 
 export async function GET({cookies}){
     const token = cookies.get('token')
-    if(token === undefined)
+    if(token == undefined)
         return json({sukces: false});
     
     const response = await getLoginFromToken(token);
