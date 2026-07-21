@@ -14,8 +14,8 @@ ALTER SEQUENCE matches_id_seq OWNED BY matches.id;
 CREATE TABLE IF NOT EXISTS users(
     login TEXT PRIMARY KEY,
     password TEXT NOT NULL,
-    match_id BIGINT REFERENCES matches(id) ON DELETE SET NULL
-    last_active TIMESTAMP,
+    match_id BIGINT REFERENCES matches(id) ON DELETE SET NULL,
+    last_active TIMESTAMP
 );
 CREATE INDEX IF NOT EXISTS idx_users_match_id ON users(match_id);
 

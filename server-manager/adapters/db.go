@@ -74,7 +74,7 @@ func (dc *DatabaseConnection) GatherMatchPlayers(ctx context.Context) ([]interna
 		return nil, ErrDBConnClosed
 	}
 
-	rows, err := dc.conn.Query(ctx, "SELECT login FROM waiting LIMIT $1", dc.config.PlayersPerRoom)
+	rows, err := dc.conn.Query(ctx, "SELECT login FROM users WHERE last_active > NOW() - INTERVAL '5 seconds' LIMIT $1", dc.config.PlayersPerRoom)
 	if err != nil {
 		return nil, err
 	}
@@ -147,19 +147,6 @@ func (dc *DatabaseConnection) AddMatch(
 	if err != nil {
 		return err
 	}
-
-	res, err := tx.Exec(
-		ctx,
-		"DELETE FROM waiting WHERE login = ANY($1)",
-		logins,
-	)
-	if err != nil {
-		return err
-	}
-	if res.RowsAffected() != int64(len(users)) {
-		return internal.ErrDBWaitingUserDisconnected
-	}
-
 	return tx.Commit(ctx)
 }
 
