@@ -27,5 +27,8 @@ jobs:
       - name: Pull DB Image
         run: docker pull postgres:18.4-alpine
 
+      - name: Pull Worker Test Container Image
+        run: docker pull busybox:latest
+
       - name: Run E2E Tests
         run: go test -v -tags=e2e -run="^TestE2E" --timeout 3m ./...
