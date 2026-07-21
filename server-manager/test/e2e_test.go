@@ -182,9 +182,44 @@ func isContainerMine(t *testing.T, c *container.Summary) bool {
 	return c.Labels["com.github.multiplayer-asset.worker"] == "true"
 }
 
-func waitForAppStart(t *testing.T, started *atomic.Bool) {
+func waitForAppStart(t *testing.T, started *atomic.Bool, appResChan chan error) {
 	t.Helper()
-	require.Eventually(t, func() bool { return started.Load() }, 10*time.Second, 100*time.Millisecond)
+
+	ticker := time.NewTicker(100 * time.Millisecond)
+	defer ticker.Stop()
+
+	timer := time.NewTimer(10 * time.Second)
+	defer timer.Stop()
+
+	for {
+		select {
+		case <-timer.C:
+			t.Fatal("app did not start within expected time")
+		default:
+		}
+
+		select {
+		case <-ticker.C:
+			if started.Load() {
+				return
+			}
+		case err := <-appResChan:
+			if err != nil {
+				t.Fatalf("app failed to start: %v", err)
+			}
+		}
+	}
+}
+
+func runApp(t *testing.T, ctx context.Context, cfg *internal.EnvConfig) chan error {
+	t.Helper()
+
+	resChan := make(chan error, 1)
+	go func() {
+		err := app.Run(ctx, cfg, slog.New(slog.NewTextHandler(io.Discard, nil)))
+		resChan <- err
+	}()
+	return resChan
 }
 
 // check if all specified users are assigned to the match
@@ -221,13 +256,9 @@ func TestE2E_GracefulShutdown(t *testing.T) {
 		TestMakeContainerDummy: true,
 	}
 
-	appResult := make(chan error, 1)
-	go func() {
-		err := app.Run(ctx, cfg, slog.New(slog.NewTextHandler(io.Discard, nil)))
-		appResult <- err
-	}()
+	appResult := runApp(t, ctx, cfg)
 
-	waitForAppStart(t, started)
+	waitForAppStart(t, started, appResult)
 	cancel()
 
 	select {
@@ -260,17 +291,13 @@ func TestE2E_AppLifecycle(t *testing.T) {
 		TestMakeContainerDummy: true,
 	}
 
-	appResult := make(chan error, 1)
-	go func() {
-		err := app.Run(ctx, cfg, slog.New(slog.NewTextHandler(io.Discard, nil)))
-		appResult <- err
-	}()
+	appResult := runApp(t, ctx, cfg)
 
 	dbConn, err := pgx.Connect(ctx, dbConnString)
 	require.NoError(t, err)
 	defer dbConn.Close(ctx)
 
-	waitForAppStart(t, started)
+	waitForAppStart(t, started, appResult)
 
 	_, err = dbConn.Exec(
 		ctx,
@@ -381,16 +408,13 @@ func TestE2E_WorkersOverloadWithMatches(t *testing.T) {
 		TestMakeContainerDummy: true,
 	}
 
-	appResult := make(chan error, 1)
-	go func() {
-		appResult <- app.Run(ctx, cfg, slog.New(slog.NewTextHandler(io.Discard, nil)))
-	}()
+	appResult := runApp(t, ctx, cfg)
 
 	dbConn, err := pgx.Connect(ctx, dbConnString)
 	require.NoError(t, err)
 	defer dbConn.Close(ctx)
 
-	waitForAppStart(t, started)
+	waitForAppStart(t, started, appResult)
 
 	_, err = dbConn.Exec(
 		ctx,
@@ -495,16 +519,13 @@ func TestE2E_WorkerFailureAndRestart(t *testing.T) {
 		TestMakeContainerDummy: true,
 	}
 
-	appResult := make(chan error, 1)
-	go func() {
-		appResult <- app.Run(ctx, cfg, slog.New(slog.NewTextHandler(io.Discard, nil)))
-	}()
+	appResult := runApp(t, ctx, cfg)
 
 	dbConn, err := pgx.Connect(ctx, dbConnString)
 	require.NoError(t, err)
 	defer dbConn.Close(ctx)
 
-	waitForAppStart(t, started)
+	waitForAppStart(t, started, appResult)
 
 	_, err = dbConn.Exec(
 		ctx,
@@ -599,16 +620,13 @@ func TestE2E_NoMatchWithoutEnoughPlayers(t *testing.T) {
 		TestMakeContainerDummy: true,
 	}
 
-	appResult := make(chan error, 1)
-	go func() {
-		appResult <- app.Run(ctx, cfg, slog.New(slog.NewTextHandler(io.Discard, nil)))
-	}()
+	appResult := runApp(t, ctx, cfg)
 
 	dbConn, err := pgx.Connect(ctx, dbConnString)
 	require.NoError(t, err)
 	defer dbConn.Close(ctx)
 
-	waitForAppStart(t, started)
+	waitForAppStart(t, started, appResult)
 
 	_, err = dbConn.Exec(ctx, "INSERT INTO users (login, password) VALUES ($1,$2)", "user1", "pass")
 	require.NoError(t, err)
