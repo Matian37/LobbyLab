@@ -109,7 +109,7 @@ describe('waiting', () => {
         const response = await waitingAPI.GET({
             cookies: {
                 get: (name) => {
-                    if (name === 'token') return '1234567';
+                    if (name == 'token') return '1234567';
                     return undefined;
                 }
             }
@@ -122,7 +122,7 @@ describe('waiting', () => {
         const response = await waitingAPI.GET({
             cookies: {
                 get: (name) => {
-                    if (name === 'token') return '1234567';
+                    if (name == 'token') return '1234567';
                     return undefined;
                 }
             }
@@ -137,7 +137,7 @@ describe('statistics', () => {
         const response = await resultsAPI.GET( {
             cookies: {
                 get: (name) => {
-                    if (name === 'token') return '1234567';
+                    if (name == 'token') return '1234567';
                     return undefined;
                 }
             }
