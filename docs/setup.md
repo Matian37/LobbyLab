@@ -1,0 +1,103 @@
+# Setup Guide
+
+## Prerequisites
+
+- [Docker](https://docs.docker.com/engine/install/)
+- [Docker Compose](https://docs.docker.com/compose/install/)
+
+## Configuration
+
+### 1. Environment Variables
+
+Copy the example environment file:
+
+```sh
+cp .env.example .env
+```
+
+| Variable | Description |
+|---|---|
+| `POSTGRES_DB` | Database name |
+| `POSTGRES_USER` | Database user |
+| `POSTGRES_PASSWORD` | Database password |
+| `NATS_URI` | NATS connection URI |
+| `PUBLIC_HOST` | Publicly reachable address of the Docker host |
+
+The defaults are suitable for local development. In production, set `PUBLIC_HOST` to your server's public IP or domain name so game clients can connect to game server containers.
+
+### 2. Game Server
+
+#### 2.1 Dockerfile
+
+Open `game-server/Dockerfile`. The build uses a two-stage Dockerfile:
+
+**Builder stage:** Compiles the Go wrapper. This image can remain unchanged unless you modify the Go code.
+
+**Runner stage** — the runtime image that ships the game server binary. Modify the following:
+
+1. **Base image** — Replace the runner image with one that supports your game server runtime (e.g., Ubuntu if your game server requires specific system libraries).
+2. **Runtime files** — Place your game server executable and any required assets in the `game-server/runtime/` directory. The Dockerfile copies this folder into the runner image.
+3. **CMD argument** — Set the first argument of CMD to the command that starts your actual game server.
+
+#### 2.2 Runtime Contract
+
+The Go wrapper launches your game server as a child process and passes two command-line flags:
+
+- `--match-config <path>` — Path to a JSON file containing the match configuration. By default the `config` field contains the list of matched players:
+  ```json
+  {"matchID": 1234, "config": {"players": ["user1", "user2", ...]}}
+  ```
+  You can extend `config` with additional fields when adding players to the waiting queue.
+- `--match-result <path>` — Path where your game server **must write** the match result as a JSON file before exiting. Example:
+  ```json
+  {"winner": "player1", "score": 10}
+  ```
+
+Your game server must read `--match-config` at startup, run the match, write results to `--match-result`, and then exit.
+
+### 3. Docker Compose (compose.yaml)
+
+Open `compose.yaml`. The `server-manager` service contains several configuration values that control game server orchestration:
+
+```yaml
+server-manager:
+  # ...
+  environment:
+    GAME_SERVER_COUNT: 2
+    GAME_SERVER_EXPOSE_PORTS: "7777/udp,8080"
+    GAME_SERVER_CLIENT_PORT: "7777/udp"
+    PLAYERS_PER_ROOM: 2
+```
+
+| Variable | Description |
+|---|---|
+| `GAME_SERVER_COUNT` | Number of game server containers to run concurrently. Each container hosts a single game at a time. |
+| `GAME_SERVER_EXPOSE_PORTS` | Comma-separated list of ports the game server exposes (protocol suffix required for UDP). |
+| `GAME_SERVER_CLIENT_PORT` | The port clients connect to. Must be one of the exposed ports. |
+| `PLAYERS_PER_ROOM` | Number of players required to start a match. |
+
+Adjust these values according to your game's requirements.
+
+### 4. Start the Stack
+
+```sh
+make up
+```
+
+This builds all Docker images (game-server, api, server-manager) and starts every service defined in `compose.yaml`. To run in detached mode:
+
+```sh
+make up UP_ARGS="-d"
+```
+
+To rebuild images without cache:
+
+```sh
+make build BUILD_ARGS="--no-cache"
+```
+
+## Additional Notes
+
+- Game server containers are managed entirely by the server manager. Do not start or stop them manually while the platform is running.
+- Database data is persisted in `data/db/` and NATS data in `data/nats/`.
+- The `server-manager` uses labels (`com.github.multiplayer-asset.worker: "true"`) to track running worker containers. Avoid manually creating containers with this label.
