@@ -39,9 +39,6 @@ services:
       context: ./api
       dockerfile: Dockerfile
     environment:
-      POSTGRES_DB: ${POSTGRES_DB}
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
     ports:
       - "3000:3000"
@@ -56,17 +53,14 @@ services:
       context: ./server-manager
       dockerfile: Dockerfile
     environment:
-      POSTGRES_DB: ${POSTGRES_DB}
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      DATABASE_URI: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
       NATS_URI: ${NATS_URI}
+      PUBLIC_HOST: ${PUBLIC_HOST}
       GAME_SERVER_IMAGE: "game-server:latest"
       GAME_SERVER_COUNT: 2
       GAME_SERVER_EXPOSE_PORTS: "7777/udp,8080"
       GAME_SERVER_CLIENT_PORT: "7777/udp"
-      PUBLIC_HOST: ${PUBLIC_HOST}
       PLAYERS_PER_ROOM: 2
-      DATABASE_URI: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
     networks:
       - db-net
       - nats-net
