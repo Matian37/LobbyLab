@@ -230,7 +230,7 @@ func TestIntegration_DatabaseConnection_GetMatchPlayers(t *testing.T) {
 				d.config.PlayersPerRoom = test.playersPerRoom
 
 				users, err := d.GatherMatchPlayers(ctx)
-				assert.ErrorIs(t, err, test.wantErr)
+				require.ErrorIs(t, err, test.wantErr)
 				assert.Equal(t, users, test.wantPlayers)
 			})
 		}
@@ -525,5 +525,65 @@ func TestIntegration_DatabaseConnection_GetNextMatchId(t *testing.T) {
 		id, err = d.GetNextMatchId(ctx)
 		require.NoError(t, err)
 		require.Equal(t, 2, id)
+	})
+}
+
+func TestIntegration_DatabaseConnection_GenerateAuthTokens(t *testing.T) {
+	t.Run("not open", func(t *testing.T) {
+		dc := DatabaseConnection{}
+		_, err := dc.GenerateAuthTokens(context.Background(), nil)
+		assert.ErrorIs(t, err, ErrDBConnNotOpen)
+	})
+
+	t.Run("closed", func(t *testing.T) {
+		dc := DatabaseConnection{connOpened: true, closed: true}
+		_, err := dc.GenerateAuthTokens(context.Background(), nil)
+		assert.ErrorIs(t, err, ErrDBConnClosed)
+	})
+
+	t.Run("success", func(t *testing.T) {
+		restartDB(t)
+
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		d := newDBConnWithOpen(t)
+		helperConn := newHelperConn(t)
+
+		_, err := helperConn.Exec(ctx, "INSERT INTO users (login, password) VALUES ('user1', ''), ('user2', '')")
+		require.NoError(t, err)
+
+		users, err := d.GenerateAuthTokens(ctx, []internal.User{{Login: "user1"}, {Login: "user2"}})
+		require.NoError(t, err)
+
+		assert.Len(t, users, 2)
+		assert.Equal(t, users[0].Login, "user1")
+		assert.Equal(t, users[1].Login, "user2")
+		assert.NotEmpty(t, users[0].MatchAuthToken)
+		assert.NotEmpty(t, users[1].MatchAuthToken)
+		assert.NotEqual(t, users[0].MatchAuthToken, users[1].MatchAuthToken)
+
+		rows, err := helperConn.Query(ctx, "SELECT match_auth_token, login FROM users ORDER BY login")
+		require.NoError(t, err)
+
+		dbUsers, err := pgx.CollectRows(rows, pgx.RowToStructByName[internal.User])
+		require.NoError(t, err)
+		assert.Equal(t, users, dbUsers)
+	})
+
+	t.Run("user dissapeared", func(t *testing.T) {
+		restartDB(t)
+
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		d := newDBConnWithOpen(t)
+		helperConn := newHelperConn(t)
+
+		_, err := helperConn.Exec(ctx, "INSERT INTO users (login, password) VALUES ('user1', '')")
+		require.NoError(t, err)
+
+		_, err = d.GenerateAuthTokens(ctx, []internal.User{{Login: "user1"}, {Login: "user2"}})
+		require.ErrorIs(t, err, internal.ErrDBNotEnoughPlayers)
 	})
 }
