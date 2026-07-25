@@ -5,15 +5,15 @@ import * as db from '$lib/db.js';
 vi.mock('$lib/db.js', () => {
     const bcrypt = require('bcryptjs');
     return {
-        findUserByLogin: vi.fn().mockResolvedValue([{ login: 'user', password: bcrypt.hashSync("123", 10) }]),
-        tokenExists: vi.fn().mockResolvedValue([]),
+        findUserByLogin: vi.fn().mockResolvedValue({ login: 'user', password: bcrypt.hashSync("123", 10) }),
+        tokenExists: vi.fn().mockResolvedValue(true),
         addSession: vi.fn().mockResolvedValue(true),
     };
 });
 
 describe('logging in', () => {
     test('logging in incorrectly (invalid login)', async () => {
-        db.findUserByLogin.mockResolvedValueOnce([]);
+        db.findUserByLogin.mockResolvedValueOnce(null);
 
         const request = new Request('http://cos', {
             method: 'POST',

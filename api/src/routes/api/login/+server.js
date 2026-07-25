@@ -5,12 +5,12 @@ import { json } from '@sveltejs/kit';
 export async function POST({request, cookies})
 {
     const {login, password} = await request.json();
-    const result = await findUserByLogin(login);
-    if(result.length == 0) {
+    const user = await findUserByLogin(login);
+    if(user === null) {
         return json({sukces: false, msg: "Podany login nie istnieje"});
     }
     
-    if(await bcrypt.compare(password, result[0].password)){
+    if(await bcrypt.compare(password, user.password)){
         const token = await addSession(login);
         cookies.set('token', token, {
             path: '/',
@@ -45,7 +45,6 @@ export async function GET({cookies}){
     const token = cookies.get('token');
     if(token == undefined)
         return json({sukces: false});
-    
-    if((await tokenExists(token)).length == 0) return json({sukces: false});
-    return json({sukces: true});
+
+    return json({ suckes: await tokenExists(token) });
 }

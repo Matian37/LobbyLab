@@ -1,4 +1,4 @@
-import { findWaitingByLogin, addToWaiting, deleteFromWaiting, getLoginFromToken } from '$lib/db.js';
+import { isWaiting, addToWaiting, deleteFromWaiting, getLoginFromToken } from '$lib/db.js';
 import { json } from '@sveltejs/kit';
 
 export async function POST({cookies}){   
@@ -45,7 +45,7 @@ export async function GET({cookies}){
         return json({sukces: false});
     const login = response[0].login;
     
-    if(findWaitingByLogin(login))
+    if(isWaiting(login))
         return json({sukces: true});
 
     return json({sukces: false});

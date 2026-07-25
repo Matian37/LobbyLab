@@ -10,7 +10,7 @@ export async function findUserByLogin(login){
     const q = await sql`
         SELECT * FROM users WHERE login = ${login}
     `
-    return q;
+    return q[0] ?? null;
 }
 
 export async function addUser(login, password){
@@ -26,11 +26,11 @@ export async function addUser(login, password){
     }
 }
 
-export async function findWaitingByLogin(login){
+export async function isWaiting(login){
     const q = await sql`
-        SELECT * FROM waiting WHERE login = ${login}
+        SELECT 1 FROM waiting WHERE login = ${login}
     `
-    return q;
+    return q.length > 0;
 }
 
 export async function addToWaiting(login){
@@ -63,7 +63,7 @@ export async function getLoginFromToken(token){
     const q = await sql`
         SELECT login FROM sessions WHERE token = ${token}
     `
-    return q;
+    return q[0]?.login ?? null;
 }
 
 export async function addSession(login){
@@ -90,9 +90,9 @@ export async function deleteSession(token){
 
 export async function tokenExists(token){
     const q = await sql`
-        SELECT * FROM sessions WHERE token = ${token}
+        SELECT 1 FROM sessions WHERE token = ${token}
     `
-    return q;
+    return q.length > 0;
 }
 
 export async function getMatchResults(login){
@@ -108,22 +108,4 @@ export async function getMatchResults(login){
         details: row.results,
         canceled: row.canceled,
     }));
-}
-
-
-async function deleteOldSessions(){
-    await sql`
-        DELETE FROM sessions WHERE date < NOW() - INTERVAL '3 months'
-    `
-}
-
-export async function healthCheck(){
-    try{
-        await sql`SELECT 1`;
-        return true;
-    }
-    catch(err){
-        console.debug(err);
-        return false;
-    }
 }

@@ -13,7 +13,7 @@ beforeEach(async () => {
 describe('user adding and getting', () => {
     test('normal user adding', async () => {
         expect(await db.addUser('user', 'hashedPassword')).toBe(true);
-        expect((await db.findUserByLogin('user')).length).toBe(1);
+        expect(await db.findUserByLogin('user')).not.toBeNull();
     });
 
     test('user adding twice', async () => {
@@ -27,49 +27,49 @@ describe('waiting list', () => {
 
     test('adding to waiting once', async () => {
         expect(await db.addToWaiting('user')).toBe(true);
-        expect((await db.findWaitingByLogin('user')).length).toBe(1);
+        expect(await db.isWaiting('user')).toBe(true);
     });
 
 
     test('adding to waiting twice', async () => {
         expect(await db.addToWaiting('user')).toBe(true);
-        expect((await db.addToWaiting('user'))).toBe(false);
+        expect(await db.addToWaiting('user')).toBe(false);
     });
 
     test('delete from waiting', async () => {
         expect(await db.deleteFromWaiting('user')).toBe(true);
         expect(await db.addToWaiting('user')).toBe(true);
-        expect((await db.findWaitingByLogin('user')).length).toBe(1);
+        expect(await db.isWaiting('user')).toBe(true);
         expect(await db.deleteFromWaiting('user')).toBe(true);
-        expect((await db.findWaitingByLogin('user')).length).toBe(0);
+        expect(await db.isWaiting('user')).toBe(false);
     });
 });
 
 describe('session system', () => {
 
     test('setting session', async () => {
-        expect((await db.addUser('user', 'hashed_password'))).toBe(true);
+        expect(await db.addUser('user', 'hashed_password')).toBe(true);
         const token = await db.addSession('user');
         expect(token).toBeTruthy();
         expect(token).toBeTypeOf('string');
-        expect((await db.getLoginFromToken(token))[0].login).toBe('user');
+        expect(await db.getLoginFromToken(token)).toBe('user');
     });
 
 
     test('deleting session', async () => {
-        expect((await db.addUser('user', 'hashed_password'))).toBe(true);
+        expect(await db.addUser('user', 'hashed_password')).toBe(true);
         const token = await db.addSession('user');
-        expect((await db.getLoginFromToken(token)).length).toBe(1);
+        expect(await db.getLoginFromToken(token)).toBe("user");
         expect(await db.deleteSession(token)).toBe(true);
-        expect((await db.getLoginFromToken(token)).length).toBe(0);
+        expect(await db.getLoginFromToken(token)).toBe(null);
     });
 
     test('token exists', async () => {
-        expect((await db.addUser('user', 'hashed_password'))).toBe(true);
+        expect(await db.addUser('user', 'hashed_password')).toBe(true);
         const token1 = await db.addSession('user');
-        expect((await db.addUser('user1', 'hashed_password'))).toBe(true);
+        expect(await db.addUser('user1', 'hashed_password')).toBe(true);
         const token2 = await db.addSession('user1');
-        expect((await db.tokenExists(token2)).length).toBe(1);
+        expect(await db.tokenExists(token2)).toBe(true);
     });
 });
 

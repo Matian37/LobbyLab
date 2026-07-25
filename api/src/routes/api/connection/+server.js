@@ -7,13 +7,12 @@ export async function GET({cookies}){
     if(token == undefined)
         return json({sukces: false});
     
-    const response = await getLoginFromToken(token);
-    if(response.length == 0) 
+    const login = await getLoginFromToken(token);
+    if(login === null)
     {
         console.debug("nie istnieje sesja z danym tokenem");
         return json({sukces: false});
     }
-    const login = response[0].login;
     
     let interval;
     return new Response(
