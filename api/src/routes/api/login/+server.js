@@ -1,5 +1,4 @@
-import { findUserByLogin, addSession, deleteSession, getLoginFromToken, tokenExists } from '$lib/db.js';
-import bcrypt from 'bcryptjs';
+import { findUserByLogin, verifyPassword, addSession, deleteSession, getLoginFromToken, tokenExists } from '$lib/db.js';
 import { json } from '@sveltejs/kit';
 
 export async function POST({request, cookies})
@@ -10,7 +9,7 @@ export async function POST({request, cookies})
         return json({sukces: false, msg: "Podany login nie istnieje"});
     }
     
-    if(await bcrypt.compare(password, user.password)){
+    if(await verifyPassword(login, password)){
         const token = await addSession(login);
         cookies.set('token', token, {
             path: '/',

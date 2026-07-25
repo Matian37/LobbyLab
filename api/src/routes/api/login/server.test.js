@@ -3,9 +3,9 @@ import * as loginAPI from './+server.js';
 import * as db from '$lib/db.js';
 
 vi.mock('$lib/db.js', () => {
-    const bcrypt = require('bcryptjs');
     return {
-        findUserByLogin: vi.fn().mockResolvedValue({ login: 'user', password: bcrypt.hashSync("123", 10) }),
+        findUserByLogin: vi.fn().mockResolvedValue({ login: 'user', password: "123" }),
+        verifyPassword: vi.fn().mockImplementation(async (login, password) => password === "123"),
         tokenExists: vi.fn().mockResolvedValue(true),
         addSession: vi.fn().mockResolvedValue(true),
     };

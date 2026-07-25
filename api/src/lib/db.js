@@ -14,7 +14,9 @@ export async function findUserByLogin(login){
 export async function addUser(login, password){
     try{
         const result = await sql`
-            INSERT INTO users (login, password) VALUES(${login}, ${password}) RETURNING *
+            INSERT INTO users (login, password)
+            VALUES(${login}, crypt(${password}, gen_salt('bf'))) 
+            RETURNING *
         `
         return true;
     }
@@ -22,6 +24,13 @@ export async function addUser(login, password){
         console.debug(err);
         return false;
     }
+}
+
+export async function verifyPassword(login, password){
+    const q = await sql`
+        SELECT (password = crypt(${password}, password)) AS match FROM users WHERE login = ${login}
+    `
+    return q.length > 0 && q[0].match;
 }
 
 export async function isWaiting(login){

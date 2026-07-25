@@ -1,12 +1,10 @@
 import { addUser, addSession } from '$lib/db.js';
-import bcrypt from 'bcryptjs';
 import { json } from '@sveltejs/kit';
 
 export async function POST({request, cookies})
 {
     const {login, password} = await request.json();
-    const hashed = await bcrypt.hash(password, 10);
-    const result = await addUser(login, hashed);
+    const result = await addUser(login, password);
     if(!result){
         return json({
             sukces: false,
