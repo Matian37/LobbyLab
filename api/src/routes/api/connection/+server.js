@@ -2,56 +2,54 @@ import { deleteFromWaiting, getLoginFromToken } from '$lib/db.js';
 import { json } from '@sveltejs/kit';
 import { Client } from 'pg';
 
-export async function GET({cookies}){
-    const token = cookies.get('token')
-    if(token == undefined)
-        return json({sukces: false});
-    
+export async function GET({ cookies }) {
+    const token = cookies.get('token');
+    if (token == undefined) return json({ sukces: false });
+
     const login = await getLoginFromToken(token);
-    if(login === null)
-    {
-        console.debug("nie istnieje sesja z danym tokenem");
-        return json({sukces: false});
+    if (login === null) {
+        console.debug('nie istnieje sesja z danym tokenem');
+        return json({ sukces: false });
     }
-    
+
     let interval;
     return new Response(
         new ReadableStream({
-            start(controller){
+            start(controller) {
                 //listen(login, controller);
-                interval = setInterval(()=>{
-                    console.debug("wysylam ping");
+                interval = setInterval(() => {
+                    console.debug('wysylam ping');
                     controller.enqueue('data: ping\n\n');
                 }, 10000);
             },
-            async cancel(){
+            async cancel() {
                 clearInterval(interval);
-                console.debug("klient przerwal polaczenie SSE");
+                console.debug('klient przerwal polaczenie SSE');
                 await deleteFromWaiting(login);
-            }
+            },
         }),
         {
             headers: {
                 'Content-Type': 'text/event-stream',
                 'Cache-Control': 'no-cache',
-                'Connection': 'keep-alive'
-            }
+                Connection: 'keep-alive',
+            },
         }
     );
 }
 
-async function listen(login, controller){
+async function listen(login, controller) {
     const client = new Client({
         connectionString: process.env.DATABASE_URL,
     });
-      
+
     await client.connect();
-      
-    await client.query("LISTEN users_match_id_assigned");
-      
-    client.on("notification", (msg) => {
-        if(msg.payload.username != login) return;
-        console.debug("wysylam socket serwera");
+
+    await client.query('LISTEN users_match_id_assigned');
+
+    client.on('notification', (msg) => {
+        if (msg.payload.username != login) return;
+        console.debug('wysylam socket serwera');
         controller.equeue(`data: ${msg.payload}\n\n`);
         controller.close();
     });

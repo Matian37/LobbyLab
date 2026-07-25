@@ -17,26 +17,29 @@ describe('registering', () => {
         const request = new Request('http://cos', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ login: 'user', password: '123' })
+            body: JSON.stringify({ login: 'user', password: '123' }),
         });
 
         const response = await registerAPI.POST({ request });
         const result = await response.json();
-        expect(result).toEqual({ sukces: false, msg: "Podany login jest zajęty" });
+        expect(result).toEqual({
+            sukces: false,
+            msg: 'Podany login jest zajęty',
+        });
     });
 
     test('registering correctly', async () => {
         const request = new Request('http://cos', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ login: 'user', password: 'haslo' })
+            body: JSON.stringify({ login: 'user', password: 'haslo' }),
         });
 
         const response = await registerAPI.POST({
             request,
             cookies: {
-                set: vi.fn()
-            }
+                set: vi.fn(),
+            },
         });
         const result = await response.json();
         expect(result.sukces).toBe(true);

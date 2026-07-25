@@ -20,16 +20,13 @@ describe('user adding and getting', () => {
         expect(await db.addUser('user', 'hashedPassword')).toBe(true);
         expect(await db.addUser('user', 'elo')).toBe(false);
     });
-
 });
 
 describe('waiting list', () => {
-
     test('adding to waiting once', async () => {
         expect(await db.addToWaiting('user')).toBe(true);
         expect(await db.isWaiting('user')).toBe(true);
     });
-
 
     test('adding to waiting twice', async () => {
         expect(await db.addToWaiting('user')).toBe(true);
@@ -46,7 +43,6 @@ describe('waiting list', () => {
 });
 
 describe('session system', () => {
-
     test('setting session', async () => {
         expect(await db.addUser('user', 'hashed_password')).toBe(true);
         const token = await db.addSession('user');
@@ -55,11 +51,10 @@ describe('session system', () => {
         expect(await db.getLoginFromToken(token)).toBe('user');
     });
 
-
     test('deleting session', async () => {
         expect(await db.addUser('user', 'hashed_password')).toBe(true);
         const token = await db.addSession('user');
-        expect(await db.getLoginFromToken(token)).toBe("user");
+        expect(await db.getLoginFromToken(token)).toBe('user');
         expect(await db.deleteSession(token)).toBe(true);
         expect(await db.getLoginFromToken(token)).toBe(null);
     });
@@ -76,41 +71,40 @@ describe('session system', () => {
 describe('statistics', () => {
     test('get matches', async () => {
         let matches = [
-            {players: ['albert', 'zbychu'], winner: 'albert'},
-            {players: ['user1', 'albert'], winner: 'user1'},
-            {players: ['user3','user4'], winner: 'user3'},
-        ]
+            { players: ['albert', 'zbychu'], winner: 'albert' },
+            { players: ['user1', 'albert'], winner: 'user1' },
+            { players: ['user3', 'user4'], winner: 'user3' },
+        ];
         let canceled = [false, true, false];
 
         const created = new Set();
-        for(let i = 0; i < matches.length; i++){
-            for(let j = 0; j < matches[i].players.length; j++){
-                if(created.has(matches[i].players[j]))
-                    continue;
+        for (let i = 0; i < matches.length; i++) {
+            for (let j = 0; j < matches[i].players.length; j++) {
+                if (created.has(matches[i].players[j])) continue;
                 created.add(matches[i].players[j]);
-                await sql`INSERT INTO users (login, password) VALUES (${matches[i].players[j]}, '123')`
+                await sql`INSERT INTO users (login, password) VALUES (${matches[i].players[j]}, '123')`;
             }
         }
-        for(let i = 0; i < matches.length; i++){
+        for (let i = 0; i < matches.length; i++) {
             let q = await sql`
                 INSERT INTO matches (host, port, results, canceled)
                 VALUES ('hoscik', 1233, ${sql.json(matches[i])}, ${canceled[i]})
                 RETURNING id
             `;
             const match_id = q[0].id;
-            for(let j = 0; j < matches[i].players.length; j++){
-                await sql`INSERT INTO user_matches (user_id, match_id) VALUES (${matches[i].players[j]}, ${match_id})`
+            for (let j = 0; j < matches[i].players.length; j++) {
+                await sql`INSERT INTO user_matches (user_id, match_id) VALUES (${matches[i].players[j]}, ${match_id})`;
             }
         }
         const result = await db.getMatchResults('albert');
         expect(result).toEqual([
             {
                 details: { players: ['albert', 'zbychu'], winner: 'albert' },
-                canceled: false
+                canceled: false,
             },
             {
                 details: { players: ['user1', 'albert'], winner: 'user1' },
-                canceled: true
+                canceled: true,
             },
         ]);
     });

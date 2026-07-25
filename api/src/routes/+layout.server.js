@@ -1,16 +1,14 @@
 import { getLoginFromToken } from '$lib/db';
 
-export async function load ({cookies}){
+export async function load({ cookies }) {
     const token = cookies.get('token');
-    if(token === undefined)
-        return null;
-    
+    if (token === undefined) return null;
+
     const login = await getLoginFromToken(token);
-    if(login === null) 
-    {
-        console.debug("nie istnieje sesja z danym tokenem");
+    if (login === null) {
+        console.debug('nie istnieje sesja z danym tokenem');
         cookies.delete('token', { path: '/' });
         return null;
     }
-    return {login: login};
+    return { login: login };
 }
