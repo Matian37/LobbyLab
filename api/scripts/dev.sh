@@ -14,3 +14,8 @@ docker run --name postgres-test \
 until docker exec postgres-test pg_isready -U postgres; do
   sleep 0.5
 done
+
+DATABASE_URL='postgresql://postgres:123@localhost:5432/postgres' vite dev
+
+docker stop postgres-test 2>/dev/null
+docker rm postgres-test 2>/dev/null

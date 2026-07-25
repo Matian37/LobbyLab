@@ -1,8 +1,6 @@
 import postgres from "postgres";
 
 let DATABASE_URL = process.env.DATABASE_URL;
-//if(!DATABASE_URL && process.env.VITEST)
-//let DATABASE_URL = 'postgresql://postgres:123@localhost:5432/postgres';
 
 export const sql = postgres(DATABASE_URL);
 
