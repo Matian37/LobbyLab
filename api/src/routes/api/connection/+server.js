@@ -1,6 +1,6 @@
 import { deleteFromWaiting, getLoginFromToken } from '$lib/db.js';
 import { json } from '@sveltejs/kit';
-import { Client } from 'pg';
+import { Client } from 'postgres';
 
 export async function GET({ cookies }) {
     const token = cookies.get('token');
@@ -39,18 +39,13 @@ export async function GET({ cookies }) {
 }
 
 async function listen(login, controller) {
-    const client = new Client({
-        connectionString: process.env.DATABASE_URL,
-    });
+    // TODO: route notification instead of spawning connection per client
+    const sql = postgres(process.env.DATABASE_URL);
 
-    await client.connect();
-
-    await client.query('LISTEN users_match_id_assigned');
-
-    client.on('notification', (msg) => {
-        if (msg.payload.username != login) return;
+    await sql.listen('users_match_id_assigned', (payload) => {
+        if (payload.username != login) return;
         console.debug('wysylam socket serwera');
-        controller.equeue(`data: ${msg.payload}\n\n`);
+        controller.equeue(`data: ${payload}\n\n`);
         controller.close();
     });
 }

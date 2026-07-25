@@ -26,7 +26,6 @@
   },
   "dependencies": {
     "jsdom": "^29.1.1",
-    "pg": "^8.21.0",
     "postgres": "^3.4.9"
   }
 }
