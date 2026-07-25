@@ -1,6 +1,5 @@
 import { findWaitingByLogin, addToWaiting, deleteFromWaiting, getLoginFromToken } from '$lib/db.js';
 import { json } from '@sveltejs/kit';
-import { handleError } from '$lib/error_handler.js';
 
 export async function POST({cookies}){   
     const token = cookies.get('token');
@@ -9,14 +8,14 @@ export async function POST({cookies}){
     const response = await getLoginFromToken(token);
     if(response.length == 0) 
     {
-        handleError(0);
+        console.debug("nie istnieje sesja z danym tokenem");
         return json({sukces: false});
     }
     const login = response[0].login;
     
     if(!(await addToWaiting(login)))
     {
-        handleError(1);
+        console.debug("nie dodano uzytkownika do bazy oczekujacych, prawdopodobnie juz tam jest");
         return json({sukces: false});
     }
     return json({sukces: true});
@@ -29,7 +28,7 @@ export async function DELETE({cookies}){
     const response = await getLoginFromToken(token);
     if(response.length == 0) 
     {
-        handleError(0);
+        console.debug("nie istnieje sesja z danym tokenem");
         return json({sukces: false});
     }
     const login = response[0].login;

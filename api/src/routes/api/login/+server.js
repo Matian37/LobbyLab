@@ -1,7 +1,6 @@
 import { findUserByLogin, setSession, deleteSession, getLoginFromToken, tokenExists } from '$lib/db.js';
 import bcrypt from 'bcryptjs';
 import { json } from '@sveltejs/kit';
-import { handleError } from '$lib/error_handler.js';
 import { generateToken } from '$lib/helpers.js';
 
 export async function POST({request, cookies})

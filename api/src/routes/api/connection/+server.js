@@ -1,7 +1,6 @@
 import { deleteFromWaiting, getLoginFromToken } from '$lib/db.js';
 import { json } from '@sveltejs/kit';
 import { Client } from 'pg';
-import { handleError } from '$lib/error_handler.js';
 
 export async function GET({cookies}){
     const token = cookies.get('token')
@@ -11,7 +10,7 @@ export async function GET({cookies}){
     const response = await getLoginFromToken(token);
     if(response.length == 0) 
     {
-        handleError(0);
+        console.debug("nie istnieje sesja z danym tokenem");
         return json({sukces: false});
     }
     const login = response[0].login;
@@ -28,7 +27,7 @@ export async function GET({cookies}){
             },
             async cancel(){
                 clearInterval(interval);
-                handleError(3);
+                console.debug("klient przerwal polaczenie SSE");
                 await deleteFromWaiting(login);
             }
         }),

@@ -1,5 +1,4 @@
 import postgres from "postgres";
-import { handleError } from "./error_handler";
 
 let DATABASE_URL = process.env.DATABASE_URL;
 //if(!DATABASE_URL && process.env.VITEST)
@@ -22,7 +21,7 @@ export async function addUser(login, password){
         return true;
     }
     catch (err){
-        handleError(-1, err);
+        console.debug(err);
         return false;
     }
 }
@@ -42,7 +41,7 @@ export async function addToWaiting(login){
         return true;
     }
     catch (err){
-        handleError(-1, err);
+        console.debug(err);
         return false;
     }
 }
@@ -55,7 +54,7 @@ export async function deleteFromWaiting(login){
         return true;
     }
     catch (err){
-        handleError(-1, err);
+        console.debug(err);
         return false;
     }
 }
@@ -76,7 +75,6 @@ export async function setSession(token, login){
     }
     catch (err){
         console.debug(err);
-        handleError(-1, err);
         return false;
     }
 }
@@ -89,7 +87,7 @@ export async function deleteSession(token){
         return true;
     }
     catch (err){
-        handleError(-1, err);
+        console.debug(err);
         return false;
     }
 }
@@ -129,7 +127,7 @@ export async function healthCheck(){
         return true;
     }
     catch(err){
-        handleError("ERROR " + err);
+        console.debug(err);
         return false;
     }
 }

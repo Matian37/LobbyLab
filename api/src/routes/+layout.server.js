@@ -1,5 +1,4 @@
 import { getLoginFromToken } from '$lib/db';
-import { handleError } from '$lib/error_handler';
 
 export async function load ({cookies}){
     const token = cookies.get('token');
@@ -8,7 +7,7 @@ export async function load ({cookies}){
     const dbLogin = await getLoginFromToken(token);
     if(dbLogin.length == 0) 
     {
-        handleError(0);
+        console.debug("nie istnieje sesja z danym tokenem");
         cookies.delete('token', { path: '/' });
         return null;
     }

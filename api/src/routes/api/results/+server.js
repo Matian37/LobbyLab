@@ -1,5 +1,4 @@
 import { getMatchResults, getLoginFromToken } from '$lib/db.js';
-import { handleError } from '$lib/error_handler.js';
 import { json } from '@sveltejs/kit';
 
 export async function GET({cookies}){
@@ -9,7 +8,7 @@ export async function GET({cookies}){
     const dbLogin = await getLoginFromToken(token);
     if(dbLogin.length == 0) 
     {
-        handleError(0);
+        console.debug("nie istnieje sesja z danym tokenem");
         return json({sukces: false, matches: null});
     }
     const login = dbLogin[0].login;
