@@ -1,5 +1,4 @@
 import {
-    findUserByLogin,
     verifyPassword,
     addSession,
     deleteSession,
@@ -10,10 +9,6 @@ import { json } from '@sveltejs/kit';
 
 export async function POST({ request, cookies }) {
     const { login, password } = await request.json();
-    const user = await findUserByLogin(login);
-    if (user === null) {
-        return json({ sukces: false, msg: 'Podany login nie istnieje' });
-    }
 
     if (await verifyPassword(login, password)) {
         const token = await addSession(login);
@@ -30,7 +25,7 @@ export async function POST({ request, cookies }) {
     } else {
         return json({
             sukces: false,
-            msg: 'Podane hasło jest błędne',
+            msg: 'Login lub hasło jest błędne',
         });
     }
 }

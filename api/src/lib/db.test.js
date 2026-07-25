@@ -13,7 +13,8 @@ beforeEach(async () => {
 describe('user adding and getting', () => {
     test('normal user adding', async () => {
         expect(await db.addUser('user', 'hashedPassword')).toBe(true);
-        expect(await db.findUserByLogin('user')).not.toBeNull();
+        const q = await sql`SELECT 1 FROM users WHERE login = 'user'`;
+        expect(q.length).toBe(1);
     });
 
     test('user adding twice', async () => {

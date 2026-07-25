@@ -4,13 +4,6 @@ let DATABASE_URL = process.env.DATABASE_URL;
 
 export const sql = postgres(DATABASE_URL);
 
-export async function findUserByLogin(login) {
-    const q = await sql`
-        SELECT * FROM users WHERE login = ${login}
-    `;
-    return q[0] ?? null;
-}
-
 export async function addUser(login, password) {
     try {
         const result = await sql`

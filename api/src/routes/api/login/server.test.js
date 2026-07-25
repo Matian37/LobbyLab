@@ -4,9 +4,6 @@ import * as db from '$lib/db.js';
 
 vi.mock('$lib/db.js', () => {
     return {
-        findUserByLogin: vi
-            .fn()
-            .mockResolvedValue({ login: 'user', password: '123' }),
         verifyPassword: vi
             .fn()
             .mockImplementation(async (login, password) => password === '123'),
@@ -17,7 +14,7 @@ vi.mock('$lib/db.js', () => {
 
 describe('logging in', () => {
     test('logging in incorrectly (invalid login)', async () => {
-        db.findUserByLogin.mockResolvedValueOnce(null);
+        db.verifyPassword.mockResolvedValueOnce(false);
 
         const request = new Request('http://cos', {
             method: 'POST',
@@ -29,7 +26,7 @@ describe('logging in', () => {
         const result = await response.json();
         expect(result).toEqual({
             sukces: false,
-            msg: 'Podany login nie istnieje',
+            msg: 'Login lub hasło jest błędne',
         });
     });
 
@@ -44,7 +41,7 @@ describe('logging in', () => {
         const result = await response.json();
         expect(result).toEqual({
             sukces: false,
-            msg: 'Podane hasło jest błędne',
+            msg: 'Login lub hasło jest błędne',
         });
     });
 
