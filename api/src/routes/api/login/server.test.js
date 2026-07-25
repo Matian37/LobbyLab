@@ -7,7 +7,7 @@ vi.mock('$lib/db.js', () => {
     return {
         findUserByLogin: vi.fn().mockResolvedValue([{ login: 'user', password: bcrypt.hashSync("123", 10) }]),
         tokenExists: vi.fn().mockResolvedValue([]),
-        setSession: vi.fn().mockResolvedValue(true),
+        addSession: vi.fn().mockResolvedValue(true),
     };
 });
 

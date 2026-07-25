@@ -1,7 +1,6 @@
-import { findUserByLogin, setSession, deleteSession, getLoginFromToken, tokenExists } from '$lib/db.js';
+import { findUserByLogin, addSession, deleteSession, getLoginFromToken, tokenExists } from '$lib/db.js';
 import bcrypt from 'bcryptjs';
 import { json } from '@sveltejs/kit';
-import { generateToken } from '$lib/helpers.js';
 
 export async function POST({request, cookies})
 {
@@ -12,7 +11,7 @@ export async function POST({request, cookies})
     }
     
     if(await bcrypt.compare(password, result[0].password)){
-        const token = await generateToken(login);
+        const token = await addSession(login);
         cookies.set('token', token, {
             path: '/',
             httpOnly: true,

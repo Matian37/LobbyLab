@@ -49,26 +49,27 @@ describe('session system', () => {
 
     test('setting session', async () => {
         expect((await db.addUser('user', 'hashed_password'))).toBe(true);
-        expect((await db.getLoginFromToken('1234567')).length).toBe(0);
-        expect(await db.setSession('1234567', 'user')).toBe(true);
-        expect((await db.getLoginFromToken('1234567'))[0].login).toBe('user');
+        const token = await db.addSession('user');
+        expect(token).toBeTruthy();
+        expect(token).toBeTypeOf('string');
+        expect((await db.getLoginFromToken(token))[0].login).toBe('user');
     });
 
 
     test('deleting session', async () => {
         expect((await db.addUser('user', 'hashed_password'))).toBe(true);
-        expect(await db.setSession('1234567', 'user')).toBe(true);
-        expect((await db.getLoginFromToken("1234567")).length).toBe(1);
-        expect(await db.deleteSession('1234567')).toBe(true);
-        expect((await db.getLoginFromToken("1234567")).length).toBe(0);
+        const token = await db.addSession('user');
+        expect((await db.getLoginFromToken(token)).length).toBe(1);
+        expect(await db.deleteSession(token)).toBe(true);
+        expect((await db.getLoginFromToken(token)).length).toBe(0);
     });
 
     test('token exists', async () => {
         expect((await db.addUser('user', 'hashed_password'))).toBe(true);
-        expect(await db.setSession('1234567', 'user')).toBe(true);
+        const token1 = await db.addSession('user');
         expect((await db.addUser('user1', 'hashed_password'))).toBe(true);
-        expect(await db.setSession('12345678', 'user1')).toBe(true);
-        expect((await db.tokenExists('12345678')).length).toBe(1);
+        const token2 = await db.addSession('user1');
+        expect((await db.tokenExists(token2)).length).toBe(1);
     });
 });
 

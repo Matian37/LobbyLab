@@ -66,17 +66,13 @@ export async function getLoginFromToken(token){
     return q;
 }
 
-export async function setSession(token, login){
-    try{
-        await sql`
-            INSERT INTO sessions (token, login, date) VALUES (${token}, ${login}, CURRENT_TIMESTAMP)
-        `
-        return true;
-    }
-    catch (err){
-        console.debug(err);
-        return false;
-    }
+export async function addSession(login){
+    const q = await sql`
+        INSERT INTO sessions (token, login, date)
+        VALUES (encode(gen_random_bytes(32), 'hex'), ${login}, NOW())
+        RETURNING token
+    `
+    return q[0].token;
 }
 
 export async function deleteSession(token){

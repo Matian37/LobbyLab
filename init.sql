@@ -1,3 +1,5 @@
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
 CREATE SEQUENCE matches_id_seq;
 
 CREATE TABLE IF NOT EXISTS matches(

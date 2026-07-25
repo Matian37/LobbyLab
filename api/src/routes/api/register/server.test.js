@@ -6,7 +6,7 @@ vi.mock('$lib/db.js', () => {
     return {
         addUser: vi.fn().mockResolvedValue(true),
         tokenExists: vi.fn().mockResolvedValue([]),
-        setSession: vi.fn().mockResolvedValue(true),
+        addSession: vi.fn().mockResolvedValue(true),
     };
 });
 
