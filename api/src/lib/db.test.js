@@ -4,10 +4,10 @@ import { sql } from '$lib/db.js';
 import postgres from 'postgres';
 
 beforeEach(async () => {
-    const sql = postgres(process.env.DATABASE_URL);
-    await sql.unsafe('DROP SCHEMA public CASCADE; CREATE SCHEMA public;');
-    await sql.unsafe(process.env.DATABASE_INIT_SQL);
-    await sql.end();
+    const helperSql = postgres(process.env.DATABASE_URL);
+    await helperSql.unsafe('DROP SCHEMA public CASCADE; CREATE SCHEMA public;');
+    await helperSql.unsafe(process.env.DATABASE_INIT_SQL);
+    await helperSql.end();
 });
 
 describe('tryQuery', () => {

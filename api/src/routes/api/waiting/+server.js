@@ -45,7 +45,7 @@ export async function GET({ cookies }) {
     if (response.length == 0) return json({ sukces: false });
     const login = response[0].login;
 
-    if (isWaiting(login)) return json({ sukces: true });
+    if (await isWaiting(login)) return json({ sukces: true });
 
     return json({ sukces: false });
 }
