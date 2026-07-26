@@ -1,6 +1,6 @@
 import {
     expect,
-    test,
+    it,
     beforeEach,
     afterEach,
     beforeAll,
@@ -71,7 +71,7 @@ describe('tryQuery', () => {
         vi.restoreAllMocks();
     });
 
-    test('failure', async () => {
+    it('returns false and logs when the callback throws', async () => {
         const result = await db.tryQuery(async () => {
             throw new Error('Test Error Message');
         });
@@ -82,109 +82,210 @@ describe('tryQuery', () => {
         );
     });
 
-    test('success', async () => {
+    it('returns true when the callback succeeds', async () => {
         const result = await db.tryQuery(async () => {});
         expect(result).toBe(true);
     });
 });
 
-describe('user adding and getting', () => {
-    test('normal user adding', async () => {
-        expect(await db.addUser('user', 'hashedPassword')).toBe(true);
-        const q = await helperSql`SELECT 1 FROM users WHERE login = 'user'`;
-        expect(q.length).toBe(1);
+describe('addUser', () => {
+    it('inserts user into the database', async () => {
+        await db.addUser('alice', 'secret');
+        const rows = await helperSql`
+            SELECT login, password = crypt('secret', password) AS match
+            FROM users
+        `;
+        expect(rows.length).toBe(1);
+        expect(rows[0].login).toBe('alice');
+        expect(rows[0].match).toBe(true);
     });
 
-    test('user adding twice', async () => {
-        expect(await db.addUser('user', 'hashedPassword')).toBe(true);
-        expect(await db.addUser('user', 'elo')).toBe(false);
-    });
-});
-
-describe('waiting list', () => {
-    test('adding to waiting once', async () => {
-        expect(await db.addToWaiting('user')).toBe(true);
-        expect(await db.isWaiting('user')).toBe(true);
-    });
-
-    test('adding to waiting twice', async () => {
-        expect(await db.addToWaiting('user')).toBe(true);
-        expect(await db.addToWaiting('user')).toBe(false);
-    });
-
-    test('delete from waiting', async () => {
-        expect(await db.deleteFromWaiting('user')).toBe(true);
-        expect(await db.addToWaiting('user')).toBe(true);
-        expect(await db.isWaiting('user')).toBe(true);
-        expect(await db.deleteFromWaiting('user')).toBe(true);
-        expect(await db.isWaiting('user')).toBe(false);
+    it('returns false on duplicate login', async () => {
+        await db.addUser('alice', 'secret');
+        const result = await db.addUser('alice', 'other');
+        expect(result).toBe(false);
     });
 });
 
-describe('session system', () => {
-    test('setting session', async () => {
-        expect(await db.addUser('user', 'hashed_password')).toBe(true);
-        const token = await db.addSession('user');
-        expect(token).toBeTruthy();
+describe('verifyPassword', () => {
+    it('returns true when the password matches', async () => {
+        await db.addUser('alice', 'correct');
+        expect(await db.verifyPassword('alice', 'correct')).toBe(true);
+    });
+
+    it('returns false when the password does not match', async () => {
+        await db.addUser('alice', 'correct');
+        expect(await db.verifyPassword('alice', 'wrong')).toBe(false);
+    });
+
+    it('returns false when the user does not exist', async () => {
+        expect(await db.verifyPassword('nobody', 'anything')).toBe(false);
+    });
+});
+
+describe('addToWaiting', () => {
+    it('adds a user to the waiting queue', async () => {
+        await db.addToWaiting('alice');
+        const rows = await helperSql`
+            SELECT login
+            FROM waiting
+        `;
+        expect(rows.length).toBe(1);
+        expect(rows[0].login).toBe('alice');
+    });
+
+    it('returns false when the user is already waiting', async () => {
+        await db.addToWaiting('alice');
+        const result = await db.addToWaiting('alice');
+        expect(result).toBe(false);
+    });
+});
+
+describe('deleteFromWaiting', () => {
+    it('removes a user from the waiting queue', async () => {
+        await db.addToWaiting('alice');
+        await db.deleteFromWaiting('alice');
+        const rows = await helperSql`
+            SELECT login
+            FROM waiting
+        `;
+        expect(rows.length).toBe(0);
+    });
+
+    it('returns true even when the user is not in the queue', async () => {
+        expect(await db.deleteFromWaiting('alice')).toBe(true);
+    });
+});
+
+describe('isWaiting', () => {
+    it('returns true when the user is in the queue', async () => {
+        await db.addToWaiting('alice');
+        expect(await db.isWaiting('alice')).toBe(true);
+    });
+
+    it('returns false when the user is not in the queue', async () => {
+        expect(await db.isWaiting('alice')).toBe(false);
+    });
+});
+
+describe('addSession', () => {
+    it('creates session and stores it', async () => {
+        await db.addUser('alice', 'secret');
+        const token = await db.addSession('alice');
         expect(token).toBeTypeOf('string');
-        expect(await db.getLoginFromToken(token)).toBe('user');
-    });
+        expect(token).toMatch(/^[0-9a-f]+$/);
+        expect(token.length).toBeGreaterThanOrEqual(32);
 
-    test('deleting session', async () => {
-        expect(await db.addUser('user', 'hashed_password')).toBe(true);
-        const token = await db.addSession('user');
-        expect(await db.getLoginFromToken(token)).toBe('user');
-        expect(await db.deleteSession(token)).toBe(true);
-        expect(await db.getLoginFromToken(token)).toBe(null);
-    });
-
-    test('token exists', async () => {
-        expect(await db.addUser('user', 'hashed_password')).toBe(true);
-        const token1 = await db.addSession('user');
-        expect(await db.addUser('user1', 'hashed_password')).toBe(true);
-        const token2 = await db.addSession('user1');
-        expect(await db.tokenExists(token2)).toBe(true);
+        const rows = await helperSql`
+            SELECT login
+            FROM sessions
+            WHERE token = ${token}
+        `;
+        expect(rows.length).toBe(1);
+        expect(rows[0].login).toBe('alice');
     });
 });
 
-describe('statistics', () => {
-    test('get matches', async () => {
-        let matches = [
-            { players: ['albert', 'zbychu'], winner: 'albert' },
-            { players: ['user1', 'albert'], winner: 'user1' },
-            { players: ['user3', 'user4'], winner: 'user3' },
+describe('getLoginFromToken', () => {
+    it('returns the login for a valid token', async () => {
+        await db.addUser('alice', 'secret');
+        const token = await db.addSession('alice');
+        expect(await db.getLoginFromToken(token)).toBe('alice');
+    });
+
+    it('returns null for a non-existent token', async () => {
+        expect(await db.getLoginFromToken('nonexistent')).toBe(null);
+    });
+});
+
+describe('deleteSession', () => {
+    it('removes the session from the database', async () => {
+        await db.addUser('alice', 'secret');
+        const token = await db.addSession('alice');
+        await db.deleteSession(token);
+        const rows = await helperSql`
+            SELECT login
+            FROM sessions
+        `;
+        expect(rows.length).toBe(0);
+    });
+
+    it('returns true even when the token does not exist', async () => {
+        expect(await db.deleteSession('nonexistent')).toBe(true);
+    });
+});
+
+describe('tokenExists', () => {
+    it('returns true for an existing token', async () => {
+        await db.addUser('alice', 'secret');
+        const token = await db.addSession('alice');
+        expect(await db.tokenExists(token)).toBe(true);
+    });
+
+    it('returns false for a non-existent token', async () => {
+        expect(await db.tokenExists('nonexistent')).toBe(false);
+    });
+});
+
+describe('getMatchResults', () => {
+    it('returns match results for an existing user', async () => {
+        const matches = [
+            { players: ['user5', 'user6'], winner: 'user5', canceled: false },
+            { players: ['user1', 'user5'], winner: 'user1', canceled: true },
+            { players: ['user3', 'user4'], winner: 'user3', canceled: false },
         ];
-        let canceled = [false, true, false];
 
         const created = new Set();
-        for (let i = 0; i < matches.length; i++) {
-            for (let j = 0; j < matches[i].players.length; j++) {
-                if (created.has(matches[i].players[j])) continue;
-                created.add(matches[i].players[j]);
-                await helperSql`INSERT INTO users (login, password) VALUES (${matches[i].players[j]}, '123')`;
+        for (const match of matches) {
+            for (const player of match.players) {
+                if (created.has(player)) continue;
+
+                created.add(player);
+
+                await helperSql`
+                    INSERT INTO users (login, password)
+                    VALUES (${player}, '')
+                `;
             }
         }
-        for (let i = 0; i < matches.length; i++) {
-            let q = await helperSql`
-                INSERT INTO matches (host, port, results, canceled)
-                VALUES ('hoscik', 1233, ${helperSql.json(matches[i])}, ${canceled[i]})
-                RETURNING id
-            `;
-            const match_id = q[0].id;
-            for (let j = 0; j < matches[i].players.length; j++) {
-                await helperSql`INSERT INTO user_matches (user_id, match_id) VALUES (${matches[i].players[j]}, ${match_id})`;
+
+        for (const match of matches) {
+            const { canceled, ...results } = match;
+
+            const match_id = (
+                await helperSql`
+                    INSERT INTO matches (host, port, results, canceled)
+                    VALUES ('', 0, ${helperSql.json(results)}, ${canceled})
+                    RETURNING id
+                `
+            )[0].id;
+
+            for (const player of match.players) {
+                await helperSql`
+                    INSERT INTO user_matches (user_id, match_id)
+                    VALUES (${player}, ${match_id})
+                `;
             }
         }
-        const result = await db.getMatchResults('albert');
+
+        const result = await db.getMatchResults('user5');
         expect(result).toEqual([
             {
-                details: { players: ['albert', 'zbychu'], winner: 'albert' },
+                details: { players: ['user5', 'user6'], winner: 'user5' },
                 canceled: false,
             },
             {
-                details: { players: ['user1', 'albert'], winner: 'user1' },
+                details: { players: ['user1', 'user5'], winner: 'user1' },
                 canceled: true,
             },
         ]);
+    });
+
+    it('returns an empty array when the user has no matches', async () => {
+        await helperSql`
+            INSERT INTO users (login, password)
+            VALUES (${'lonely'}, '')
+        `;
+        expect(await db.getMatchResults('lonely')).toEqual([]);
     });
 });
