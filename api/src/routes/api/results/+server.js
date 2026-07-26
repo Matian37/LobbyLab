@@ -3,12 +3,12 @@ import { json } from '@sveltejs/kit';
 
 export async function GET({ cookies }) {
     const token = cookies.get('token');
-    if (token == undefined) return json({ sukces: false, matches: null });
+    if (token == undefined) return json({ success: false, matches: null });
 
     const login = await getLoginFromToken(token);
     if (login === null) {
-        console.debug('nie istnieje sesja z danym tokenem');
-        return json({ sukces: false, matches: null });
+        console.debug('session with given token does not exist');
+        return json({ success: false, matches: null });
     }
-    return json({ sukces: true, matches: await getMatchResults(login) });
+    return json({ success: true, matches: await getMatchResults(login) });
 }

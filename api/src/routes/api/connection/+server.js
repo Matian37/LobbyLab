@@ -4,12 +4,12 @@ import { Client } from 'postgres';
 
 export async function GET({ cookies }) {
     const token = cookies.get('token');
-    if (token == undefined) return json({ sukces: false });
+    if (token == undefined) return json({ success: false });
 
     const login = await getLoginFromToken(token);
     if (login === null) {
-        console.debug('nie istnieje sesja z danym tokenem');
-        return json({ sukces: false });
+        console.debug('session with given token does not exist');
+        return json({ success: false });
     }
 
     let interval;
@@ -18,13 +18,13 @@ export async function GET({ cookies }) {
             start(controller) {
                 //listen(login, controller);
                 interval = setInterval(() => {
-                    console.debug('wysylam ping');
+                    console.debug('sending ping');
                     controller.enqueue('data: ping\n\n');
                 }, 10000);
             },
             async cancel() {
                 clearInterval(interval);
-                console.debug('klient przerwal polaczenie SSE');
+                console.debug('client disconnected SSE connection');
                 await deleteFromWaiting(login);
             },
         }),
@@ -44,7 +44,7 @@ async function listen(login, controller) {
 
     await sql.listen('users_match_id_assigned', (payload) => {
         if (payload.username != login) return;
-        console.debug('wysylam socket serwera');
+        console.debug('sending server socket');
         controller.equeue(`data: ${payload}\n\n`);
         controller.close();
     });

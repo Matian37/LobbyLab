@@ -6,8 +6,8 @@ export async function POST({ request, cookies }) {
     const result = await addUser(login, password);
     if (!result) {
         return json({
-            sukces: false,
-            msg: 'Podany login jest zajęty',
+            success: false,
+            msg: 'Login is already taken',
         });
     } else {
         const token = await addSession(login);
@@ -18,7 +18,7 @@ export async function POST({ request, cookies }) {
             sameSite: 'strict',
         });
         return json({
-            sukces: true,
+            success: true,
             msg: null,
         });
     }

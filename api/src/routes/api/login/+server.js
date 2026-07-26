@@ -19,29 +19,29 @@ export async function POST({ request, cookies }) {
             sameSite: 'strict',
         });
         return json({
-            sukces: true,
+            success: true,
             msg: null,
         });
     } else {
         return json({
-            sukces: false,
-            msg: 'Login lub hasło jest błędne',
+            success: false,
+            msg: 'Invalid login or password',
         });
     }
 }
 
 export async function DELETE({ cookies }) {
     const token = cookies.get('token');
-    if (token == undefined) return json({ sukces: false });
+    if (token == undefined) return json({ success: false });
 
     await deleteSession(token);
     cookies.delete('token', { path: '/' });
-    return json({ sukces: true });
+    return json({ success: true });
 }
 
 export async function GET({ cookies }) {
     const token = cookies.get('token');
-    if (token == undefined) return json({ sukces: false });
+    if (token == undefined) return json({ success: false });
 
-    return json({ suckes: await tokenExists(token) });
+    return json({ success: await tokenExists(token) });
 }

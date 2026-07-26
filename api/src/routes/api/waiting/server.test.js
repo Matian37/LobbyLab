@@ -23,7 +23,7 @@ describe('waiting', () => {
             },
         });
         const result = await response.json();
-        expect(result.sukces).toBe(false);
+        expect(result.success).toBe(false);
     });
 
     test('adding to waiting already waiting user', async () => {
@@ -38,7 +38,7 @@ describe('waiting', () => {
             },
         });
         const result = await response.json();
-        expect(result.sukces).toBe(false);
+        expect(result.success).toBe(false);
     });
 
     test('adding to waiting correctly', async () => {
@@ -51,7 +51,7 @@ describe('waiting', () => {
             },
         });
         const result = await response.json();
-        expect(result.sukces).toBe(true);
+        expect(result.success).toBe(true);
     });
 
     test('deleting from waiting user with no corresponding login to token', async () => {
@@ -66,7 +66,7 @@ describe('waiting', () => {
             },
         });
         const result = await response.json();
-        expect(result.sukces).toBe(false);
+        expect(result.success).toBe(false);
     });
 
     test('deleting from waiting', async () => {
@@ -79,6 +79,6 @@ describe('waiting', () => {
             },
         });
         const result = await response.json();
-        expect(result.sukces).toBe(true);
+        expect(result.success).toBe(true);
     });
 });

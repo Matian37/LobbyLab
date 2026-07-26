@@ -6,7 +6,7 @@ export async function load({ cookies }) {
 
     const login = await getLoginFromToken(token);
     if (login === null) {
-        console.debug('nie istnieje sesja z danym tokenem');
+        console.debug('session with given token does not exist');
         cookies.delete('token', { path: '/' });
         return null;
     }

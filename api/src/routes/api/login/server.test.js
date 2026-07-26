@@ -25,8 +25,8 @@ describe('logging in', () => {
         const response = await loginAPI.POST({ request });
         const result = await response.json();
         expect(result).toEqual({
-            sukces: false,
-            msg: 'Login lub hasło jest błędne',
+            success: false,
+            msg: 'Invalid login or password',
         });
     });
 
@@ -34,14 +34,14 @@ describe('logging in', () => {
         const request = new Request('http://cos', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ login: 'user', password: 'zle haslo' }),
+            body: JSON.stringify({ login: 'user', password: 'wrong password' }),
         });
 
         const response = await loginAPI.POST({ request });
         const result = await response.json();
         expect(result).toEqual({
-            sukces: false,
-            msg: 'Login lub hasło jest błędne',
+            success: false,
+            msg: 'Invalid login or password',
         });
     });
 
@@ -59,6 +59,6 @@ describe('logging in', () => {
             },
         });
         const result = await response.json();
-        expect(result.sukces).toBe(true);
+        expect(result.success).toBe(true);
     });
 });

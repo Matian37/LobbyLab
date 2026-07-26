@@ -23,8 +23,8 @@ describe('registering', () => {
         const response = await registerAPI.POST({ request });
         const result = await response.json();
         expect(result).toEqual({
-            sukces: false,
-            msg: 'Podany login jest zajęty',
+            success: false,
+            msg: 'Login is already taken',
         });
     });
 
@@ -32,7 +32,7 @@ describe('registering', () => {
         const request = new Request('http://cos', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ login: 'user', password: 'haslo' }),
+            body: JSON.stringify({ login: 'user', password: 'secret' }),
         });
 
         const response = await registerAPI.POST({
@@ -42,7 +42,7 @@ describe('registering', () => {
             },
         });
         const result = await response.json();
-        expect(result.sukces).toBe(true);
+        expect(result.success).toBe(true);
         expect(result.msg).toBe(null);
     });
 });

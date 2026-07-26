@@ -6,7 +6,7 @@
     let buttonText = $state('Play');
     let rows = $state([]);
     let user = $derived($page.data);
-    let title = $derived(!user.login ? 'Zaloguj sie' : user.login);
+    let title = $derived(!user.login ? 'Log in' : user.login);
 
     onMount(async () => {
         invalidateAll();
@@ -19,7 +19,7 @@
             method: 'GET',
         });
         const response = await query.json();
-        if (!response.sukces) return;
+        if (!response.success) return;
         rows = response.matches;
     }
 
@@ -34,16 +34,16 @@
         });
         user = null;
 
-        title = 'Zaloguj sie';
+        title = 'Log in';
     }
 
     async function play() {
         if (!user) {
-            console.debug('zaloguj sie~!!');
+            console.debug('log in first');
             return;
         }
         if (await isInWaitingList()) {
-            console.debug('jestes juz w kolejce');
+            console.debug('already in queue');
             return;
         }
     }
@@ -53,7 +53,7 @@
             method: 'GET',
         });
         let wynik = await response.json();
-        return wynik.sukces;
+        return wynik.success;
     }
 </script>
 

@@ -30,7 +30,7 @@ describe('statistics', () => {
         });
         const result = await response.json();
         expect(result).toEqual({
-            sukces: true,
+            success: true,
             matches: [
                 {
                     details: {

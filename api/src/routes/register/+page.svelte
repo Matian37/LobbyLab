@@ -10,7 +10,7 @@
 
     async function submit() {
         if (password.length < 3 || password.length > 64) {
-            errorText = 'Haslo musi miec co najmniej 3 znaki i co najwyżej 64';
+            errorText = 'Password must be between 3 and 64 characters';
             return;
         }
         let data = { login: login, password: password };
@@ -22,16 +22,16 @@
             body: JSON.stringify(data),
         });
         const result = await response.json();
-        if (!result.sukces) {
+        if (!result.success) {
             errorText = result.msg;
         } else {
-            console.debug('poprawnie zarejestrowano');
+            console.debug('registered successfully');
             changePage('/');
         }
     }
 </script>
 
-<button onclick={() => changePage('/')}>Powrót</button>
+<button onclick={() => changePage('/')}>Back</button>
 Login <input bind:value={login} data-testid="login-input" />
 Password
 <input bind:value={password} type="password" data-testid="password-input" />
