@@ -1,4 +1,4 @@
-import { expect, test, beforeEach, describe } from 'vitest';
+import { expect, test, beforeEach, afterEach, describe, vi } from 'vitest';
 import * as db from '$lib/db.js';
 import { sql } from '$lib/db.js';
 import postgres from 'postgres';
@@ -8,6 +8,31 @@ beforeEach(async () => {
     await sql.unsafe('DROP SCHEMA public CASCADE; CREATE SCHEMA public;');
     await sql.unsafe(process.env.DATABASE_INIT_SQL);
     await sql.end();
+});
+
+describe('tryQuery', () => {
+    beforeEach(() => {
+        vi.spyOn(console, 'debug').mockImplementation(() => {});
+    });
+    afterEach(() => {
+        vi.restoreAllMocks();
+    });
+
+    test('failure', async () => {
+        const result = await db.tryQuery(async () => {
+            throw new Error('Test Error Message');
+        });
+        expect(result).toBe(false);
+        expect(console.debug).toHaveBeenCalled();
+        expect(console.debug).toHaveBeenCalledWith(
+            expect.objectContaining({ message: 'Test Error Message' })
+        );
+    });
+
+    test('success', async () => {
+        const result = await db.tryQuery(async () => {});
+        expect(result).toBe(true);
+    });
 });
 
 describe('user adding and getting', () => {
