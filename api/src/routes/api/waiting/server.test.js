@@ -17,7 +17,7 @@ describe('waiting', () => {
         const response = await waitingAPI.POST({
             cookies: {
                 get: (name) => {
-                    if (name === 'token') return '1234567';
+                    if (name === 'session') return '1234567';
                     return undefined;
                 },
             },
@@ -32,7 +32,7 @@ describe('waiting', () => {
         const response = await waitingAPI.POST({
             cookies: {
                 get: (name) => {
-                    if (name === 'token') return '1234567';
+                    if (name === 'session') return '1234567';
                     return undefined;
                 },
             },
@@ -45,7 +45,7 @@ describe('waiting', () => {
         const response = await waitingAPI.POST({
             cookies: {
                 get: (name) => {
-                    if (name === 'token') return '1234567';
+                    if (name === 'session') return '1234567';
                     return undefined;
                 },
             },
@@ -60,7 +60,7 @@ describe('waiting', () => {
         const response = await waitingAPI.DELETE({
             cookies: {
                 get: (name) => {
-                    if (name === 'token') return '1234567';
+                    if (name === 'session') return '1234567';
                     return undefined;
                 },
             },
@@ -73,7 +73,7 @@ describe('waiting', () => {
         const response = await waitingAPI.DELETE({
             cookies: {
                 get: (name) => {
-                    if (name === 'token') return '1234567';
+                    if (name === 'session') return '1234567';
                     return undefined;
                 },
             },

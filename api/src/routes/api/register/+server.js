@@ -11,7 +11,7 @@ export async function POST({ request, cookies }) {
         });
     } else {
         const token = await addSession(login);
-        cookies.set('token', token, {
+        cookies.set('session', token, {
             path: '/',
             httpOnly: true,
             secure: true,

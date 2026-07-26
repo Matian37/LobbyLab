@@ -23,7 +23,7 @@ describe('statistics', () => {
         const response = await resultsAPI.GET({
             cookies: {
                 get: (name) => {
-                    if (name === 'token') return '1234567';
+                    if (name === 'session') return '1234567';
                     return undefined;
                 },
             },

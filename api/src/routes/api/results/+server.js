@@ -2,7 +2,7 @@ import { getMatchResults, getLoginFromToken } from '$lib/db.js';
 import { json } from '@sveltejs/kit';
 
 export async function GET({ cookies }) {
-    const token = cookies.get('token');
+    const token = cookies.get('session');
     if (token == undefined) return json({ success: false, matches: null });
 
     const login = await getLoginFromToken(token);

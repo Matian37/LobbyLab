@@ -7,7 +7,7 @@ import {
 import { json } from '@sveltejs/kit';
 
 export async function POST({ cookies }) {
-    const token = cookies.get('token');
+    const token = cookies.get('session');
     if (token == undefined) return json({ success: false });
     const response = await getLoginFromToken(token);
     if (response.length == 0) {
@@ -17,16 +17,14 @@ export async function POST({ cookies }) {
     const login = response[0].login;
 
     if (!(await addToWaiting(login))) {
-        console.debug(
-            'user not added to waiting list, probably already there'
-        );
+        console.debug('user not added to waiting list, probably already there');
         return json({ success: false });
     }
     return json({ success: true });
 }
 
 export async function DELETE({ cookies }) {
-    const token = cookies.get('token');
+    const token = cookies.get('session');
     if (token == undefined) return json({ success: false });
     const response = await getLoginFromToken(token);
     if (response.length == 0) {
@@ -39,7 +37,7 @@ export async function DELETE({ cookies }) {
 }
 
 export async function GET({ cookies }) {
-    const token = cookies.get('token');
+    const token = cookies.get('session');
     if (token == undefined) return json({ success: false });
     const response = await getLoginFromToken(token);
     if (response.length == 0) return json({ success: false });

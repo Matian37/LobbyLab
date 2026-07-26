@@ -3,7 +3,7 @@ import { json } from '@sveltejs/kit';
 import { Client } from 'postgres';
 
 export async function GET({ cookies }) {
-    const token = cookies.get('token');
+    const token = cookies.get('session');
     if (token == undefined) return json({ success: false });
 
     const login = await getLoginFromToken(token);

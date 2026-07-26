@@ -12,7 +12,7 @@ export async function POST({ request, cookies }) {
 
     if (await verifyPassword(login, password)) {
         const token = await addSession(login);
-        cookies.set('token', token, {
+        cookies.set('session', token, {
             path: '/',
             httpOnly: true,
             secure: true,
@@ -31,16 +31,16 @@ export async function POST({ request, cookies }) {
 }
 
 export async function DELETE({ cookies }) {
-    const token = cookies.get('token');
+    const token = cookies.get('session');
     if (token == undefined) return json({ success: false });
 
     await deleteSession(token);
-    cookies.delete('token', { path: '/' });
+    cookies.delete('session', { path: '/' });
     return json({ success: true });
 }
 
 export async function GET({ cookies }) {
-    const token = cookies.get('token');
+    const token = cookies.get('session');
     if (token == undefined) return json({ success: false });
 
     return json({ success: await tokenExists(token) });
