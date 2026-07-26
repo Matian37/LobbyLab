@@ -219,10 +219,12 @@ func TestIntegration_DatabaseConnection_GetMatchPlayers(t *testing.T) {
 
 				hc := newHelperConn(t)
 				for _, user := range test.users {
-					_, err := hc.Exec(ctx, "INSERT INTO users (login, password) VALUES ($1, $2)", user.Login, "")
-					require.NoError(t, err)
+					_, err := hc.Exec(
+						ctx,
+						"INSERT INTO users (login, password, queued_until) VALUES ($1, $2, NOW() + INTERVAL '5 hours')",
+						user.Login,
+						"")
 
-					_, err = hc.Exec(ctx, "INSERT INTO waiting (login) VALUES ($1)", user.Login)
 					require.NoError(t, err)
 				}
 
@@ -262,17 +264,9 @@ func TestIntegration_DatabaseConnection_AddMatch(t *testing.T) {
 
 		_, err := d.conn.Exec(
 			ctx, `
-			INSERT INTO users (login, password)
-			VALUES ('user1', ''),
-				   ('user2', '')
-			`,
-		)
-		require.NoError(t, err)
-		_, err = d.conn.Exec(
-			ctx, `
-			INSERT INTO waiting (login)
-			VALUES ('user1'),
-				   ('user2')
+			INSERT INTO users (login, password, queued_until)
+			VALUES ('user1', '', NOW() + INTERVAL '5 hours'),
+				   ('user2', '', NOW() + INTERVAL '5 hours')
 			`,
 		)
 		require.NoError(t, err)
@@ -304,57 +298,6 @@ func TestIntegration_DatabaseConnection_AddMatch(t *testing.T) {
 
 		expectedMatches := []UserMatch{{UserID: "user1", MatchID: matchID}, {UserID: "user2", MatchID: matchID}}
 		require.Equal(t, expectedMatches, matches)
-	})
-
-	t.Run("waiting user disconnected", func(t *testing.T) {
-		restartDB(t)
-
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-
-		d := newDBConnWithOpen(t)
-
-		matchUsers := []internal.User{{Login: "user1"}, {Login: "user2"}}
-
-		_, err := d.conn.Exec(
-			ctx, `
-			INSERT INTO users (login, password)
-			VALUES ('user1', ''),
-				   ('user2', '')
-			`,
-		)
-		require.NoError(t, err)
-		_, err = d.conn.Exec(
-			ctx, `
-			INSERT INTO waiting (login)
-			VALUES ('user2')
-			`,
-		)
-		require.NoError(t, err)
-
-		err = d.AddMatch(ctx, matchUsers, internal.ServerInfo{Host: "someGameServerHost", Port: "1234/udp"}, 1)
-		require.ErrorIs(t, err, internal.ErrDBWaitingUserDisconnected)
-
-		var matchCount int
-		err = d.conn.QueryRow(ctx, "SELECT COUNT(*) FROM matches").Scan(&matchCount)
-		require.NoError(t, err)
-		require.Zero(t, matchCount)
-
-		var userMatchCount int
-		err = d.conn.QueryRow(ctx, "SELECT COUNT(*) FROM user_matches").Scan(&userMatchCount)
-		require.NoError(t, err)
-		require.Zero(t, userMatchCount)
-
-		var noMatchAssigned bool
-		err = d.conn.QueryRow(ctx, `
-			SELECT NOT EXISTS (
-				SELECT 1
-				FROM users
-				WHERE match_id IS NOT NULL
-			)
-		`).Scan(&noMatchAssigned)
-		require.NoError(t, err)
-		require.True(t, noMatchAssigned)
 	})
 }
 
