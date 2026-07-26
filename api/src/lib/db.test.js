@@ -17,7 +17,7 @@ import { fileURLToPath } from 'url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 let db;
-let sql;
+let helperSql;
 let container;
 
 beforeAll(async () => {
@@ -44,11 +44,13 @@ beforeAll(async () => {
 
     console.log('[test-db] importing $lib/db.js...');
     db = await import('$lib/db.js');
-    sql = db.sql;
+    helperSql = postgres(databaseUrl);
     console.log('[test-db] $lib/db.js loaded, connection pool ready');
 }, 30000);
 
 afterAll(async () => {
+    if (helperSql) await helperSql.end();
+
     if (container) {
         console.log('[test-db] stopping...');
         await container.stop();
@@ -57,10 +59,8 @@ afterAll(async () => {
 });
 
 beforeEach(async () => {
-    const helperSql = postgres(process.env.DATABASE_URL);
     await helperSql.unsafe('DROP SCHEMA public CASCADE; CREATE SCHEMA public;');
     await helperSql.unsafe(process.env.DATABASE_INIT_SQL);
-    await helperSql.end();
 });
 
 describe('tryQuery', () => {
@@ -91,7 +91,7 @@ describe('tryQuery', () => {
 describe('user adding and getting', () => {
     test('normal user adding', async () => {
         expect(await db.addUser('user', 'hashedPassword')).toBe(true);
-        const q = await sql`SELECT 1 FROM users WHERE login = 'user'`;
+        const q = await helperSql`SELECT 1 FROM users WHERE login = 'user'`;
         expect(q.length).toBe(1);
     });
 
@@ -161,18 +161,18 @@ describe('statistics', () => {
             for (let j = 0; j < matches[i].players.length; j++) {
                 if (created.has(matches[i].players[j])) continue;
                 created.add(matches[i].players[j]);
-                await sql`INSERT INTO users (login, password) VALUES (${matches[i].players[j]}, '123')`;
+                await helperSql`INSERT INTO users (login, password) VALUES (${matches[i].players[j]}, '123')`;
             }
         }
         for (let i = 0; i < matches.length; i++) {
-            let q = await sql`
+            let q = await helperSql`
                 INSERT INTO matches (host, port, results, canceled)
-                VALUES ('hoscik', 1233, ${sql.json(matches[i])}, ${canceled[i]})
+                VALUES ('hoscik', 1233, ${helperSql.json(matches[i])}, ${canceled[i]})
                 RETURNING id
             `;
             const match_id = q[0].id;
             for (let j = 0; j < matches[i].players.length; j++) {
-                await sql`INSERT INTO user_matches (user_id, match_id) VALUES (${matches[i].players[j]}, ${match_id})`;
+                await helperSql`INSERT INTO user_matches (user_id, match_id) VALUES (${matches[i].players[j]}, ${match_id})`;
             }
         }
         const result = await db.getMatchResults('albert');
