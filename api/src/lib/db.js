@@ -119,3 +119,10 @@ export async function healthCheck(){
         return false;
     }
 }
+
+export async function getAuthToken(login){
+    const q = await sql`
+        SELECT match_auth_token FROM users WHERE login = ${login}
+    `
+    return q[0]?.match_auth_token ?? null;
+}

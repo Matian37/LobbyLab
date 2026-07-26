@@ -55,7 +55,11 @@ async function listen(login, controller){
     await client.query("LISTEN users_match_id_assigned");
       
     client.on("notification", (msg) => {
-        if(msg.payload.username != login) return;
+        // FIX: msg.payload is a string, so this is not valid
+        if (msg.payload.username != login) return;
+
+        msg.payload.match_auth_token = await getAuthToken(login);
+        
         console.debug("wysylam socket serwera");
         controller.equeue(`data: ${msg.payload}\n\n`);
         controller.close();

@@ -101,3 +101,22 @@ describe('statistics', () => {
         ]);
     });
 });
+
+describe("getAuthToken", () => {
+    test("returns auth token for valid login", async () => {
+        await sql`INSERT INTO users (login, password, match_auth_token) VALUES ('user', '123', 'token')`;
+        const token = await db.getAuthToken('user');
+        expect(token).toBe('token');
+    });
+
+    test("returns null for invalid login", async () => {
+        const token = await db.getAuthToken('invalid');
+        expect(token).toBeNull();
+    });
+
+    test("returns null for no token", async () => {
+        await sql`INSERT INTO users (login, password) VALUES ('user', '123')`;
+        const token = await db.getAuthToken('user');
+        expect(token).toBeNull();
+    });
+});
