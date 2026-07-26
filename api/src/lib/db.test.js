@@ -1,7 +1,60 @@
-import { expect, test, beforeEach, afterEach, describe, vi } from 'vitest';
-import * as db from '$lib/db.js';
-import { sql } from '$lib/db.js';
+import {
+    expect,
+    test,
+    beforeEach,
+    afterEach,
+    beforeAll,
+    afterAll,
+    describe,
+    vi,
+} from 'vitest';
+import { PostgreSqlContainer } from '@testcontainers/postgresql';
 import postgres from 'postgres';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+let db;
+let sql;
+let container;
+
+beforeAll(async () => {
+    console.log('[test-db] starting PostgreSQL...');
+    container = await new PostgreSqlContainer('postgres:18.4-alpine')
+        .withUsername('postgres')
+        .withPassword('123')
+        .withDatabase('postgres')
+        .start();
+
+    const databaseUrl = container.getConnectionUri();
+    process.env.DATABASE_URL = databaseUrl;
+    console.log('[test-db] started at', databaseUrl);
+
+    console.log('[test-db] initializing schema...');
+    const initSqlPath = path.resolve(__dirname, '../../../init.sql');
+    const initSql = fs.readFileSync(initSqlPath, 'utf8');
+    process.env.DATABASE_INIT_SQL = initSql;
+
+    const pg = postgres(databaseUrl);
+    await pg.unsafe(initSql);
+    await pg.end();
+    console.log('[test-db] schema initialized');
+
+    console.log('[test-db] importing $lib/db.js...');
+    db = await import('$lib/db.js');
+    sql = db.sql;
+    console.log('[test-db] $lib/db.js loaded, connection pool ready');
+}, 30000);
+
+afterAll(async () => {
+    if (container) {
+        console.log('[test-db] stopping...');
+        await container.stop();
+        console.log('[test-db] stopped');
+    }
+});
 
 beforeEach(async () => {
     const helperSql = postgres(process.env.DATABASE_URL);
