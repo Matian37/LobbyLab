@@ -301,7 +301,7 @@ func TestE2E_AppLifecycle(t *testing.T) {
 
 	_, err = dbConn.Exec(
 		ctx,
-		"INSERT INTO users (login, password, queued_until) VALUES ($1, $2, NOW() + INTERVAL '5 seconds'), ($3, $4, NOW() + INTERVAL '5 seconds')",
+		"INSERT INTO users (login, password, queued_until) VALUES ($1, $2, NOW() + INTERVAL '5 hours'), ($3, $4, NOW() + INTERVAL '5 hours')",
 		"user1", "pass1",
 		"user2", "pass2",
 	)
@@ -417,10 +417,10 @@ func TestE2E_WorkersOverloadWithMatches(t *testing.T) {
 		ctx,
 		`INSERT INTO users (login, password, queued_until) 
 		VALUES 
-		($1,$2,NOW() + INTERVAL '5 seconds'),
-		($3,$4,NOW() + INTERVAL '5 seconds'),
-		($5,$6,NOW() + INTERVAL '5 seconds'),
-		($7,$8,NOW() + INTERVAL '5 seconds')`,
+		($1,$2,NOW() + INTERVAL '5 hours'),
+		($3,$4,NOW() + INTERVAL '5 hours'),
+		($5,$6,NOW() + INTERVAL '5 hours'),
+		($7,$8,NOW() + INTERVAL '5 hours')`,
 		"user1", "pass",
 		"user2", "pass",
 		"user3", "pass",
@@ -435,7 +435,7 @@ func TestE2E_WorkersOverloadWithMatches(t *testing.T) {
 	}, 10*time.Second, 100*time.Millisecond, "should create 2 matches")
 
 	_, err = dbConn.Exec(ctx,
-		"INSERT INTO users (login, password, queued_until) VALUES ($1,$2,NOW() + INTERVAL '5 seconds'),($3,$4,NOW() + INTERVAL '5 seconds')",
+		"INSERT INTO users (login, password, queued_until) VALUES ($1,$2,NOW() + INTERVAL '5 hours'),($3,$4,NOW() + INTERVAL '5 hours')",
 		"user5", "pass",
 		"user6", "pass",
 	)
@@ -517,7 +517,7 @@ func TestE2E_WorkerFailureAndRestart(t *testing.T) {
 
 	_, err = dbConn.Exec(
 		ctx,
-		"INSERT INTO users (login, password, queued_until) VALUES ($1,$2,NOW() + INTERVAL '5 seconds'),($3,$4,NOW() + INTERVAL '5 seconds')",
+		"INSERT INTO users (login, password, queued_until) VALUES ($1,$2,NOW() + INTERVAL '5 hours'),($3,$4,NOW() + INTERVAL '5 hours')",
 		"user1", "pass",
 		"user2", "pass",
 	)
@@ -626,7 +626,7 @@ func TestE2E_NoMatchWithoutEnoughPlayers(t *testing.T) {
 
 	waitForAppStart(t, started, appResult)
 
-	_, err = dbConn.Exec(ctx, "INSERT INTO users (login, password, queued_until) VALUES ($1,$2,NOW() + INTERVAL '5 seconds')", "user1", "pass")
+	_, err = dbConn.Exec(ctx, "INSERT INTO users (login, password, queued_until) VALUES ($1,$2,NOW() + INTERVAL '5 hours')", "user1", "pass")
 	require.NoError(t, err)
 
 	time.Sleep(2 * time.Second)
