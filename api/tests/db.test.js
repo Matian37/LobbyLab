@@ -24,24 +24,11 @@ describe('user adding and getting', () => {
 });
 
 describe('waiting list', () => {
-
-    test('adding to waiting once', async () => {
-        expect(await db.addToWaiting('user')).toBe(true);
-        expect((await db.findWaitingByLogin('user')).length).toBe(1);
-    });
-
-
-    test('adding to waiting twice', async () => {
-        expect(await db.addToWaiting('user')).toBe(true);
-        expect((await db.addToWaiting('user'))).toBe(false);
-    });
-
-    test('delete from waiting', async () => {
-        expect(await db.deleteFromWaiting('user')).toBe(true);
-        expect(await db.addToWaiting('user')).toBe(true);
-        expect((await db.findWaitingByLogin('user')).length).toBe(1);
-        expect(await db.deleteFromWaiting('user')).toBe(true);
+    test('adding to waiting', async () => {
+        expect(await db.addUser('user', 'hashedPassword')).toBe(true);
         expect((await db.findWaitingByLogin('user')).length).toBe(0);
+        expect(await db.setUserStatus('user')).toBe(true);
+        expect((await db.findWaitingByLogin('user')).length).toBe(1);
     });
 });
 

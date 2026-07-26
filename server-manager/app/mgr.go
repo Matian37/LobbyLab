@@ -171,6 +171,13 @@ func (wm *WorkerManager) saveLoop(ctx context.Context) error {
 		case res := <-wm.saveResultChan:
 			wm.logger.Debug("received save request", "result", res)
 
+			if err := wm.dbConn.RemoveMatchStatus(ctx, res.MatchID); err != nil {
+				wm.logger.Error(
+					"failed to remove match status from match users. this will block their matchmaking indefinitely",
+					"matchID", res.MatchID, "error", err,
+				)
+			}
+
 			err := wm.dbConn.SaveMatchResults(ctx, res)
 			if err != nil {
 				wm.logger.Error("failed to save result", "error", err)

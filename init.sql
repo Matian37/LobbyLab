@@ -17,7 +17,8 @@ CREATE TABLE IF NOT EXISTS users(
     login TEXT PRIMARY KEY,
     password TEXT NOT NULL,
     match_id BIGINT REFERENCES matches(id) ON DELETE SET NULL,
-    match_auth_token TEXT
+    match_auth_token TEXT,
+    queued_until TIMESTAMP
 );
 CREATE INDEX IF NOT EXISTS idx_users_match_id ON users(match_id);
 
@@ -26,10 +27,6 @@ CREATE TABLE IF NOT EXISTS user_matches (
     user_id TEXT NOT NULL REFERENCES users(login) ON DELETE CASCADE,
     match_id BIGINT NOT NULL REFERENCES matches(id) ON DELETE CASCADE,
     PRIMARY KEY (user_id, match_id)
-);
-
-CREATE TABLE IF NOT EXISTS waiting(
-    login TEXT PRIMARY KEY
 );
 
 CREATE TABLE IF NOT EXISTS sessions(

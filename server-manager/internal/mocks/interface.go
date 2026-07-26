@@ -412,6 +412,20 @@ func (mr *MockDatabaseConnectionMockRecorder) Open(ctx any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Open", reflect.TypeOf((*MockDatabaseConnection)(nil).Open), ctx)
 }
 
+// RemoveMatchStatus mocks base method.
+func (m *MockDatabaseConnection) RemoveMatchStatus(ctx context.Context, matchID int) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "RemoveMatchStatus", ctx, matchID)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// RemoveMatchStatus indicates an expected call of RemoveMatchStatus.
+func (mr *MockDatabaseConnectionMockRecorder) RemoveMatchStatus(ctx, matchID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RemoveMatchStatus", reflect.TypeOf((*MockDatabaseConnection)(nil).RemoveMatchStatus), ctx, matchID)
+}
+
 // SaveMatchResults mocks base method.
 func (m *MockDatabaseConnection) SaveMatchResults(ctx context.Context, results internal.Result) error {
 	m.ctrl.T.Helper()

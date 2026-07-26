@@ -11,12 +11,11 @@ vi.mock('$lib/db.js', () => {
     const bcrypt = require('bcryptjs')
     return {
         findUserByLogin: vi.fn().mockResolvedValue([{ login: 'user', password: bcrypt.hashSync("123", 10) }]),
+        findWaitingByLogin: vi.fn().mockResolvedValue([{cos: 'hek'}]),
         tokenExists: vi.fn().mockResolvedValue([]),
         setSession: vi.fn().mockResolvedValue(true),
         addUser: vi.fn().mockResolvedValue(true),
         getLoginFromToken: vi.fn().mockResolvedValue([{login: "user"}]),
-        addToWaiting: vi.fn().mockResolvedValue(true),
-        deleteFromWaiting: vi.fn().mockResolvedValue(true),
         getMatchResults: vi.fn().mockResolvedValue([
             {details: {players: ['albert', 'zbychu'], winner: 'albert'}, canceled: false},
             {details: {players: ['user1', 'albert'], winner: 'user1'}, canceled: true},
@@ -104,13 +103,13 @@ describe('registering', () => {
 
 
 describe('waiting', () => {
-    test('adding to waiting user with wrong token', async () => {
+    test('getting waiting user that does not have corresponding token', async () => {
         db.getLoginFromToken.mockResolvedValueOnce([]);
 
-        const response = await waitingAPI.POST({
+        const response = await waitingAPI.GET({
             cookies: {
                 get: (name) => {
-                    if (name === 'token') return '1234567';
+                    if (name == 'token') return '1234567';
                     return undefined;
                 }
             }
@@ -119,55 +118,11 @@ describe('waiting', () => {
         expect(result.sukces).toBe(false);
     });
 
-    test('adding to waiting already waiting user', async () => {
-        db.addToWaiting.mockResolvedValueOnce(false);
-
-        const response = await waitingAPI.POST({
+    test('getting waiting user', async () => {
+        const response = await waitingAPI.GET({
             cookies: {
                 get: (name) => {
-                    if (name === 'token') return '1234567';
-                    return undefined;
-                }
-            }
-         });
-        const result = await response.json();
-        expect(result.sukces).toBe(false);
-    });
-
-    test('adding to waiting correctly', async () => {
-        const response = await waitingAPI.POST({
-            cookies: {
-                get: (name) => {
-                    if (name === 'token') return '1234567';
-                    return undefined;
-                }
-            }
-         });
-        const result = await response.json();
-        expect(result.sukces).toBe(true);
-    });
-
-    test('deleting from waiting user with no corresponding login to token', async () => {
-        db.getLoginFromToken.mockResolvedValueOnce([]);
-
-        const response = await waitingAPI.DELETE({
-            cookies: {
-                get: (name) => {
-                    if (name === 'token') return '1234567';
-                    return undefined;
-                }
-            }
-         });
-        const result = await response.json();
-        expect(result.sukces).toBe(false);
-    });
-
-    test('deleting from waiting', async () => {
-
-        const response = await waitingAPI.DELETE({
-            cookies: {
-                get: (name) => {
-                    if (name === 'token') return '1234567';
+                    if (name == 'token') return '1234567';
                     return undefined;
                 }
             }
@@ -182,7 +137,7 @@ describe('statistics', () => {
         const response = await resultsAPI.GET( {
             cookies: {
                 get: (name) => {
-                    if (name === 'token') return '1234567';
+                    if (name == 'token') return '1234567';
                     return undefined;
                 }
             }
