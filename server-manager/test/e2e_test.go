@@ -301,7 +301,7 @@ func TestE2E_AppLifecycle(t *testing.T) {
 
 	_, err = dbConn.Exec(
 		ctx,
-		"INSERT INTO users (login, password, last_active) VALUES ($1, $2, NOW()), ($3, $4, NOW())",
+		"INSERT INTO users (login, password, queued_until) VALUES ($1, $2, NOW() + INTERVAL '5 seconds'), ($3, $4, NOW() + INTERVAL '5 seconds')",
 		"user1", "pass1",
 		"user2", "pass2",
 	)
@@ -314,7 +314,7 @@ func TestE2E_AppLifecycle(t *testing.T) {
 	}, 10*time.Second, 100*time.Millisecond, "should matchmake users and create match")
 
 	var waitingCount int
-	err = dbConn.QueryRow(ctx, "SELECT COUNT(*) FROM users WHERE last_active > NOW() - INTERVAL '5 seconds' AND match_id IS NULL").Scan(&waitingCount)
+	err = dbConn.QueryRow(ctx, "SELECT COUNT(*) FROM users WHERE queued_until > NOW() AND match_id IS NULL").Scan(&waitingCount)
 	require.NoError(t, err)
 	assert.Zero(t, waitingCount)
 
@@ -415,7 +415,12 @@ func TestE2E_WorkersOverloadWithMatches(t *testing.T) {
 
 	_, err = dbConn.Exec(
 		ctx,
-		"INSERT INTO users (login, password, last_active) VALUES ($1,$2,NOW()),($3,$4,NOW()),($5,$6,NOW()),($7,$8,NOW())",
+		`INSERT INTO users (login, password, queued_until) 
+		VALUES 
+		($1,$2,NOW() + INTERVAL '5 seconds'),
+		($3,$4,NOW() + INTERVAL '5 seconds'),
+		($5,$6,NOW() + INTERVAL '5 seconds'),
+		($7,$8,NOW() + INTERVAL '5 seconds')`,
 		"user1", "pass",
 		"user2", "pass",
 		"user3", "pass",
@@ -430,7 +435,7 @@ func TestE2E_WorkersOverloadWithMatches(t *testing.T) {
 	}, 10*time.Second, 100*time.Millisecond, "should create 2 matches")
 
 	_, err = dbConn.Exec(ctx,
-		"INSERT INTO users (login, password, last_active) VALUES ($1,$2,NOW()),($3,$4,NOW())",
+		"INSERT INTO users (login, password, queued_until) VALUES ($1,$2,NOW() + INTERVAL '5 seconds'),($3,$4,NOW() + INTERVAL '5 seconds')",
 		"user5", "pass",
 		"user6", "pass",
 	)
@@ -439,7 +444,7 @@ func TestE2E_WorkersOverloadWithMatches(t *testing.T) {
 	time.Sleep(2 * time.Second)
 
 	var waitingCount int
-	err = dbConn.QueryRow(ctx, "SELECT COUNT(*) FROM users WHERE last_active > NOW() - INTERVAL '5 seconds' AND match_id IS NULL").Scan(&waitingCount)
+	err = dbConn.QueryRow(ctx, "SELECT COUNT(*) FROM users WHERE queued_until > NOW() AND match_id IS NULL").Scan(&waitingCount)
 	require.NoError(t, err)
 	assert.Equal(t, 2, waitingCount, "users 5,6 should still wait when all workers occupied")
 
@@ -465,7 +470,7 @@ func TestE2E_WorkersOverloadWithMatches(t *testing.T) {
 		return err == nil && matchCount == 3
 	}, 10*time.Second, 100*time.Millisecond, "should create 3rd match after result frees a worker")
 
-	err = dbConn.QueryRow(ctx, "SELECT COUNT(*) FROM users WHERE last_active > NOW() - INTERVAL '5 seconds' AND match_id IS NULL").Scan(&waitingCount)
+	err = dbConn.QueryRow(ctx, "SELECT COUNT(*) FROM users WHERE queued_until > NOW() AND match_id IS NULL").Scan(&waitingCount)
 	require.NoError(t, err)
 	assert.Zero(t, waitingCount, "all users should be matched")
 
@@ -512,7 +517,7 @@ func TestE2E_WorkerFailureAndRestart(t *testing.T) {
 
 	_, err = dbConn.Exec(
 		ctx,
-		"INSERT INTO users (login, password, last_active) VALUES ($1,$2,NOW()),($3,$4,NOW())",
+		"INSERT INTO users (login, password, queued_until) VALUES ($1,$2,NOW() + INTERVAL '5 seconds'),($3,$4,NOW() + INTERVAL '5 seconds')",
 		"user1", "pass",
 		"user2", "pass",
 	)
@@ -528,7 +533,7 @@ func TestE2E_WorkerFailureAndRestart(t *testing.T) {
 
 	_, err = dbConn.Exec(
 		ctx,
-		"INSERT INTO users (login, password, last_active) VALUES ($1,$2,NOW() + INTERVAL '5 hours'),($3,$4,NOW() + INTERVAL '5 hours')",
+		"INSERT INTO users (login, password, queued_until) VALUES ($1,$2,NOW() + INTERVAL '5 hours'),($3,$4,NOW() + INTERVAL '5 hours')",
 		"user3", "pass", "user4", "pass",
 	)
 	require.NoError(t, err)
@@ -578,7 +583,7 @@ func TestE2E_WorkerFailureAndRestart(t *testing.T) {
 	)
 
 	var waitingCount int
-	err = dbConn.QueryRow(ctx, "SELECT COUNT(*) FROM users WHERE last_active > NOW() - INTERVAL '5 seconds' AND match_id IS NULL").Scan(&waitingCount)
+	err = dbConn.QueryRow(ctx, "SELECT COUNT(*) FROM users WHERE queued_until > NOW() AND match_id IS NULL").Scan(&waitingCount)
 	require.NoError(t, err)
 	assert.Zero(t, waitingCount, "all users should be matched")
 
@@ -621,7 +626,7 @@ func TestE2E_NoMatchWithoutEnoughPlayers(t *testing.T) {
 
 	waitForAppStart(t, started, appResult)
 
-	_, err = dbConn.Exec(ctx, "INSERT INTO users (login, password, last_active) VALUES ($1,$2,NOW())", "user1", "pass")
+	_, err = dbConn.Exec(ctx, "INSERT INTO users (login, password, queued_until) VALUES ($1,$2,NOW() + INTERVAL '5 seconds')", "user1", "pass")
 	require.NoError(t, err)
 
 	time.Sleep(2 * time.Second)

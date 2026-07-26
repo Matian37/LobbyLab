@@ -30,7 +30,7 @@ export async function addUser(login, password){
 export async function setUserStatus(login){
     try{
         await sql`
-            UPDATE users SET last_active = NOW() WHERE login = ${login}
+            UPDATE users SET queued_until = NOW() + INTERVAL '5 seconds' WHERE login = ${login}
         `
         return true;
     }
@@ -41,7 +41,7 @@ export async function setUserStatus(login){
 
 export async function findWaitingByLogin(login){
     const q = await sql`
-        SELECT * FROM users WHERE login = ${login} AND last_active > NOW() - INTERVAL '5 seconds'
+        SELECT * FROM users WHERE login = ${login} AND queued_until > NOW()
     `
     return q;
 }

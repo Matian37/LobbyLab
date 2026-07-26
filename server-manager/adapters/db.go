@@ -74,7 +74,7 @@ func (dc *DatabaseConnection) GatherMatchPlayers(ctx context.Context) ([]interna
 		return nil, ErrDBConnClosed
 	}
 
-	rows, err := dc.conn.Query(ctx, "SELECT login FROM users WHERE last_active > NOW() - INTERVAL '5 seconds' AND match_id IS NULL LIMIT $1", dc.config.PlayersPerRoom)
+	rows, err := dc.conn.Query(ctx, "SELECT login FROM users WHERE queued_until > NOW() AND match_id IS NULL LIMIT $1", dc.config.PlayersPerRoom)
 	if err != nil {
 		return nil, err
 	}
@@ -140,7 +140,7 @@ func (dc *DatabaseConnection) AddMatch(
 
 	_, err = tx.Exec(
 		ctx,
-		"UPDATE users SET match_id = $1, last_active = NOW() - INTERVAL '6 seconds' WHERE login = ANY($2)",
+		"UPDATE users SET match_id = $1, queued_until = NOW() - INTERVAL '5 seconds' WHERE login = ANY($2)",
 		matchID,
 		logins,
 	)

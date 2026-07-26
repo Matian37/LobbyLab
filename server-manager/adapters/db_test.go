@@ -219,7 +219,12 @@ func TestIntegration_DatabaseConnection_GetMatchPlayers(t *testing.T) {
 
 				hc := newHelperConn(t)
 				for _, user := range test.users {
-					_, err := hc.Exec(ctx, "INSERT INTO users (login, password, last_active) VALUES ($1, $2, NOW())", user.Login, "")
+					_, err := hc.Exec(
+						ctx,
+						"INSERT INTO users (login, password, queued_until) VALUES ($1, $2, NOW() + INTERVAL '5 seconds')",
+						user.Login,
+						"")
+
 					require.NoError(t, err)
 				}
 
@@ -259,9 +264,9 @@ func TestIntegration_DatabaseConnection_AddMatch(t *testing.T) {
 
 		_, err := d.conn.Exec(
 			ctx, `
-			INSERT INTO users (login, password, last_active)
-			VALUES ('user1', '', NOW()),
-				   ('user2', '', NOW())
+			INSERT INTO users (login, password, queued_until)
+			VALUES ('user1', '', NOW() + INTERVAL '5 seconds'),
+				   ('user2', '', NOW() + INTERVAL '5 seconds')
 			`,
 		)
 		require.NoError(t, err)
