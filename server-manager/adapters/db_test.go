@@ -479,22 +479,6 @@ func TestIntegration_DatabaseConnection_GenerateAuthTokens(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, users, dbUsers)
 	})
-
-	t.Run("user dissapeared", func(t *testing.T) {
-		restartDB(t)
-
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-
-		d := newDBConnWithOpen(t)
-		helperConn := newHelperConn(t)
-
-		_, err := helperConn.Exec(ctx, "INSERT INTO users (login, password) VALUES ('user1', '')")
-		require.NoError(t, err)
-
-		_, err = d.GenerateAuthTokens(ctx, []internal.User{{Login: "user1"}, {Login: "user2"}})
-		require.ErrorIs(t, err, internal.ErrDBNotEnoughPlayers)
-	})
 }
 
 func TestIntegration_DatabaseConnection_RemoveMatchStatus(t *testing.T) {

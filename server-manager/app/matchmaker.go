@@ -142,13 +142,8 @@ func (m *Matchmaker) matchmakingLoop(ctx context.Context) error {
 
 		users, err = m.db.GenerateAuthTokens(ctx, users)
 		if err != nil {
-			if errors.Is(err, internal.ErrDBNotEnoughPlayers) {
-				m.logger.Info("match creation failed due to decrease in number of players")
-				iterationErr = nil
-			} else {
-				m.logger.Error("failed to set match auth tokens for users", "error", err)
-				iterationErr = err
-			}
+			m.logger.Error("failed to set match auth tokens for users", "error", err)
+			iterationErr = err
 			continue
 		}
 

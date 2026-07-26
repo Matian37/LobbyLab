@@ -230,10 +230,6 @@ func (dc *DatabaseConnection) GenerateAuthTokens(ctx context.Context, users []in
 	if err != nil {
 		return nil, err
 	}
-	if len(newUsers) != len(users) {
-		return nil, internal.ErrDBNotEnoughPlayers
-	}
-
 	return newUsers, nil
 }
 
