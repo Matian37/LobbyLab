@@ -40,6 +40,7 @@ type DatabaseConnection interface {
 	GatherMatchPlayers(ctx context.Context) ([]User, error)
 	AddMatch(ctx context.Context, users []User, serverInfo ServerInfo, matchId int) error
 	GetNextMatchId(ctx context.Context) (int, error)
+	RemoveMatchStatus(ctx context.Context, matchID int) error
 }
 
 type Message interface {

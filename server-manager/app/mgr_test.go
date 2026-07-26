@@ -740,6 +740,7 @@ func TestWorkerManager_SaveLoop(t *testing.T) {
 		_, _, db, wm := newMockWorkerManagerWithInit(t, []*Worker{})
 		res := internal.Result{Success: true, MatchID: 42}
 
+		db.EXPECT().RemoveMatchStatus(ctx, 42).Return(nil)
 		db.EXPECT().SaveMatchResults(ctx, res).DoAndReturn(
 			func(any, any) error {
 				cancel()
@@ -962,6 +963,7 @@ func TestWorkerManager_LifeCycle(t *testing.T) {
 		broker.EXPECT().GetResult(ctx).Return(msg, nil)
 		msg.EXPECT().Data().Times(2).Return(payload)
 		msg.EXPECT().Ack().Return(nil)
+		db.EXPECT().RemoveMatchStatus(ctx, 1).Return(nil)
 		db.EXPECT().SaveMatchResults(ctx, res).
 			DoAndReturn(func(ctx any, result any) error {
 				cancel()
