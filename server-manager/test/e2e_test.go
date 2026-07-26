@@ -528,7 +528,7 @@ func TestE2E_WorkerFailureAndRestart(t *testing.T) {
 
 	_, err = dbConn.Exec(
 		ctx,
-		"INSERT INTO users (login, password, last_active) VALUES ($1,$2,NOW()),($3,$4,NOW())",
+		"INSERT INTO users (login, password, last_active) VALUES ($1,$2,NOW() + INTERVAL '5 hours'),($3,$4,NOW() + INTERVAL '5 hours')",
 		"user3", "pass", "user4", "pass",
 	)
 	require.NoError(t, err)
@@ -547,6 +547,26 @@ func TestE2E_WorkerFailureAndRestart(t *testing.T) {
 		100*time.Millisecond,
 		"should cancel match",
 	)
+
+	rows, err := dbConn.Query(ctx, "SELECT * FROM users")
+	require.NoError(t, err)
+	defer rows.Close()
+
+	for rows.Next() {
+		values, err := rows.Values()
+		require.NoError(t, err)
+		t.Log(values)
+	}
+
+	rows, err = dbConn.Query(ctx, "SELECT * FROM matches")
+	require.NoError(t, err)
+	defer rows.Close()
+
+	for rows.Next() {
+		values, err := rows.Values()
+		require.NoError(t, err)
+		t.Log(values)
+	}
 
 	var secondMatchID int
 	require.Eventually(t,
