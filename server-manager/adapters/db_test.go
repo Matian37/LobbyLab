@@ -329,41 +329,20 @@ func TestIntegration_DatabaseConnection_SaveMatchResults(t *testing.T) {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 
-		type userRow struct {
-			Login   string `db:"login"`
-			MatchID *int   `db:"match_id"`
-		}
-
 		tests := []struct {
-			Name      string
-			MatchID   int
-			Success   bool
-			Details   []byte
-			WantUsers []userRow
+			Name    string
+			Success bool
+			Details []byte
 		}{
 			{
 				Name:    "successful match",
-				MatchID: 1,
 				Success: true,
-				Details: []byte(`{"example": {"id": 1}}`),
-				WantUsers: []userRow{
-					{Login: "match1_user1", MatchID: nil},
-					{Login: "match1_user2", MatchID: nil},
-					{Login: "match2_user1", MatchID: new(2)},
-					{Login: "unrelated", MatchID: nil},
-				},
+				Details: []byte(`{"example1": {"id1": 1}}`),
 			},
 			{
 				Name:    "canceled match",
-				MatchID: 2,
 				Success: false,
-				Details: []byte(`{"example": {"id": 2}}`),
-				WantUsers: []userRow{
-					{Login: "match1_user1", MatchID: new(1)},
-					{Login: "match1_user2", MatchID: new(1)},
-					{Login: "match2_user1", MatchID: nil},
-					{Login: "unrelated", MatchID: nil},
-				},
+				Details: []byte(`{"example2": {"id2": 1}}`),
 			},
 		}
 		for _, test := range tests {
@@ -373,36 +352,23 @@ func TestIntegration_DatabaseConnection_SaveMatchResults(t *testing.T) {
 				conn := newHelperConn(t)
 				_, err := conn.Exec(ctx, "INSERT INTO matches (id, host, port) VALUES (1, '', ''), (2, '', '')")
 				require.NoError(t, err)
-				_, err = conn.Exec(ctx, `
-					INSERT INTO users (login, password, match_id)
-					VALUES ('match1_user1', '', 1),
-						   ('match1_user2', '', 1),
-						   ('match2_user1', '', 2),
-						   ('unrelated', '', NULL)
-				`)
-				require.NoError(t, err)
 
 				d := newDBConnWithOpen(t)
 				require.NoError(t, d.SaveMatchResults(ctx, internal.Result{
 					Success: test.Success,
-					MatchID: test.MatchID,
+					MatchID: 1,
 					Details: test.Details,
 				}))
 
 				var json string
 				var canceled bool
 				err = d.conn.QueryRow(
-					ctx, "SELECT results, canceled FROM matches WHERE id = $1", test.MatchID,
+					ctx, "SELECT results, canceled FROM matches WHERE id = 1",
 				).Scan(&json, &canceled)
 				require.NoError(t, err)
+
 				assert.JSONEq(t, string(test.Details), json)
 				assert.Equal(t, !test.Success, canceled)
-
-				rows, err := d.conn.Query(ctx, "SELECT login, match_id FROM users ORDER BY login")
-				require.NoError(t, err)
-				userRows, err := pgx.CollectRows(rows, pgx.RowToStructByName[userRow])
-				require.NoError(t, err)
-				require.Equal(t, test.WantUsers, userRows)
 			})
 		}
 	})
@@ -468,5 +434,65 @@ func TestIntegration_DatabaseConnection_GetNextMatchId(t *testing.T) {
 		id, err = d.GetNextMatchId(ctx)
 		require.NoError(t, err)
 		require.Equal(t, 2, id)
+	})
+}
+
+func TestIntegration_DatabaseConnection_RemoveMatchStatus(t *testing.T) {
+	t.Run("not open", func(t *testing.T) {
+		dc := DatabaseConnection{}
+		err := dc.RemoveMatchStatus(context.Background(), 0)
+		assert.ErrorIs(t, err, ErrDBConnNotOpen)
+	})
+
+	t.Run("closed", func(t *testing.T) {
+		dc := DatabaseConnection{connOpened: true, closed: true}
+		err := dc.RemoveMatchStatus(context.Background(), 0)
+		assert.ErrorIs(t, err, ErrDBConnClosed)
+	})
+
+	t.Run("success", func(t *testing.T) {
+		restartDB(t)
+
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		helperConn := newHelperConn(t)
+		_, err := helperConn.Exec(ctx,
+			"INSERT INTO matches (host, port, id) VALUES ('', '0', 1), ('', '0', 2)",
+		)
+		require.NoError(t, err)
+
+		_, err = helperConn.Exec(
+			ctx, `
+				INSERT INTO users (login, password, match_id, queued_until)
+				VALUES
+					('user1', '', 1, NOW() + INTERVAL '5 hours'),
+					('user2', '', NULL, NOW() + INTERVAL '5 hours'),
+					('user3', '', 2, NOW() + INTERVAL '5 hours'),
+					('user4', '', 1, NOW() + INTERVAL '5 hours')
+			`,
+		)
+		require.NoError(t, err)
+
+		d := newDBConnWithOpen(t)
+		require.NoError(t, d.RemoveMatchStatus(ctx, 1))
+
+		rows, err := d.conn.Query(ctx, `SELECT login, match_id, queued_until < NOW() AS notQueued FROM users ORDER BY login`)
+		require.NoError(t, err)
+
+		type User struct {
+			Login     string
+			MatchID   *int
+			NotQueued bool
+		}
+		users, err := pgx.CollectRows(rows, pgx.RowToStructByName[User])
+		require.NoError(t, err)
+
+		require.Equal(t, users, []User{
+			{Login: "user1", MatchID: nil, NotQueued: true},
+			{Login: "user2", MatchID: nil, NotQueued: false},
+			{Login: "user3", MatchID: new(2), NotQueued: false},
+			{Login: "user4", MatchID: nil, NotQueued: true},
+		})
 	})
 }

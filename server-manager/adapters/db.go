@@ -158,22 +158,7 @@ func (dc *DatabaseConnection) SaveMatchResults(ctx context.Context, results inte
 		return ErrDBConnClosed
 	}
 
-	tx, err := dc.conn.BeginTx(ctx, pgx.TxOptions{})
-	if err != nil {
-		return err
-	}
-	defer func() { _ = tx.Rollback(ctx) }()
-
-	_, err = tx.Exec(
-		ctx,
-		"UPDATE users SET match_id = NULL WHERE match_id = $1",
-		results.MatchID,
-	)
-	if err != nil {
-		return err
-	}
-
-	res, err := tx.Exec(
+	res, err := dc.conn.Exec(
 		ctx,
 		"UPDATE matches SET results = $1, canceled = $2 WHERE id = $3",
 		results.Details,
@@ -186,8 +171,7 @@ func (dc *DatabaseConnection) SaveMatchResults(ctx context.Context, results inte
 	if res.RowsAffected() == 0 {
 		return fmt.Errorf("%w id=%d", ErrDBMatchNotFound, results.MatchID)
 	}
-
-	return tx.Commit(ctx)
+	return nil
 }
 
 func (dc *DatabaseConnection) GetNextMatchId(ctx context.Context) (int, error) {
@@ -204,4 +188,21 @@ func (dc *DatabaseConnection) GetNextMatchId(ctx context.Context) (int, error) {
 		return 0, err
 	}
 	return id, nil
+}
+
+// removes match_id status for all users in the match
+func (dc *DatabaseConnection) RemoveMatchStatus(ctx context.Context, matchID int) error {
+	if !dc.connOpened {
+		return ErrDBConnNotOpen
+	}
+	if dc.closed {
+		return ErrDBConnClosed
+	}
+
+	_, err := dc.conn.Exec(
+		ctx,
+		"UPDATE users SET match_id = NULL, queued_until = NOW() - INTERVAL '5 seconds' WHERE match_id = $1",
+		matchID,
+	)
+	return err
 }

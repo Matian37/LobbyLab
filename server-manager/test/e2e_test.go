@@ -6,7 +6,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"log/slog"
 	"net"
 	"os"
@@ -216,7 +215,7 @@ func runApp(t *testing.T, ctx context.Context, cfg *internal.EnvConfig) chan err
 
 	resChan := make(chan error, 1)
 	go func() {
-		err := app.Run(ctx, cfg, slog.New(slog.NewTextHandler(io.Discard, nil)))
+		err := app.Run(ctx, cfg, slog.New(slog.NewTextHandler(os.Stdout, nil)))
 		resChan <- err
 	}()
 	return resChan
@@ -300,10 +299,10 @@ func TestE2E_AppLifecycle(t *testing.T) {
 	waitForAppStart(t, started, appResult)
 
 	_, err = dbConn.Exec(
-		ctx,
-		"INSERT INTO users (login, password, queued_until) VALUES ($1, $2, NOW() + INTERVAL '5 hours'), ($3, $4, NOW() + INTERVAL '5 hours')",
-		"user1", "pass1",
-		"user2", "pass2",
+		ctx, `
+			INSERT INTO users (login, password, queued_until)
+			VALUES ('user1', '', NOW() + INTERVAL '5 hours'), ('user2', '', NOW() + INTERVAL '5 hours')
+		`,
 	)
 	require.NoError(t, err)
 
@@ -343,16 +342,13 @@ func TestE2E_AppLifecycle(t *testing.T) {
 	_, err = js.Publish(ctx, "workers.results", resultPayload)
 	require.NoError(t, err)
 
-	var results string
+	var results *string
 	require.Eventually(t, func() bool {
 		err := dbConn.QueryRow(ctx, "SELECT results FROM matches WHERE id = $1", matchID).Scan(&results)
-		if err != nil || len(results) == 0 {
-			return false
-		}
-		return true
+		return err == nil && results != nil && len(*results) != 0
 	}, 10*time.Second, 100*time.Millisecond, "should save match results to database")
 
-	assert.JSONEq(t, `{"winner": "user1"}`, results)
+	assert.JSONEq(t, `{"winner": "user1"}`, *results)
 
 	cancel()
 	select {
@@ -415,8 +411,8 @@ func TestE2E_WorkersOverloadWithMatches(t *testing.T) {
 
 	_, err = dbConn.Exec(
 		ctx,
-		`INSERT INTO users (login, password, queued_until) 
-		VALUES 
+		`INSERT INTO users (login, password, queued_until)
+		VALUES
 		($1,$2,NOW() + INTERVAL '5 hours'),
 		($3,$4,NOW() + INTERVAL '5 hours'),
 		($5,$6,NOW() + INTERVAL '5 hours'),
@@ -552,26 +548,6 @@ func TestE2E_WorkerFailureAndRestart(t *testing.T) {
 		100*time.Millisecond,
 		"should cancel match",
 	)
-
-	rows, err := dbConn.Query(ctx, "SELECT * FROM users")
-	require.NoError(t, err)
-	defer rows.Close()
-
-	for rows.Next() {
-		values, err := rows.Values()
-		require.NoError(t, err)
-		t.Log(values)
-	}
-
-	rows, err = dbConn.Query(ctx, "SELECT * FROM matches")
-	require.NoError(t, err)
-	defer rows.Close()
-
-	for rows.Next() {
-		values, err := rows.Values()
-		require.NoError(t, err)
-		t.Log(values)
-	}
 
 	var secondMatchID int
 	require.Eventually(t,
