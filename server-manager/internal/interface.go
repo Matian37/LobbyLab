@@ -14,6 +14,7 @@ type DockerConnection interface {
 	RestartContainer(ctx context.Context, id string) error
 	KillContainer(ctx context.Context, id string) error
 	GetGamePort(ctx context.Context, containerID string) (string, error)
+	RemoveZombieWorkers(ctx context.Context) error
 }
 
 type BrokerConnection interface {
@@ -42,6 +43,7 @@ type DatabaseConnection interface {
 	GetNextMatchId(ctx context.Context) (int, error)
 	GenerateAuthTokens(ctx context.Context, users []User) ([]User, error)
 	RemoveMatchStatus(ctx context.Context, matchID int) error
+	SetupMatchmaking(ctx context.Context) error
 }
 
 type Message interface {

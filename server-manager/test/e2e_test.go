@@ -268,6 +268,87 @@ func TestE2E_GracefulShutdown(t *testing.T) {
 	}
 }
 
+func runZombieContainer(t *testing.T, ctx context.Context) string {
+	t.Helper()
+
+	cli, err := client.New()
+	require.NoError(t, err)
+	defer cli.Close()
+
+	res, err := cli.ContainerCreate(ctx, client.ContainerCreateOptions{
+		Config: &container.Config{
+			Image: "busybox:latest",
+			Cmd:   []string{"sleep", "inf"},
+			Labels: map[string]string{
+				"com.github.multiplayer-asset.worker": "true",
+			},
+		},
+	})
+	require.NoError(t, err)
+
+	t.Cleanup(func() {
+		cleanupCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		cli, err := client.New()
+		if err != nil {
+			return
+		}
+		defer cli.Close()
+		_, _ = cli.ContainerRemove(cleanupCtx, res.ID, client.ContainerRemoveOptions{Force: true})
+	})
+
+	_, err = cli.ContainerStart(ctx, res.ID, client.ContainerStartOptions{})
+	require.NoError(t, err)
+
+	return res.ID
+}
+
+func TestE2E_RemoveZombieWorkers(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreCurrent())
+	})
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	natsURI, started := setupTestEnvironment(t)
+
+	cfg := &internal.EnvConfig{
+		Image:                  "busybox:latest",
+		Workercount:            1,
+		ExposePorts:            network.PortSet{network.MustParsePort("8080"): {}},
+		ClientPort:             network.MustParsePort("8080"),
+		BrokerURI:              natsURI,
+		PublicHost:             "127.0.0.1",
+		DatabaseURI:            dbConnString,
+		PlayersPerRoom:         2,
+		TestMakeContainerDummy: true,
+	}
+
+	zombieID := runZombieContainer(t, ctx)
+
+	appResult := runApp(t, ctx, cfg)
+	waitForAppStart(t, started, appResult)
+
+	cli, err := client.New()
+	require.NoError(t, err)
+	defer cli.Close()
+
+	info, err := cli.ContainerInspect(ctx, zombieID, client.ContainerInspectOptions{})
+	require.NoError(t, err)
+	require.NotNil(t, info.Container.State)
+	assert.Equal(t, container.StateExited, info.Container.State.Status,
+		"zombie container should be killed by RemoveZombieWorkers")
+
+	cancel()
+	select {
+	case err := <-appResult:
+		require.NoError(t, err)
+	case <-time.After(5 * time.Second):
+		t.Fatal("timeout")
+	}
+}
+
 func TestE2E_AppLifecycle(t *testing.T) {
 	t.Cleanup(func() {
 		goleak.VerifyNone(t, goleak.IgnoreCurrent())

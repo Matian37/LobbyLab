@@ -394,6 +394,96 @@ func TestIntegration_DockerConnection_getPorts(t *testing.T) {
 	})
 }
 
+func runContainerWithLabels(t *testing.T, dc *DockerConnection, labels map[string]string) string {
+	t.Helper()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	res, err := dc.client.ContainerCreate(ctx, client.ContainerCreateOptions{
+		Config: &container.Config{
+			Image:  containerImage,
+			Cmd:    []string{"sleep", "inf"},
+			Labels: labels,
+		},
+	})
+	require.NoError(t, err)
+
+	t.Cleanup(func() {
+		cleanupCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		dc.client.ContainerRemove(cleanupCtx, res.ID, client.ContainerRemoveOptions{Force: true})
+	})
+
+	_, err = dc.client.ContainerStart(ctx, res.ID, client.ContainerStartOptions{})
+	require.NoError(t, err)
+
+	return res.ID
+}
+
+func TestIntegration_DockerConnection_RemoveZombieWorkers(t *testing.T) {
+	t.Run("not init", func(t *testing.T) {
+		dc := DockerConnection{}
+		err := dc.RemoveZombieWorkers(context.Background())
+		assert.ErrorIs(t, err, ErrDockerConnNotInit)
+	})
+
+	t.Run("closed", func(t *testing.T) {
+		dc := DockerConnection{initialized: true, closed: true}
+		err := dc.RemoveZombieWorkers(context.Background())
+		assert.ErrorIs(t, err, ErrDockerConnClosed)
+	})
+
+	t.Run("timeout", func(t *testing.T) {
+		dc := newTestConn(t)
+		dc.killTimeout = 0
+
+		start := time.Now()
+		err := dc.RemoveZombieWorkers(context.Background())
+		elapsed := time.Since(start)
+
+		assert.ErrorIs(t, err, context.DeadlineExceeded)
+		assert.Less(t, elapsed, 200*time.Millisecond)
+	})
+
+	t.Run("canceled", func(t *testing.T) {
+		dc := newTestConn(t)
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+		err := dc.RemoveZombieWorkers(ctx)
+		assert.ErrorIs(t, err, context.Canceled)
+	})
+
+	t.Run("success", func(t *testing.T) {
+		dc := newTestConn(t)
+
+		withLabel := runContainerWithLabels(t, dc, map[string]string{
+			"com.github.multiplayer-asset.worker": "true",
+		})
+		withLabelFalse := runContainerWithLabels(t, dc, map[string]string{
+			"com.github.multiplayer-asset.worker": "false",
+		})
+		noLabel := runContainerWithLabels(t, dc, map[string]string{
+			"some.other.label": "value",
+		})
+
+		err := dc.RemoveZombieWorkers(context.Background())
+		assert.NoError(t, err)
+
+		info := inspectContainer(t, dc, withLabel)
+		assert.Equal(t, container.StateExited, info.Container.State.Status,
+			"container with correct label should be killed")
+
+		info = inspectContainer(t, dc, withLabelFalse)
+		assert.Equal(t, container.StateRunning, info.Container.State.Status,
+			"container with false label should still be running")
+
+		info = inspectContainer(t, dc, noLabel)
+		assert.Equal(t, container.StateRunning, info.Container.State.Status,
+			"container without label should still be running")
+	})
+}
+
 func TestIntegration_DockerConnection_GetGamePort(t *testing.T) {
 	t.Run("not init", func(t *testing.T) {
 		dc := DockerConnection{}

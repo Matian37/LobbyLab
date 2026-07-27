@@ -66,6 +66,7 @@ func TestMatchmaker_Start(t *testing.T) {
 		cancel()
 
 		db.EXPECT().Open(ctx).Return(nil)
+		db.EXPECT().SetupMatchmaking(ctx).Return(nil)
 		wm.EXPECT().WaitForFreeWorker(gomock.Any()).MaxTimes(1)
 
 		assert.NoError(t, m.Start(ctx))

@@ -350,7 +350,10 @@ func TestIntegration_DatabaseConnection_SaveMatchResults(t *testing.T) {
 				restartDB(t)
 
 				conn := newHelperConn(t)
-				_, err := conn.Exec(ctx, "INSERT INTO matches (id, host, port) VALUES (1, '', ''), (2, '', '')")
+				_, err := conn.Exec(ctx, `
+					INSERT INTO matches (id, host, port, active)
+					VALUES (1, '', '', true), (2, '', '', true)
+				`)
 				require.NoError(t, err)
 
 				d := newDBConnWithOpen(t)
@@ -361,14 +364,15 @@ func TestIntegration_DatabaseConnection_SaveMatchResults(t *testing.T) {
 				}))
 
 				var json string
-				var canceled bool
+				var canceled, active bool
 				err = d.conn.QueryRow(
-					ctx, "SELECT results, canceled FROM matches WHERE id = 1",
-				).Scan(&json, &canceled)
+					ctx, "SELECT results, canceled, active FROM matches WHERE id = 1",
+				).Scan(&json, &canceled, &active)
 				require.NoError(t, err)
 
 				assert.JSONEq(t, string(test.Details), json)
 				assert.Equal(t, !test.Success, canceled)
+				assert.False(t, active)
 			})
 		}
 	})

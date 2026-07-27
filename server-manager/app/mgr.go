@@ -92,6 +92,10 @@ func (wm *WorkerManager) Start(ctx context.Context) error {
 		return fmt.Errorf("failed to open database connection: %w", err)
 	}
 
+	if err := wm.dockerConn.RemoveZombieWorkers(ctx); err != nil {
+		return fmt.Errorf("failed to remove zombie workers: %w", err)
+	}
+
 	for range wm.workerCount {
 		id, err := wm.dockerConn.SpawnContainer(ctx)
 		if err != nil {
