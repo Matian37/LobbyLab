@@ -368,6 +368,21 @@ func (mr *MockDatabaseConnectionMockRecorder) GatherMatchPlayers(ctx any) *gomoc
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GatherMatchPlayers", reflect.TypeOf((*MockDatabaseConnection)(nil).GatherMatchPlayers), ctx)
 }
 
+// GenerateAuthTokens mocks base method.
+func (m *MockDatabaseConnection) GenerateAuthTokens(ctx context.Context, users []internal.User) ([]internal.User, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GenerateAuthTokens", ctx, users)
+	ret0, _ := ret[0].([]internal.User)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GenerateAuthTokens indicates an expected call of GenerateAuthTokens.
+func (mr *MockDatabaseConnectionMockRecorder) GenerateAuthTokens(ctx, users any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GenerateAuthTokens", reflect.TypeOf((*MockDatabaseConnection)(nil).GenerateAuthTokens), ctx, users)
+}
+
 // GetNextMatchId mocks base method.
 func (m *MockDatabaseConnection) GetNextMatchId(ctx context.Context) (int, error) {
 	m.ctrl.T.Helper()

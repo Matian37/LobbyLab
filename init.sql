@@ -1,3 +1,5 @@
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
 CREATE SEQUENCE matches_id_seq;
 
 CREATE TABLE IF NOT EXISTS matches(
@@ -15,6 +17,7 @@ CREATE TABLE IF NOT EXISTS users(
     login TEXT PRIMARY KEY,
     password TEXT NOT NULL,
     match_id BIGINT REFERENCES matches(id) ON DELETE SET NULL,
+    match_auth_token TEXT,
     queued_until TIMESTAMP
 );
 CREATE INDEX IF NOT EXISTS idx_users_match_id ON users(match_id);

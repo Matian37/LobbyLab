@@ -74,7 +74,16 @@ func (dc *DatabaseConnection) GatherMatchPlayers(ctx context.Context) ([]interna
 		return nil, ErrDBConnClosed
 	}
 
-	rows, err := dc.conn.Query(ctx, "SELECT login FROM users WHERE queued_until > NOW() AND match_id IS NULL LIMIT $1", dc.config.PlayersPerRoom)
+	rows, err := dc.conn.Query(
+		ctx,
+		`
+		SELECT login, '' AS matchAuthToken
+		FROM users
+		WHERE queued_until > NOW() AND match_id IS NULL
+		LIMIT $1
+		`,
+		dc.config.PlayersPerRoom,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -190,6 +199,40 @@ func (dc *DatabaseConnection) GetNextMatchId(ctx context.Context) (int, error) {
 	return id, nil
 }
 
+func (dc *DatabaseConnection) GenerateAuthTokens(ctx context.Context, users []internal.User) ([]internal.User, error) {
+	if !dc.connOpened {
+		return nil, ErrDBConnNotOpen
+	}
+	if dc.closed {
+		return nil, ErrDBConnClosed
+	}
+
+	logins := make([]string, 0, len(users))
+	for _, user := range users {
+		logins = append(logins, user.Login)
+	}
+
+	rows, err := dc.conn.Query(
+		ctx,
+		`
+		UPDATE users
+		SET match_auth_token = encode(gen_random_bytes(32), 'base64')
+		WHERE login = ANY($1)
+		RETURNING login, match_auth_token
+		`,
+		logins,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	newUsers, err := pgx.CollectRows(rows, pgx.RowToStructByName[internal.User])
+	if err != nil {
+		return nil, err
+	}
+	return newUsers, nil
+}
+
 // removes match_id status for all users in the match
 func (dc *DatabaseConnection) RemoveMatchStatus(ctx context.Context, matchID int) error {
 	if !dc.connOpened {
@@ -201,7 +244,14 @@ func (dc *DatabaseConnection) RemoveMatchStatus(ctx context.Context, matchID int
 
 	_, err := dc.conn.Exec(
 		ctx,
-		"UPDATE users SET match_id = NULL, queued_until = NOW() - INTERVAL '5 seconds' WHERE match_id = $1",
+		`
+		UPDATE users
+		SET
+			match_id = NULL,
+			queued_until = NOW() - INTERVAL '5 seconds',
+			match_auth_token = NULL
+		WHERE match_id = $1
+		`,
 		matchID,
 	)
 	return err

@@ -140,6 +140,13 @@ func (m *Matchmaker) matchmakingLoop(ctx context.Context) error {
 			continue
 		}
 
+		users, err = m.db.GenerateAuthTokens(ctx, users)
+		if err != nil {
+			m.logger.Error("failed to set match auth tokens for users", "error", err)
+			iterationErr = err
+			continue
+		}
+
 		m.logger.Info("creating a match for users", "users", users)
 		matchID, err := m.createMatch(ctx, users)
 		if err != nil {

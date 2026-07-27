@@ -232,7 +232,7 @@ func TestIntegration_DatabaseConnection_GetMatchPlayers(t *testing.T) {
 				d.config.PlayersPerRoom = test.playersPerRoom
 
 				users, err := d.GatherMatchPlayers(ctx)
-				assert.ErrorIs(t, err, test.wantErr)
+				require.ErrorIs(t, err, test.wantErr)
 				assert.Equal(t, users, test.wantPlayers)
 			})
 		}
@@ -437,6 +437,50 @@ func TestIntegration_DatabaseConnection_GetNextMatchId(t *testing.T) {
 	})
 }
 
+func TestIntegration_DatabaseConnection_GenerateAuthTokens(t *testing.T) {
+	t.Run("not open", func(t *testing.T) {
+		dc := DatabaseConnection{}
+		_, err := dc.GenerateAuthTokens(context.Background(), nil)
+		assert.ErrorIs(t, err, ErrDBConnNotOpen)
+	})
+
+	t.Run("closed", func(t *testing.T) {
+		dc := DatabaseConnection{connOpened: true, closed: true}
+		_, err := dc.GenerateAuthTokens(context.Background(), nil)
+		assert.ErrorIs(t, err, ErrDBConnClosed)
+	})
+
+	t.Run("success", func(t *testing.T) {
+		restartDB(t)
+
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		d := newDBConnWithOpen(t)
+		helperConn := newHelperConn(t)
+
+		_, err := helperConn.Exec(ctx, "INSERT INTO users (login, password) VALUES ('user1', ''), ('user2', '')")
+		require.NoError(t, err)
+
+		users, err := d.GenerateAuthTokens(ctx, []internal.User{{Login: "user1"}, {Login: "user2"}})
+		require.NoError(t, err)
+
+		assert.Len(t, users, 2)
+		assert.Equal(t, users[0].Login, "user1")
+		assert.Equal(t, users[1].Login, "user2")
+		assert.NotEmpty(t, users[0].MatchAuthToken)
+		assert.NotEmpty(t, users[1].MatchAuthToken)
+		assert.NotEqual(t, users[0].MatchAuthToken, users[1].MatchAuthToken)
+
+		rows, err := helperConn.Query(ctx, "SELECT match_auth_token, login FROM users ORDER BY login")
+		require.NoError(t, err)
+
+		dbUsers, err := pgx.CollectRows(rows, pgx.RowToStructByName[internal.User])
+		require.NoError(t, err)
+		assert.Equal(t, users, dbUsers)
+	})
+}
+
 func TestIntegration_DatabaseConnection_RemoveMatchStatus(t *testing.T) {
 	t.Run("not open", func(t *testing.T) {
 		dc := DatabaseConnection{}
@@ -464,12 +508,12 @@ func TestIntegration_DatabaseConnection_RemoveMatchStatus(t *testing.T) {
 
 		_, err = helperConn.Exec(
 			ctx, `
-				INSERT INTO users (login, password, match_id, queued_until)
+				INSERT INTO users (login, password, match_id, queued_until, match_auth_token)
 				VALUES
-					('user1', '', 1, NOW() + INTERVAL '5 hours'),
-					('user2', '', NULL, NOW() + INTERVAL '5 hours'),
-					('user3', '', 2, NOW() + INTERVAL '5 hours'),
-					('user4', '', 1, NOW() + INTERVAL '5 hours')
+					('user1', '', 1, NOW() + INTERVAL '5 hours', 't1'),
+					('user2', '', NULL, NOW() + INTERVAL '5 hours', NULL),
+					('user3', '', 2, NOW() + INTERVAL '5 hours', 't2'),
+					('user4', '', 1, NOW() + INTERVAL '5 hours', 't3')
 			`,
 		)
 		require.NoError(t, err)
@@ -477,22 +521,33 @@ func TestIntegration_DatabaseConnection_RemoveMatchStatus(t *testing.T) {
 		d := newDBConnWithOpen(t)
 		require.NoError(t, d.RemoveMatchStatus(ctx, 1))
 
-		rows, err := d.conn.Query(ctx, `SELECT login, match_id, queued_until < NOW() AS notQueued FROM users ORDER BY login`)
+		rows, err := d.conn.Query(
+			ctx, `
+			SELECT
+				login,
+				match_id,
+				queued_until < NOW() AS notQueued,
+				match_auth_token AS matchAuthToken
+			FROM users
+			ORDER BY login
+			`,
+		)
 		require.NoError(t, err)
 
 		type User struct {
-			Login     string
-			MatchID   *int
-			NotQueued bool
+			Login          string
+			MatchID        *int
+			NotQueued      bool
+			MatchAuthToken *string
 		}
 		users, err := pgx.CollectRows(rows, pgx.RowToStructByName[User])
 		require.NoError(t, err)
 
 		require.Equal(t, users, []User{
-			{Login: "user1", MatchID: nil, NotQueued: true},
-			{Login: "user2", MatchID: nil, NotQueued: false},
-			{Login: "user3", MatchID: new(2), NotQueued: false},
-			{Login: "user4", MatchID: nil, NotQueued: true},
+			{Login: "user1", MatchID: nil, NotQueued: true, MatchAuthToken: nil},
+			{Login: "user2", MatchID: nil, NotQueued: false, MatchAuthToken: nil},
+			{Login: "user3", MatchID: new(2), NotQueued: false, MatchAuthToken: new("t2")},
+			{Login: "user4", MatchID: nil, NotQueued: true, MatchAuthToken: nil},
 		})
 	})
 }

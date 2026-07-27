@@ -43,9 +43,17 @@ Open `game-server/Dockerfile`. The build uses a two-stage Dockerfile:
 
 The Go wrapper launches your game server as a child process and passes two command-line flags:
 
-- `--match-config <path>` — Path to a JSON file containing the match configuration. By default the `config` field contains the list of matched players:
+- `--match-config <path>` — Path to a JSON file containing the match configuration. By default the `config` field contains the list of matched players with their logins and authorization tokens:
   ```json
-  {"matchID": 1234, "config": {"players": ["user1", "user2", ...]}}
+  {
+    "matchID": 1234,
+    "config": {
+      "players": [
+        {"login": "user1", "matchAuthToken": "a3B2cD1eF4gH5iJ6kL7mN8oP9qR0sT1uV2wX3yZ4="},
+        {"login": "user2", "matchAuthToken": "b4C5dE6fG7hI8jK9lM0nO1pQ2rS3tU4vW5xY6zA7="}
+      ]
+    }
+  }
   ```
   You can extend `config` with additional fields when adding players to the waiting queue.
 - `--match-result <path>` — Path where your game server **must write** the match result as a JSON file before exiting. Example:
