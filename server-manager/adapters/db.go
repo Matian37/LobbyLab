@@ -244,7 +244,14 @@ func (dc *DatabaseConnection) RemoveMatchStatus(ctx context.Context, matchID int
 
 	_, err := dc.conn.Exec(
 		ctx,
-		"UPDATE users SET match_id = NULL, queued_until = NOW() - INTERVAL '5 seconds' WHERE match_id = $1",
+		`
+		UPDATE users
+		SET
+			match_id = NULL,
+			queued_until = NOW() - INTERVAL '5 seconds',
+			match_auth_token = NULL
+		WHERE match_id = $1
+		`,
 		matchID,
 	)
 	return err
