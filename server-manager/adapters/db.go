@@ -262,7 +262,7 @@ func (dc *DatabaseConnection) SetupMatchmaking(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	// remove users from matches and matchmaking queue
 	_, err = tx.Exec(
