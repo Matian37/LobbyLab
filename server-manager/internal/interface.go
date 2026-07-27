@@ -42,6 +42,7 @@ type DatabaseConnection interface {
 	GetNextMatchId(ctx context.Context) (int, error)
 	GenerateAuthTokens(ctx context.Context, users []User) ([]User, error)
 	RemoveMatchStatus(ctx context.Context, matchID int) error
+	SetupMatchmaking(ctx context.Context) error
 }
 
 type Message interface {

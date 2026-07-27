@@ -440,6 +440,20 @@ func (mr *MockDatabaseConnectionMockRecorder) SaveMatchResults(ctx, results any)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SaveMatchResults", reflect.TypeOf((*MockDatabaseConnection)(nil).SaveMatchResults), ctx, results)
 }
 
+// SetupMatchmaking mocks base method.
+func (m *MockDatabaseConnection) SetupMatchmaking(ctx context.Context) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SetupMatchmaking", ctx)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// SetupMatchmaking indicates an expected call of SetupMatchmaking.
+func (mr *MockDatabaseConnectionMockRecorder) SetupMatchmaking(ctx any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetupMatchmaking", reflect.TypeOf((*MockDatabaseConnection)(nil).SetupMatchmaking), ctx)
+}
+
 // MockMessage is a mock of Message interface.
 type MockMessage struct {
 	ctrl     *gomock.Controller

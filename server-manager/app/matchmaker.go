@@ -56,6 +56,10 @@ func (m *Matchmaker) Start(ctx context.Context) error {
 		return err
 	}
 
+	if err := m.db.SetupMatchmaking(ctx); err != nil {
+		return err
+	}
+
 	m.wg.Go(func() {
 		m.logger.Debug("starting core loop")
 		err := m.matchmakingLoop(ctx)

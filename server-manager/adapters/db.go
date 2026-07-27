@@ -169,7 +169,7 @@ func (dc *DatabaseConnection) SaveMatchResults(ctx context.Context, results inte
 
 	res, err := dc.conn.Exec(
 		ctx,
-		"UPDATE matches SET results = $1, canceled = $2 WHERE id = $3",
+		"UPDATE matches SET results = $1, canceled = $2, active = false WHERE id = $3",
 		results.Details,
 		!results.Success,
 		results.MatchID,
@@ -255,4 +255,44 @@ func (dc *DatabaseConnection) RemoveMatchStatus(ctx context.Context, matchID int
 		matchID,
 	)
 	return err
+}
+
+func (dc *DatabaseConnection) SetupMatchmaking(ctx context.Context) error {
+	tx, err := dc.conn.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	// remove users from matches and matchmaking queue
+	_, err = tx.Exec(
+		ctx,
+		`
+		UPDATE users
+		SET
+			match_id = NULL,
+			queued_until = NOW() - INTERVAL '5 seconds',
+			match_auth_token = NULL
+		`,
+	)
+	if err != nil {
+		return err
+	}
+
+	// cancel all active matches
+	_, err = tx.Exec(
+		ctx,
+		`
+		UPDATE matches
+		SET
+			active = false,
+			canceled = true,
+			results = '{}'
+		WHERE active = true
+		`,
+	)
+	if err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
 }
