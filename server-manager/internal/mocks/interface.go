@@ -99,6 +99,20 @@ func (mr *MockDockerConnectionMockRecorder) Open(config any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Open", reflect.TypeOf((*MockDockerConnection)(nil).Open), config)
 }
 
+// RemoveZombieWorkers mocks base method.
+func (m *MockDockerConnection) RemoveZombieWorkers(ctx context.Context) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "RemoveZombieWorkers", ctx)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// RemoveZombieWorkers indicates an expected call of RemoveZombieWorkers.
+func (mr *MockDockerConnectionMockRecorder) RemoveZombieWorkers(ctx any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RemoveZombieWorkers", reflect.TypeOf((*MockDockerConnection)(nil).RemoveZombieWorkers), ctx)
+}
+
 // RestartContainer mocks base method.
 func (m *MockDockerConnection) RestartContainer(ctx context.Context, id string) error {
 	m.ctrl.T.Helper()

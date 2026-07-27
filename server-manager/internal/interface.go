@@ -14,6 +14,7 @@ type DockerConnection interface {
 	RestartContainer(ctx context.Context, id string) error
 	KillContainer(ctx context.Context, id string) error
 	GetGamePort(ctx context.Context, containerID string) (string, error)
+	RemoveZombieWorkers(ctx context.Context) error
 }
 
 type BrokerConnection interface {
