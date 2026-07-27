@@ -1,48 +1,62 @@
-import { vi, test, expect, describe } from 'vitest';
-import * as registerAPI from './+server.js';
+import { vi, it, expect, describe, beforeEach } from 'vitest';
+import * as api from './+server.js';
 import * as db from '$lib/db.js';
 
 vi.mock('$lib/db.js', () => {
     return {
-        addUser: vi.fn().mockResolvedValue(true),
-        tokenExists: vi.fn().mockResolvedValue(true),
-        addSession: vi.fn().mockResolvedValue(true),
+        addUser: vi.fn(),
+        addSession: vi.fn(),
     };
 });
 
-describe('registering', () => {
-    test('registering incorrectly (invalid login)', async () => {
-        db.addUser.mockResolvedValueOnce(false);
+function mockRequest(body) {
+    return new Request('http://abc', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+    });
+}
 
-        const request = new Request('http://cos', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ login: 'user', password: '123' }),
+describe('POST', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+    });
+
+    it('registers user and sets session cookie', async () => {
+        db.addUser.mockResolvedValue(true);
+        db.addSession.mockResolvedValue('session-token-123');
+
+        const cookies = { set: vi.fn() };
+        const response = await api.POST({
+            request: mockRequest({ login: 'alice', password: 'secret' }),
+            cookies,
         });
 
-        const response = await registerAPI.POST({ request });
-        const result = await response.json();
-        expect(result).toEqual({
+        expect(await response.json()).toEqual({ success: true, msg: null });
+        expect(db.addUser).toHaveBeenCalledWith('alice', 'secret');
+        expect(db.addSession).toHaveBeenCalledWith('alice');
+        expect(cookies.set).toHaveBeenCalledWith(
+            'session',
+            'session-token-123',
+            expect.objectContaining({
+                httpOnly: true,
+                secure: true,
+                sameSite: 'strict',
+            })
+        );
+    });
+
+    it('returns failure when login is already taken', async () => {
+        db.addUser.mockResolvedValue(false);
+
+        const response = await api.POST({
+            request: mockRequest({ login: 'alice', password: 'secret' }),
+        });
+
+        expect(await response.json()).toEqual({
             success: false,
             msg: 'Login is already taken',
         });
-    });
-
-    test('registering correctly', async () => {
-        const request = new Request('http://cos', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ login: 'user', password: 'secret' }),
-        });
-
-        const response = await registerAPI.POST({
-            request,
-            cookies: {
-                set: vi.fn(),
-            },
-        });
-        const result = await response.json();
-        expect(result.success).toBe(true);
-        expect(result.msg).toBe(null);
+        expect(db.addSession).not.toHaveBeenCalled();
     });
 });

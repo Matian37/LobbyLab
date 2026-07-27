@@ -4,11 +4,9 @@
     let login = $state(''),
         password = $state(''),
         errorText = $state('');
-    function changePage(path) {
-        goto(path);
-    }
 
     async function submit() {
+        // TODO: enforce it by api
         if (password.length < 3 || password.length > 64) {
             errorText = 'Password must be between 3 and 64 characters';
             return;
@@ -26,12 +24,12 @@
             errorText = result.msg;
         } else {
             console.debug('registered successfully');
-            changePage('/');
+            goto('/');
         }
     }
 </script>
 
-<button onclick={() => changePage('/')}>Back</button>
+<button onclick={() => goto('/')}>Back</button>
 Login <input bind:value={login} data-testid="login-input" />
 Password
 <input bind:value={password} type="password" data-testid="password-input" />

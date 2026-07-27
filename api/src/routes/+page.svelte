@@ -3,6 +3,7 @@
     import { onMount } from 'svelte';
     import { page } from '$app/stores';
     import { invalidateAll } from '$app/navigation';
+
     let buttonText = $state('Play');
     let rows = $state([]);
     let user = $derived($page.data);
@@ -19,12 +20,9 @@
             method: 'GET',
         });
         const response = await query.json();
+
         if (!response.success) return;
         rows = response.matches;
-    }
-
-    export function changePage(path) {
-        goto(path);
     }
 
     async function logout() {
@@ -57,10 +55,8 @@
     }
 </script>
 
-<button onclick={() => changePage('/login')} data-testid="login-page">
-    Login
-</button>
-<button onclick={() => changePage('/register')}> Register </button>
+<button onclick={() => goto('/login')} data-testid="login-page"> Login </button>
+<button onclick={() => goto('/register')}> Register </button>
 <button onclick={() => logout()} data-testid="logout"> Log out </button>
 <button onclick={() => play()}>
     {buttonText}

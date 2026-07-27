@@ -9,12 +9,12 @@ import { json } from '@sveltejs/kit';
 export async function POST({ cookies }) {
     const token = cookies.get('session');
     if (token == undefined) return json({ success: false });
-    const response = await getLoginFromToken(token);
-    if (response.length == 0) {
+
+    const login = await getLoginFromToken(token);
+    if (login === null) {
         console.debug('session with given token does not exist');
         return json({ success: false });
     }
-    const login = response[0].login;
 
     if (!(await addToWaiting(login))) {
         console.debug('user not added to waiting list, probably already there');
@@ -26,24 +26,26 @@ export async function POST({ cookies }) {
 export async function DELETE({ cookies }) {
     const token = cookies.get('session');
     if (token == undefined) return json({ success: false });
-    const response = await getLoginFromToken(token);
-    if (response.length == 0) {
+
+    const login = await getLoginFromToken(token);
+    if (login === null) {
         console.debug('session with given token does not exist');
         return json({ success: false });
     }
-    const login = response[0].login;
-    await deleteFromWaiting(login);
-    return json({ success: true });
+
+    if (await deleteFromWaiting(login)) {
+        console.debug('user removed from waiting list');
+        return json({ success: true });
+    }
+    return json({ success: false });
 }
 
 export async function GET({ cookies }) {
     const token = cookies.get('session');
     if (token == undefined) return json({ success: false });
-    const response = await getLoginFromToken(token);
-    if (response.length == 0) return json({ success: false });
-    const login = response[0].login;
 
-    if (await isWaiting(login)) return json({ success: true });
+    const login = await getLoginFromToken(token);
+    if (login === null) return json({ success: false });
 
-    return json({ success: false });
+    return json({ success: await isWaiting(login) });
 }

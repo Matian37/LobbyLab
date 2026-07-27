@@ -1,64 +1,134 @@
-import { vi, test, expect, describe } from 'vitest';
-import * as loginAPI from './+server.js';
+import { vi, it, expect, describe, beforeEach } from 'vitest';
+import * as api from './+server.js';
 import * as db from '$lib/db.js';
 
 vi.mock('$lib/db.js', () => {
     return {
-        verifyPassword: vi
-            .fn()
-            .mockImplementation(async (login, password) => password === '123'),
-        tokenExists: vi.fn().mockResolvedValue(true),
-        addSession: vi.fn().mockResolvedValue(true),
+        verifyPassword: vi.fn(),
+        addSession: vi.fn(),
+        deleteSession: vi.fn(),
+        tokenExists: vi.fn(),
     };
 });
 
-describe('logging in', () => {
-    test('logging in incorrectly (invalid login)', async () => {
-        db.verifyPassword.mockResolvedValueOnce(false);
+function mockRequest(body) {
+    return new Request('http://abc', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+    });
+}
 
-        const request = new Request('http://cos', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ login: 'user', password: '123' }),
+describe('POST', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+    });
+
+    it('returns success and sets session cookie when credentials are valid', async () => {
+        db.verifyPassword.mockResolvedValue(true);
+        db.addSession.mockResolvedValue('session-token-123');
+
+        const cookies = { set: vi.fn() };
+        const response = await api.POST({
+            request: mockRequest({ login: 'alice', password: 'correct' }),
+            cookies,
         });
 
-        const response = await loginAPI.POST({ request });
-        const result = await response.json();
-        expect(result).toEqual({
+        expect(await response.json()).toEqual({ success: true, msg: null });
+        expect(cookies.set).toHaveBeenCalledWith(
+            'session',
+            'session-token-123',
+            expect.objectContaining({
+                httpOnly: true,
+                secure: true,
+                sameSite: 'strict',
+            })
+        );
+    });
+
+    it('returns failure when password does not match', async () => {
+        db.verifyPassword.mockResolvedValue(false);
+
+        const response = await api.POST({
+            request: mockRequest({ login: 'alice', password: 'wrong' }),
+        });
+
+        expect(await response.json()).toEqual({
             success: false,
             msg: 'Invalid login or password',
         });
     });
 
-    test('logging in incorrectly (invalid password)', async () => {
-        const request = new Request('http://cos', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ login: 'user', password: 'wrong password' }),
+    it('returns failure when login does not exist', async () => {
+        db.verifyPassword.mockResolvedValue(false);
+
+        const response = await api.POST({
+            request: mockRequest({ login: 'nobody', password: 'anything' }),
         });
 
-        const response = await loginAPI.POST({ request });
-        const result = await response.json();
-        expect(result).toEqual({
+        expect(await response.json()).toEqual({
             success: false,
             msg: 'Invalid login or password',
         });
     });
+});
 
-    test('logging in correctly', async () => {
-        const request = new Request('http://cos', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ login: 'user', password: '123' }),
-        });
+describe('DELETE', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+    });
 
-        const response = await loginAPI.POST({
-            request,
-            cookies: {
-                set: vi.fn(),
-            },
-        });
-        const result = await response.json();
-        expect(result.success).toBe(true);
+    it('deletes session and clears cookie when token exists', async () => {
+        db.deleteSession.mockResolvedValue(true);
+
+        const cookies = {
+            get: vi.fn().mockReturnValue('session-token-123'),
+            delete: vi.fn(),
+        };
+        const response = await api.DELETE({ cookies });
+
+        expect(await response.json()).toEqual({ success: true });
+        expect(db.deleteSession).toHaveBeenCalledWith('session-token-123');
+        expect(cookies.delete).toHaveBeenCalledWith('session', { path: '/' });
+    });
+
+    it('returns failure when no session cookie', async () => {
+        const cookies = { get: vi.fn().mockReturnValue(undefined) };
+        const response = await api.DELETE({ cookies });
+
+        expect(await response.json()).toEqual({ success: false });
+        expect(db.deleteSession).not.toHaveBeenCalled();
+    });
+});
+
+describe('GET', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+    });
+
+    it('returns true when session token is valid', async () => {
+        db.tokenExists.mockResolvedValue(true);
+
+        const cookies = { get: vi.fn().mockReturnValue('session-token-123') };
+        const response = await api.GET({ cookies });
+
+        expect(await response.json()).toEqual({ success: true });
+    });
+
+    it('returns false when session token is invalid', async () => {
+        db.tokenExists.mockResolvedValue(false);
+
+        const cookies = { get: vi.fn().mockReturnValue('invalid-token') };
+        const response = await api.GET({ cookies });
+
+        expect(await response.json()).toEqual({ success: false });
+    });
+
+    it('returns false when no session cookie', async () => {
+        const cookies = { get: vi.fn().mockReturnValue(undefined) };
+        const response = await api.GET({ cookies });
+
+        expect(await response.json()).toEqual({ success: false });
+        expect(db.tokenExists).not.toHaveBeenCalled();
     });
 });

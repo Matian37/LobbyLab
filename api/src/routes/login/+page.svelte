@@ -5,18 +5,13 @@
         password = $state(''),
         errorMessage = $state('');
 
-    function changePage(path) {
-        goto(path);
-    }
-
     async function submit() {
-        let data = { login: login, password: password };
         const response = await fetch('/api/login', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify(data),
+            body: JSON.stringify({ login: login, password: password }),
         });
         console.log('response received');
 
@@ -24,14 +19,14 @@
         if (success.success) {
             console.log('logged in successfully');
             errorMessage = '';
-            changePage('/');
+            goto('/');
         } else {
             errorMessage = success.msg;
         }
     }
 </script>
 
-<button onclick={() => changePage('/')}>Back</button>
+<button onclick={() => goto('/')}>Back</button>
 Login <input bind:value={login} data-testid="login-input" />
 Password
 <input bind:value={password} type="password" data-testid="password-input" />
