@@ -47,13 +47,13 @@ async function listen(login, controller) {
     const sql = postgres(process.env.DATABASE_URL);
 
     await sql.listen('users_match_id_assigned', (payload) => {
-        // FIX: payload is a string, so this is not valid
-        if (payload.username != login) return;
+        const parsed = JSON.parse(payload);
+        if (parsed.username != login) return;
 
-        payload.match_auth_token = await getAuthToken(login);
+        parsed.match_auth_token = await getAuthToken(login);
         
         console.debug('sending server socket');
-        controller.equeue(`data: ${payload}\n\n`);
+        controller.equeue(`data: ${JSON.stringify(parsed)}\n\n`);
         controller.close();
     });
 }
