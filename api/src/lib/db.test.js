@@ -127,11 +127,12 @@ describe('extendQueueStatus', () => {
     it('sets user status to waiting in queue', async () => {
         expect(await db.addUser('alice', 'secret')).toBe(true);
         expect(await db.extendQueueStatus('alice')).toBe(true);
-        const rows = await helperSql`SELECT queue_until FROM waiting`;
+        const now = Date.now();
+        const rows = await helperSql`
+            SELECT queued_until > NOW() as cond FROM users
+        `;
         expect(rows.length).toBe(1);
-        expect(rows[0].queue_until.getTime()).toBeGreaterThanOrEqual(
-            Date.now()
-        );
+        expect(rows[0].cond).toBe(true);
     });
 });
 
@@ -259,7 +260,7 @@ describe('getMatchResults', () => {
 
 describe('getAuthToken', () => {
     it('returns auth token for valid login', async () => {
-        await sql`INSERT INTO users (login, password, match_auth_token) VALUES ('user', '123', 'token')`;
+        await helperSql`INSERT INTO users (login, password, match_auth_token) VALUES ('user', '123', 'token')`;
         const token = await db.getAuthToken('user');
         expect(token).toBe('token');
     });
@@ -270,7 +271,7 @@ describe('getAuthToken', () => {
     });
 
     it('returns null for no token', async () => {
-        await sql`INSERT INTO users (login, password) VALUES ('user', '123')`;
+        await helperSql`INSERT INTO users (login, password) VALUES ('user', '123')`;
         const token = await db.getAuthToken('user');
         expect(token).toBeNull();
     });
