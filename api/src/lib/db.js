@@ -1,128 +1,110 @@
-import postgres from "postgres";
-import { handleError } from "./error_handler";
+import postgres from 'postgres';
 
-let DATABASE_URL = process.env.DATABASE_URL;
-//if(!DATABASE_URL && process.env.VITEST)
-//let DATABASE_URL = 'postgresql://postgres:123@localhost:5432/postgres';
+const DATABASE_URL = process.env.DATABASE_URL;
 
 export const sql = postgres(DATABASE_URL);
 
-export async function findUserByLogin(login){
-    const q = await sql`
-        SELECT * FROM users WHERE login = ${login}
-    `
-    return q;
-}
-
-export async function addUser(login, password){
-    try{
-        const result = await sql`
-            INSERT INTO users (login, password) VALUES(${login}, ${password}) RETURNING *
-        `
+export async function tryQuery(fn) {
+    try {
+        await fn();
         return true;
-    }
-    catch (err){
-        handleError(-1, err);
+    } catch (err) {
+        console.debug(err);
         return false;
     }
 }
 
-export async function setUserStatus(login){
-    try{
-        await sql`
-            UPDATE users SET queued_until = NOW() + INTERVAL '5 seconds' WHERE login = ${login}
+export async function addUser(login, password) {
+    return tryQuery(
+        () => sql`
+            INSERT INTO users (login, password)
+            VALUES(${login}, crypt(${password}, gen_salt('bf'))) 
+            RETURNING *
         `
-        return true;
-    }
-    catch{
-        return false;
-    }
+    );
 }
 
-export async function findWaitingByLogin(login){
+export async function verifyPassword(login, password) {
     const q = await sql`
-        SELECT * FROM users WHERE login = ${login} AND queued_until > NOW()
-    `
-    return q;
+        SELECT (password = crypt(${password}, password)) AS match 
+        FROM users
+        WHERE login = ${login}
+    `;
+    return q.length > 0 && q[0].match;
 }
 
-export async function getLoginFromToken(token){
+export async function extendQueueStatus(login) {
+    return tryQuery(
+        () => sql`
+            UPDATE users
+            SET queued_until = NOW() + INTERVAL '5 seconds'
+            WHERE login = ${login}
+        `
+    );
+}
+
+export async function isWaiting(login) {
+    const q = await sql`
+        SELECT * FROM users
+        WHERE
+            login = ${login} 
+            AND match_id IS NULL 
+            AND queued_until > NOW()
+    `;
+    return q.length > 0;
+}
+
+export async function getLoginFromToken(token) {
     const q = await sql`
         SELECT login FROM sessions WHERE token = ${token}
-    `
-    return q;
+    `;
+    return q[0]?.login ?? null;
 }
 
-export async function setSession(token, login){
-    try{
-        await sql`
-            INSERT INTO sessions (token, login, date) VALUES (${token}, ${login}, CURRENT_TIMESTAMP)
-        `
-        return true;
-    }
-    catch (err){
-        console.debug(err);
-        handleError(-1, err);
-        return false;
-    }
+export async function addSession(login) {
+    const q = await sql`
+        INSERT INTO sessions (token, login, date)
+        VALUES (encode(gen_random_bytes(32), 'hex'), ${login}, NOW())
+        RETURNING token
+    `;
+    return q[0].token;
 }
 
-export async function deleteSession(token){
-    try{
-        await sql`
+export async function deleteSession(token) {
+    return tryQuery(
+        () => sql`
             DELETE FROM sessions WHERE token = ${token}
         `
-        return true;
-    }
-    catch (err){
-        handleError(-1, err);
-        return false;
-    }
+    );
 }
 
-export async function tokenExists(token){
+export async function tokenExists(token) {
     const q = await sql`
-        SELECT * FROM sessions WHERE token = ${token}
-    `
-    return q;
+        SELECT 1 FROM sessions WHERE token = ${token}
+    `;
+    return q.length > 0;
 }
 
-export async function getMatchResults(login){
-    const q = await sql`
-        SELECT match_id FROM user_matches WHERE user_id = ${login}
-    `
-    const matchIds = q.map(row => row.match_id);
-
-    const q1 = await sql`
-        SELECT results, canceled FROM matches WHERE id = ANY(${matchIds}::int[])
-    `
-    return q1.map(row => ({
+export async function getMatchResults(login) {
+    return (
+        await sql`
+            SELECT m.results, m.canceled
+            FROM matches m
+            WHERE m.id IN (
+                SELECT match_id
+                FROM user_matches
+                WHERE user_id = ${login} 
+            )
+        `
+    ).map((row) => ({
         details: row.results,
         canceled: row.canceled,
     }));
 }
 
-
-async function deleteOldSessions(){
-    await sql`
-        DELETE FROM sessions WHERE date < NOW() - INTERVAL '3 months'
-    `
-}
-
-export async function healthCheck(){
-    try{
-        await sql`SELECT 1`;
-        return true;
-    }
-    catch(err){
-        handleError("ERROR " + err);
-        return false;
-    }
-}
-
-export async function getAuthToken(login){
+export async function getAuthToken(login) {
     const q = await sql`
         SELECT match_auth_token FROM users WHERE login = ${login}
-    `
+    `;
     return q[0]?.match_auth_token ?? null;
 }

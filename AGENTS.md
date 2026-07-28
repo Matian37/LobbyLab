@@ -53,7 +53,7 @@ It handles user login, game server management, and matchmaking logic. Runs every
 ## Formatting
 
 - for golang use `go fmt`
-- for svelte-kit currently there is no formatter configured
+- for svelte-kit use `npx prettier --write .`
 
 ## Linter
 

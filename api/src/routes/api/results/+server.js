@@ -1,18 +1,14 @@
 import { getMatchResults, getLoginFromToken } from '$lib/db.js';
-import { handleError } from '$lib/error_handler.js';
 import { json } from '@sveltejs/kit';
 
-export async function GET({cookies}){
-    const token = cookies.get('token');
-    if(token == undefined)
-        return json({sukces: false, matches: null});
-    const dbLogin = await getLoginFromToken(token);
-    if(dbLogin.length == 0) 
-    {
-        handleError(0);
-        return json({sukces: false, matches: null});
+export async function GET({ cookies }) {
+    const token = cookies.get('session');
+    if (token == undefined) return json({ success: false, matches: null });
+
+    const login = await getLoginFromToken(token);
+    if (login === null) {
+        console.debug('session with given token does not exist');
+        return json({ success: false, matches: null });
     }
-    const login = dbLogin[0].login;
-    const matches = await getMatchResults(login)
-    return json({sukces: true, matches: matches})
+    return json({ success: true, matches: await getMatchResults(login) });
 }

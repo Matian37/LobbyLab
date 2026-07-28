@@ -4,7 +4,7 @@
   "version": "0.0.1",
   "type": "module",
   "scripts": {
-    "dev": "bash tests/localDb.sh && vite dev",
+    "dev": "bash scripts/dev.sh",
     "build": "vite build",
     "preview": "vite preview",
     "prepare": "svelte-kit sync || echo ''",
@@ -17,15 +17,16 @@
     "@sveltejs/vite-plugin-svelte": "^7.0.0",
     "@testcontainers/postgresql": "^12.0.4",
     "@types/node": "^25.9.2",
+    "@vitest/coverage-v8": "^4.1.10",
+    "prettier": "^3.9.6",
+    "prettier-plugin-svelte": "^4.1.1",
     "svelte": "^5.55.2",
     "testcontainers": "^12.0.4",
     "vite": "^8.0.7",
     "vitest": "^4.1.8"
   },
   "dependencies": {
-    "bcryptjs": "^3.0.3",
     "jsdom": "^29.1.1",
-    "pg": "^8.21.0",
     "postgres": "^3.4.9"
   }
 }

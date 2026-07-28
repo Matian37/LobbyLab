@@ -1,53 +1,47 @@
-import { findUserByLogin, setSession, deleteSession, getLoginFromToken, tokenExists } from '$lib/db.js';
-import bcrypt from 'bcryptjs';
+import {
+    verifyPassword,
+    addSession,
+    deleteSession,
+    getLoginFromToken,
+    tokenExists,
+} from '$lib/db.js';
 import { json } from '@sveltejs/kit';
-import { handleError } from '$lib/error_handler.js';
-import { generateToken } from '$lib/helpers.js';
 
-export async function POST({request, cookies})
-{
-    const {login, password} = await request.json();
-    const result = await findUserByLogin(login);
-    if(result.length == 0) {
-        return json({sukces: false, msg: "Podany login nie istnieje"});
-    }
-    
-    if(await bcrypt.compare(password, result[0].password)){
-        const token = await generateToken(login);
-        cookies.set('token', token, {
-            path: '/',
-            httpOnly: true,
-            secure: true,
-            sameSite: 'strict'
-        });
+export async function POST({ request, cookies }) {
+    const { login, password } = await request.json();
+
+    if (!(await verifyPassword(login, password))) {
         return json({
-            sukces: true,
-            msg: null
+            success: false,
+            msg: 'Invalid login or password',
         });
     }
-    else{
-        return json({
-            sukces: false,
-            msg: "Podane hasło jest błędne"
-        });
-    }
+
+    const token = await addSession(login);
+    cookies.set('session', token, {
+        path: '/',
+        httpOnly: true,
+        secure: true,
+        sameSite: 'strict',
+    });
+
+    return json({
+        success: true,
+        msg: null,
+    });
 }
 
-export async function DELETE({cookies}){
-    const token = cookies.get('token');
-    if(token == undefined)
-        return json({sukces: false});
+export async function DELETE({ cookies }) {
+    const token = cookies.get('session');
+    if (token == undefined) return json({ success: false });
 
     await deleteSession(token);
-    cookies.delete('token', { path: '/' });
-    return json({sukces: true});
+    cookies.delete('session', { path: '/' });
+    return json({ success: true });
 }
 
-export async function GET({cookies}){
-    const token = cookies.get('token');
-    if(token == undefined)
-        return json({sukces: false});
-    
-    if((await tokenExists(token)).length == 0) return json({sukces: false});
-    return json({sukces: true});
+export async function GET({ cookies }) {
+    const token = cookies.get('session');
+    if (token == undefined) return json({ success: false });
+    return json({ success: await tokenExists(token) });
 }
