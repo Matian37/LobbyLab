@@ -22,6 +22,30 @@ describe('POST', () => {
         vi.clearAllMocks();
     });
 
+    it('returns failure when password is too short', async () => {
+        const response = await api.POST({
+            request: mockRequest({ login: 'alice', password: '1234' }),
+        });
+
+        expect(await response.json()).toEqual({
+            success: false,
+            msg: 'Password must be between 5 and 64 characters',
+        });
+        expect(db.addUser).not.toHaveBeenCalled();
+    });
+
+    it('returns failure when password is too long', async () => {
+        const response = await api.POST({
+            request: mockRequest({ login: 'alice', password: 'x'.repeat(65) }),
+        });
+
+        expect(await response.json()).toEqual({
+            success: false,
+            msg: 'Password must be between 5 and 64 characters',
+        });
+        expect(db.addUser).not.toHaveBeenCalled();
+    });
+
     it('registers user and sets session cookie', async () => {
         db.addUser.mockResolvedValue(true);
         db.addSession.mockResolvedValue('session-token-123');

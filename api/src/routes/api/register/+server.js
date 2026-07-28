@@ -3,9 +3,15 @@ import { json } from '@sveltejs/kit';
 
 export async function POST({ request, cookies }) {
     const { login, password } = await request.json();
-    const result = await addUser(login, password);
 
-    if (!result) {
+    if (password.length < 5 || password.length > 64) {
+        return json({
+            success: false,
+            msg: 'Password must be between 5 and 64 characters',
+        });
+    }
+
+    if (!(await addUser(login, password))) {
         return json({
             success: false,
             msg: 'Login is already taken',
