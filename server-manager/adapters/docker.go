@@ -134,6 +134,34 @@ func (dc *DockerConnection) KillContainer(ctx context.Context, id string) error 
 	return nil
 }
 
+func (dc *DockerConnection) RemoveZombieWorkers(ctx context.Context) error {
+	if !dc.initialized {
+		return ErrDockerConnNotInit
+	}
+	if dc.closed {
+		return ErrDockerConnClosed
+	}
+
+	timeoutCtx, cancel := context.WithTimeout(ctx, dc.killTimeout)
+	defer cancel()
+
+	containers, err := dc.client.ContainerList(timeoutCtx, client.ContainerListOptions{
+		All:     true,
+		Filters: client.Filters{}.Add("label", "com.github.multiplayer-asset.worker=true"),
+	})
+	if err != nil {
+		return err
+	}
+
+	for _, c := range containers.Items {
+		if _, err := dc.client.ContainerKill(timeoutCtx, c.ID, client.ContainerKillOptions{}); err != nil {
+			slog.Error("failed to kill zombie container", "id", c.ID, "error", err)
+		}
+	}
+
+	return nil
+}
+
 func (dc *DockerConnection) GetGamePort(ctx context.Context, containerID string) (string, error) {
 	if !dc.initialized {
 		return "", ErrDockerConnNotInit

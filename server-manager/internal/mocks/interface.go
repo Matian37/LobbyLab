@@ -99,6 +99,20 @@ func (mr *MockDockerConnectionMockRecorder) Open(config any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Open", reflect.TypeOf((*MockDockerConnection)(nil).Open), config)
 }
 
+// RemoveZombieWorkers mocks base method.
+func (m *MockDockerConnection) RemoveZombieWorkers(ctx context.Context) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "RemoveZombieWorkers", ctx)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// RemoveZombieWorkers indicates an expected call of RemoveZombieWorkers.
+func (mr *MockDockerConnectionMockRecorder) RemoveZombieWorkers(ctx any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RemoveZombieWorkers", reflect.TypeOf((*MockDockerConnection)(nil).RemoveZombieWorkers), ctx)
+}
+
 // RestartContainer mocks base method.
 func (m *MockDockerConnection) RestartContainer(ctx context.Context, id string) error {
 	m.ctrl.T.Helper()
@@ -368,6 +382,21 @@ func (mr *MockDatabaseConnectionMockRecorder) GatherMatchPlayers(ctx any) *gomoc
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GatherMatchPlayers", reflect.TypeOf((*MockDatabaseConnection)(nil).GatherMatchPlayers), ctx)
 }
 
+// GenerateAuthTokens mocks base method.
+func (m *MockDatabaseConnection) GenerateAuthTokens(ctx context.Context, users []internal.User) ([]internal.User, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GenerateAuthTokens", ctx, users)
+	ret0, _ := ret[0].([]internal.User)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GenerateAuthTokens indicates an expected call of GenerateAuthTokens.
+func (mr *MockDatabaseConnectionMockRecorder) GenerateAuthTokens(ctx, users any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GenerateAuthTokens", reflect.TypeOf((*MockDatabaseConnection)(nil).GenerateAuthTokens), ctx, users)
+}
+
 // GetNextMatchId mocks base method.
 func (m *MockDatabaseConnection) GetNextMatchId(ctx context.Context) (int, error) {
 	m.ctrl.T.Helper()
@@ -397,6 +426,20 @@ func (mr *MockDatabaseConnectionMockRecorder) Open(ctx any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Open", reflect.TypeOf((*MockDatabaseConnection)(nil).Open), ctx)
 }
 
+// RemoveMatchStatus mocks base method.
+func (m *MockDatabaseConnection) RemoveMatchStatus(ctx context.Context, matchID int) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "RemoveMatchStatus", ctx, matchID)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// RemoveMatchStatus indicates an expected call of RemoveMatchStatus.
+func (mr *MockDatabaseConnectionMockRecorder) RemoveMatchStatus(ctx, matchID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RemoveMatchStatus", reflect.TypeOf((*MockDatabaseConnection)(nil).RemoveMatchStatus), ctx, matchID)
+}
+
 // SaveMatchResults mocks base method.
 func (m *MockDatabaseConnection) SaveMatchResults(ctx context.Context, results internal.Result) error {
 	m.ctrl.T.Helper()
@@ -409,6 +452,20 @@ func (m *MockDatabaseConnection) SaveMatchResults(ctx context.Context, results i
 func (mr *MockDatabaseConnectionMockRecorder) SaveMatchResults(ctx, results any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SaveMatchResults", reflect.TypeOf((*MockDatabaseConnection)(nil).SaveMatchResults), ctx, results)
+}
+
+// SetupMatchmaking mocks base method.
+func (m *MockDatabaseConnection) SetupMatchmaking(ctx context.Context) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SetupMatchmaking", ctx)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// SetupMatchmaking indicates an expected call of SetupMatchmaking.
+func (mr *MockDatabaseConnectionMockRecorder) SetupMatchmaking(ctx any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetupMatchmaking", reflect.TypeOf((*MockDatabaseConnection)(nil).SetupMatchmaking), ctx)
 }
 
 // MockMessage is a mock of Message interface.

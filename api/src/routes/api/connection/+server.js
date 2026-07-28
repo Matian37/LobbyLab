@@ -1,4 +1,4 @@
-import { deleteFromWaiting, getLoginFromToken } from '$lib/db.js';
+import { getLoginFromToken, setUserStatus } from '$lib/db.js';
 import { json } from '@sveltejs/kit';
 import { Client } from 'postgres';
 
@@ -11,21 +11,25 @@ export async function GET({ cookies }) {
         console.debug('session with given token does not exist');
         return json({ success: false });
     }
-
-    let interval;
+                    
+    let interval, dbInterval;
     return new Response(
         new ReadableStream({
-            start(controller) {
-                //listen(login, controller);
-                interval = setInterval(() => {
-                    console.debug('sending ping');
+            start(controller){
+                await listen(login, controller);
+                interval = setInterval(()=>{
+                    console.debug("sending ping");
                     controller.enqueue('data: ping\n\n');
                 }, 10000);
+
+                dbInterval = setInverval(()=>{
+                    setUserStatus(login);
+                }, 1000);
             },
             async cancel() {
                 clearInterval(interval);
                 console.debug('client disconnected SSE connection');
-                await deleteFromWaiting(login);
+                // TODO: set user status to not queued
             },
         }),
         {
@@ -43,7 +47,11 @@ async function listen(login, controller) {
     const sql = postgres(process.env.DATABASE_URL);
 
     await sql.listen('users_match_id_assigned', (payload) => {
+        // FIX: payload is a string, so this is not valid
         if (payload.username != login) return;
+
+        payload.match_auth_token = await getAuthToken(login);
+        
         console.debug('sending server socket');
         controller.equeue(`data: ${payload}\n\n`);
         controller.close();

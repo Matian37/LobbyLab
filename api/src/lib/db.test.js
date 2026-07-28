@@ -123,48 +123,15 @@ describe('verifyPassword', () => {
     });
 });
 
-describe('addToWaiting', () => {
-    it('adds a user to the waiting queue', async () => {
-        await db.addToWaiting('alice');
-        const rows = await helperSql`
-            SELECT login
-            FROM waiting
-        `;
+describe('setUserStatus', () => {
+    it('sets user status to waiting in queue', async () => {
+        expect(await db.addUser('alice', 'secret')).toBe(true);
+        expect(await db.setUserStatus('alice')).toBe(true);
+        const rows = await helperSql`SELECT queue_until FROM waiting`;
         expect(rows.length).toBe(1);
-        expect(rows[0].login).toBe('alice');
-    });
-
-    it('returns false when the user is already waiting', async () => {
-        await db.addToWaiting('alice');
-        const result = await db.addToWaiting('alice');
-        expect(result).toBe(false);
-    });
-});
-
-describe('deleteFromWaiting', () => {
-    it('removes a user from the waiting queue', async () => {
-        await db.addToWaiting('alice');
-        await db.deleteFromWaiting('alice');
-        const rows = await helperSql`
-            SELECT login
-            FROM waiting
-        `;
-        expect(rows.length).toBe(0);
-    });
-
-    it('returns true even when the user is not in the queue', async () => {
-        expect(await db.deleteFromWaiting('alice')).toBe(true);
-    });
-});
-
-describe('isWaiting', () => {
-    it('returns true when the user is in the queue', async () => {
-        await db.addToWaiting('alice');
-        expect(await db.isWaiting('alice')).toBe(true);
-    });
-
-    it('returns false when the user is not in the queue', async () => {
-        expect(await db.isWaiting('alice')).toBe(false);
+        expect(rows[0].queue_until.getTime()).toBeGreaterThanOrEqual(
+            Date.now()
+        );
     });
 });
 
@@ -287,5 +254,24 @@ describe('getMatchResults', () => {
             VALUES (${'lonely'}, '')
         `;
         expect(await db.getMatchResults('lonely')).toEqual([]);
+    });
+});
+
+describe('getAuthToken', () => {
+    it('returns auth token for valid login', async () => {
+        await sql`INSERT INTO users (login, password, match_auth_token) VALUES ('user', '123', 'token')`;
+        const token = await db.getAuthToken('user');
+        expect(token).toBe('token');
+    });
+
+    it('returns null for invalid login', async () => {
+        const token = await db.getAuthToken('invalid');
+        expect(token).toBeNull();
+    });
+
+    it('returns null for no token', async () => {
+        await sql`INSERT INTO users (login, password) VALUES ('user', '123')`;
+        const token = await db.getAuthToken('user');
+        expect(token).toBeNull();
     });
 });

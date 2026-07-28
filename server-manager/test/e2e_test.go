@@ -6,7 +6,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"log/slog"
 	"net"
 	"os"
@@ -216,7 +215,7 @@ func runApp(t *testing.T, ctx context.Context, cfg *internal.EnvConfig) chan err
 
 	resChan := make(chan error, 1)
 	go func() {
-		err := app.Run(ctx, cfg, slog.New(slog.NewTextHandler(io.Discard, nil)))
+		err := app.Run(ctx, cfg, slog.New(slog.NewTextHandler(os.Stdout, nil)))
 		resChan <- err
 	}()
 	return resChan
@@ -269,6 +268,87 @@ func TestE2E_GracefulShutdown(t *testing.T) {
 	}
 }
 
+func runZombieContainer(t *testing.T, ctx context.Context) string {
+	t.Helper()
+
+	cli, err := client.New()
+	require.NoError(t, err)
+	defer cli.Close()
+
+	res, err := cli.ContainerCreate(ctx, client.ContainerCreateOptions{
+		Config: &container.Config{
+			Image: "busybox:latest",
+			Cmd:   []string{"sleep", "inf"},
+			Labels: map[string]string{
+				"com.github.multiplayer-asset.worker": "true",
+			},
+		},
+	})
+	require.NoError(t, err)
+
+	t.Cleanup(func() {
+		cleanupCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		cli, err := client.New()
+		if err != nil {
+			return
+		}
+		defer cli.Close()
+		_, _ = cli.ContainerRemove(cleanupCtx, res.ID, client.ContainerRemoveOptions{Force: true})
+	})
+
+	_, err = cli.ContainerStart(ctx, res.ID, client.ContainerStartOptions{})
+	require.NoError(t, err)
+
+	return res.ID
+}
+
+func TestE2E_RemoveZombieWorkers(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreCurrent())
+	})
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	natsURI, started := setupTestEnvironment(t)
+
+	cfg := &internal.EnvConfig{
+		Image:                  "busybox:latest",
+		Workercount:            1,
+		ExposePorts:            network.PortSet{network.MustParsePort("8080"): {}},
+		ClientPort:             network.MustParsePort("8080"),
+		BrokerURI:              natsURI,
+		PublicHost:             "127.0.0.1",
+		DatabaseURI:            dbConnString,
+		PlayersPerRoom:         2,
+		TestMakeContainerDummy: true,
+	}
+
+	zombieID := runZombieContainer(t, ctx)
+
+	appResult := runApp(t, ctx, cfg)
+	waitForAppStart(t, started, appResult)
+
+	cli, err := client.New()
+	require.NoError(t, err)
+	defer cli.Close()
+
+	info, err := cli.ContainerInspect(ctx, zombieID, client.ContainerInspectOptions{})
+	require.NoError(t, err)
+	require.NotNil(t, info.Container.State)
+	assert.Equal(t, container.StateExited, info.Container.State.Status,
+		"zombie container should be killed by RemoveZombieWorkers")
+
+	cancel()
+	select {
+	case err := <-appResult:
+		require.NoError(t, err)
+	case <-time.After(5 * time.Second):
+		t.Fatal("timeout")
+	}
+}
+
 func TestE2E_AppLifecycle(t *testing.T) {
 	t.Cleanup(func() {
 		goleak.VerifyNone(t, goleak.IgnoreCurrent())
@@ -300,14 +380,11 @@ func TestE2E_AppLifecycle(t *testing.T) {
 	waitForAppStart(t, started, appResult)
 
 	_, err = dbConn.Exec(
-		ctx,
-		"INSERT INTO users (login, password) VALUES ($1, $2), ($3, $4)",
-		"user1", "pass1",
-		"user2", "pass2",
+		ctx, `
+			INSERT INTO users (login, password, queued_until)
+			VALUES ('user1', '', NOW() + INTERVAL '5 hours'), ('user2', '', NOW() + INTERVAL '5 hours')
+		`,
 	)
-	require.NoError(t, err)
-
-	_, err = dbConn.Exec(ctx, "INSERT INTO waiting (login) VALUES ($1), ($2)", "user1", "user2")
 	require.NoError(t, err)
 
 	var matchID int
@@ -317,7 +394,7 @@ func TestE2E_AppLifecycle(t *testing.T) {
 	}, 10*time.Second, 100*time.Millisecond, "should matchmake users and create match")
 
 	var waitingCount int
-	err = dbConn.QueryRow(ctx, "SELECT COUNT(*) FROM waiting").Scan(&waitingCount)
+	err = dbConn.QueryRow(ctx, "SELECT COUNT(*) FROM users WHERE queued_until > NOW() AND match_id IS NULL").Scan(&waitingCount)
 	require.NoError(t, err)
 	assert.Zero(t, waitingCount)
 
@@ -346,16 +423,13 @@ func TestE2E_AppLifecycle(t *testing.T) {
 	_, err = js.Publish(ctx, "workers.results", resultPayload)
 	require.NoError(t, err)
 
-	var results string
+	var results *string
 	require.Eventually(t, func() bool {
 		err := dbConn.QueryRow(ctx, "SELECT results FROM matches WHERE id = $1", matchID).Scan(&results)
-		if err != nil || len(results) == 0 {
-			return false
-		}
-		return true
+		return err == nil && results != nil && len(*results) != 0
 	}, 10*time.Second, 100*time.Millisecond, "should save match results to database")
 
-	assert.JSONEq(t, `{"winner": "user1"}`, results)
+	assert.JSONEq(t, `{"winner": "user1"}`, *results)
 
 	cancel()
 	select {
@@ -418,18 +492,16 @@ func TestE2E_WorkersOverloadWithMatches(t *testing.T) {
 
 	_, err = dbConn.Exec(
 		ctx,
-		"INSERT INTO users (login, password) VALUES ($1,$2),($3,$4),($5,$6),($7,$8)",
+		`INSERT INTO users (login, password, queued_until)
+		VALUES
+		($1,$2,NOW() + INTERVAL '5 hours'),
+		($3,$4,NOW() + INTERVAL '5 hours'),
+		($5,$6,NOW() + INTERVAL '5 hours'),
+		($7,$8,NOW() + INTERVAL '5 hours')`,
 		"user1", "pass",
 		"user2", "pass",
 		"user3", "pass",
 		"user4", "pass",
-	)
-	require.NoError(t, err)
-
-	_, err = dbConn.Exec(
-		ctx,
-		"INSERT INTO waiting (login) VALUES ($1),($2),($3),($4)",
-		"user1", "user2", "user3", "user4",
 	)
 	require.NoError(t, err)
 
@@ -440,23 +512,16 @@ func TestE2E_WorkersOverloadWithMatches(t *testing.T) {
 	}, 10*time.Second, 100*time.Millisecond, "should create 2 matches")
 
 	_, err = dbConn.Exec(ctx,
-		"INSERT INTO users (login, password) VALUES ($1,$2),($3,$4)",
+		"INSERT INTO users (login, password, queued_until) VALUES ($1,$2,NOW() + INTERVAL '5 hours'),($3,$4,NOW() + INTERVAL '5 hours')",
 		"user5", "pass",
 		"user6", "pass",
-	)
-	require.NoError(t, err)
-
-	_, err = dbConn.Exec(
-		ctx,
-		"INSERT INTO waiting (login) VALUES ($1),($2)",
-		"user5", "user6",
 	)
 	require.NoError(t, err)
 
 	time.Sleep(2 * time.Second)
 
 	var waitingCount int
-	err = dbConn.QueryRow(ctx, "SELECT COUNT(*) FROM waiting").Scan(&waitingCount)
+	err = dbConn.QueryRow(ctx, "SELECT COUNT(*) FROM users WHERE queued_until > NOW() AND match_id IS NULL").Scan(&waitingCount)
 	require.NoError(t, err)
 	assert.Equal(t, 2, waitingCount, "users 5,6 should still wait when all workers occupied")
 
@@ -482,7 +547,7 @@ func TestE2E_WorkersOverloadWithMatches(t *testing.T) {
 		return err == nil && matchCount == 3
 	}, 10*time.Second, 100*time.Millisecond, "should create 3rd match after result frees a worker")
 
-	err = dbConn.QueryRow(ctx, "SELECT COUNT(*) FROM waiting").Scan(&waitingCount)
+	err = dbConn.QueryRow(ctx, "SELECT COUNT(*) FROM users WHERE queued_until > NOW() AND match_id IS NULL").Scan(&waitingCount)
 	require.NoError(t, err)
 	assert.Zero(t, waitingCount, "all users should be matched")
 
@@ -529,16 +594,9 @@ func TestE2E_WorkerFailureAndRestart(t *testing.T) {
 
 	_, err = dbConn.Exec(
 		ctx,
-		"INSERT INTO users (login, password) VALUES ($1,$2),($3,$4)",
+		"INSERT INTO users (login, password, queued_until) VALUES ($1,$2,NOW() + INTERVAL '5 hours'),($3,$4,NOW() + INTERVAL '5 hours')",
 		"user1", "pass",
 		"user2", "pass",
-	)
-	require.NoError(t, err)
-
-	_, err = dbConn.Exec(
-		ctx,
-		"INSERT INTO waiting (login) VALUES ($1),($2)",
-		"user1", "user2",
 	)
 	require.NoError(t, err)
 
@@ -552,12 +610,9 @@ func TestE2E_WorkerFailureAndRestart(t *testing.T) {
 
 	_, err = dbConn.Exec(
 		ctx,
-		"INSERT INTO users (login, password) VALUES ($1,$2),($3,$4)",
+		"INSERT INTO users (login, password, queued_until) VALUES ($1,$2,NOW() + INTERVAL '5 hours'),($3,$4,NOW() + INTERVAL '5 hours')",
 		"user3", "pass", "user4", "pass",
 	)
-	require.NoError(t, err)
-
-	_, err = dbConn.Exec(ctx, "INSERT INTO waiting (login) VALUES ($1),($2)", "user3", "user4")
 	require.NoError(t, err)
 
 	require.Eventually(t,
@@ -585,7 +640,7 @@ func TestE2E_WorkerFailureAndRestart(t *testing.T) {
 	)
 
 	var waitingCount int
-	err = dbConn.QueryRow(ctx, "SELECT COUNT(*) FROM waiting").Scan(&waitingCount)
+	err = dbConn.QueryRow(ctx, "SELECT COUNT(*) FROM users WHERE queued_until > NOW() AND match_id IS NULL").Scan(&waitingCount)
 	require.NoError(t, err)
 	assert.Zero(t, waitingCount, "all users should be matched")
 
@@ -628,10 +683,7 @@ func TestE2E_NoMatchWithoutEnoughPlayers(t *testing.T) {
 
 	waitForAppStart(t, started, appResult)
 
-	_, err = dbConn.Exec(ctx, "INSERT INTO users (login, password) VALUES ($1,$2)", "user1", "pass")
-	require.NoError(t, err)
-
-	_, err = dbConn.Exec(ctx, "INSERT INTO waiting (login) VALUES ($1)", "user1")
+	_, err = dbConn.Exec(ctx, "INSERT INTO users (login, password, queued_until) VALUES ($1,$2,NOW() + INTERVAL '5 hours')", "user1", "pass")
 	require.NoError(t, err)
 
 	time.Sleep(2 * time.Second)

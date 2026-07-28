@@ -92,6 +92,10 @@ func (wm *WorkerManager) Start(ctx context.Context) error {
 		return fmt.Errorf("failed to open database connection: %w", err)
 	}
 
+	if err := wm.dockerConn.RemoveZombieWorkers(ctx); err != nil {
+		return fmt.Errorf("failed to remove zombie workers: %w", err)
+	}
+
 	for range wm.workerCount {
 		id, err := wm.dockerConn.SpawnContainer(ctx)
 		if err != nil {
@@ -170,6 +174,13 @@ func (wm *WorkerManager) saveLoop(ctx context.Context) error {
 			return ctx.Err()
 		case res := <-wm.saveResultChan:
 			wm.logger.Debug("received save request", "result", res)
+
+			if err := wm.dbConn.RemoveMatchStatus(ctx, res.MatchID); err != nil {
+				wm.logger.Error(
+					"failed to remove match status from match users. this will block their matchmaking indefinitely",
+					"matchID", res.MatchID, "error", err,
+				)
+			}
 
 			err := wm.dbConn.SaveMatchResults(ctx, res)
 			if err != nil {

@@ -48,7 +48,6 @@ func Test_Handle(t *testing.T) {
 				attrs:  []slog.Attr{slog.Any("error", nil)},
 				writes: true,
 			},
-	
 		}
 
 		for _, tc := range tests {

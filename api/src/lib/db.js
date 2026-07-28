@@ -33,29 +33,22 @@ export async function verifyPassword(login, password) {
     return q.length > 0 && q[0].match;
 }
 
-export async function isWaiting(login) {
+export async function setUserStatus(login) {
+    try {
+        await sql`
+            UPDATE users SET queued_until = NOW() + INTERVAL '5 seconds' WHERE login = ${login}
+        `;
+        return true;
+    } catch {
+        return false;
+    }
+}
+
+export async function findWaitingByLogin(login) {
     const q = await sql`
-        SELECT 1
-        FROM waiting
-        WHERE login = ${login}
+        SELECT * FROM users WHERE login = ${login} AND queued_until > NOW()
     `;
-    return q.length > 0;
-}
-
-export async function addToWaiting(login) {
-    return tryQuery(
-        () => sql`
-            INSERT INTO waiting (login) VALUES(${login})
-        `
-    );
-}
-
-export async function deleteFromWaiting(login) {
-    return tryQuery(
-        () => sql`
-            DELETE FROM waiting WHERE login=${login}
-        `
-    );
+    return q;
 }
 
 export async function getLoginFromToken(token) {
@@ -104,4 +97,11 @@ export async function getMatchResults(login) {
         details: row.results,
         canceled: row.canceled,
     }));
+}
+
+export async function getAuthToken(login) {
+    const q = await sql`
+        SELECT match_auth_token FROM users WHERE login = ${login}
+    `;
+    return q[0]?.match_auth_token ?? null;
 }

@@ -56,6 +56,10 @@ func (m *Matchmaker) Start(ctx context.Context) error {
 		return err
 	}
 
+	if err := m.db.SetupMatchmaking(ctx); err != nil {
+		return err
+	}
+
 	m.wg.Go(func() {
 		m.logger.Debug("starting core loop")
 		err := m.matchmakingLoop(ctx)
@@ -136,6 +140,13 @@ func (m *Matchmaker) matchmakingLoop(ctx context.Context) error {
 		users, err := m.waitForEnoughPlayers(ctx)
 		if err != nil {
 			m.logger.Error("failed to wait for enough players", "error", err)
+			iterationErr = err
+			continue
+		}
+
+		users, err = m.db.GenerateAuthTokens(ctx, users)
+		if err != nil {
+			m.logger.Error("failed to set match auth tokens for users", "error", err)
 			iterationErr = err
 			continue
 		}

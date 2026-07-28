@@ -133,6 +133,25 @@ func TestWorkerManager_Start(t *testing.T) {
 		assert.False(t, wm.closed)
 	})
 
+	t.Run("remove zombie workers error", func(t *testing.T) {
+		ctx := context.Background()
+
+		docker, broker, db, wm := newMockWorkerManager(t, 1)
+		wantErr := errors.New("zombie removal failed")
+
+		gomock.InOrder(
+			docker.EXPECT().Open(wm.config).Return(nil),
+			broker.EXPECT().Open(ctx, wm.config).Return(nil),
+			db.EXPECT().Open(ctx).Return(nil),
+			docker.EXPECT().RemoveZombieWorkers(ctx).Return(wantErr),
+		)
+
+		err := wm.Start(ctx)
+		require.ErrorIs(t, err, wantErr)
+		assert.False(t, wm.initialized)
+		assert.False(t, wm.closed)
+	})
+
 	t.Run("worker spawn error", func(t *testing.T) {
 		ctx := context.Background()
 
@@ -144,6 +163,7 @@ func TestWorkerManager_Start(t *testing.T) {
 			docker.EXPECT().Open(wm.config).Return(nil),
 			broker.EXPECT().Open(ctx, wm.config).Return(nil),
 			db.EXPECT().Open(ctx).Return(nil),
+			docker.EXPECT().RemoveZombieWorkers(ctx).Return(nil),
 			docker.EXPECT().SpawnContainer(ctx).Return("worker-1", nil),
 			docker.EXPECT().SpawnContainer(ctx).Return("", wantErr),
 		)
@@ -169,6 +189,7 @@ func TestWorkerManager_Start(t *testing.T) {
 			docker.EXPECT().Open(wm.config).Return(nil),
 			broker.EXPECT().Open(ctx, wm.config).Return(nil),
 			db.EXPECT().Open(ctx).Return(nil),
+			docker.EXPECT().RemoveZombieWorkers(ctx).Return(nil),
 			docker.EXPECT().SpawnContainer(ctx).Return("worker-1", nil),
 			docker.EXPECT().SpawnContainer(ctx).Return("worker-2", nil),
 		)
@@ -740,6 +761,7 @@ func TestWorkerManager_SaveLoop(t *testing.T) {
 		_, _, db, wm := newMockWorkerManagerWithInit(t, []*Worker{})
 		res := internal.Result{Success: true, MatchID: 42}
 
+		db.EXPECT().RemoveMatchStatus(ctx, 42).Return(nil)
 		db.EXPECT().SaveMatchResults(ctx, res).DoAndReturn(
 			func(any, any) error {
 				cancel()
@@ -962,6 +984,7 @@ func TestWorkerManager_LifeCycle(t *testing.T) {
 		broker.EXPECT().GetResult(ctx).Return(msg, nil)
 		msg.EXPECT().Data().Times(2).Return(payload)
 		msg.EXPECT().Ack().Return(nil)
+		db.EXPECT().RemoveMatchStatus(ctx, 1).Return(nil)
 		db.EXPECT().SaveMatchResults(ctx, res).
 			DoAndReturn(func(ctx any, result any) error {
 				cancel()

@@ -66,6 +66,7 @@ func TestMatchmaker_Start(t *testing.T) {
 		cancel()
 
 		db.EXPECT().Open(ctx).Return(nil)
+		db.EXPECT().SetupMatchmaking(ctx).Return(nil)
 		wm.EXPECT().WaitForFreeWorker(gomock.Any()).MaxTimes(1)
 
 		assert.NoError(t, m.Start(ctx))
@@ -84,7 +85,7 @@ func TestMatchmaker_createMatch(t *testing.T) {
 		users := []internal.User{{Login: "1"}}
 		wantMatchConfig := internal.MatchConfig{
 			MatchID: 1,
-			Config:  []byte(`{"players":[{"login":"1"}]}`),
+			Config:  []byte(`{"players":[{"login":"1","matchAuthToken":""}]}`),
 		}
 
 		gomock.InOrder(
@@ -227,7 +228,7 @@ func TestMatchmaker_matchmakingLoop(t *testing.T) {
 
 		matchUsers := []internal.User{{Login: "1"}, {Login: "2"}}
 		matchConfig := internal.MatchConfig{
-			Config:  []byte(`{"players":[{"login":"1"},{"login":"2"}]}`),
+			Config:  []byte(`{"players":[{"login":"1","matchAuthToken":""},{"login":"2","matchAuthToken":""}]}`),
 			MatchID: 1,
 		}
 
@@ -235,6 +236,7 @@ func TestMatchmaker_matchmakingLoop(t *testing.T) {
 			wm.EXPECT().WaitForFreeWorker(ctx),
 			db.EXPECT().GatherMatchPlayers(ctx).Return(nil, internal.ErrDBNotEnoughPlayers),
 			db.EXPECT().GatherMatchPlayers(ctx).Return(matchUsers, nil),
+			db.EXPECT().GenerateAuthTokens(ctx, matchUsers).Return(matchUsers, nil),
 			db.EXPECT().GetNextMatchId(gomock.Any()).Return(matchConfig.MatchID, nil),
 			wm.EXPECT().AssignMatch(gomock.Any(), matchConfig).Return(internal.ServerInfo{}, nil),
 			db.EXPECT().AddMatch(gomock.Any(), matchUsers, internal.ServerInfo{}, matchConfig.MatchID).Return(nil),

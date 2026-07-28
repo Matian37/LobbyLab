@@ -32,7 +32,8 @@ type Result struct {
 }
 
 type User struct {
-	Login string `json:"login"`
+	Login          string `json:"login"`
+	MatchAuthToken string `json:"matchAuthToken"`
 }
 
 type ServerInfo struct {
