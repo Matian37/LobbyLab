@@ -1,11 +1,5 @@
-import {
-    verifyPassword,
-    addSession,
-    deleteSession,
-    getLoginFromToken,
-    sessionExist,
-} from '$lib/db.js';
 import { json } from '@sveltejs/kit';
+import { verifyPassword, addSession } from '$lib/db.js';
 
 export async function POST({ request, cookies }) {
     const { login, password } = await request.json();
@@ -29,19 +23,4 @@ export async function POST({ request, cookies }) {
         success: true,
         msg: null,
     });
-}
-
-export async function DELETE({ cookies }) {
-    const token = cookies.get('session');
-    if (token == undefined) return json({ success: false });
-
-    await deleteSession(token);
-    cookies.delete('session', { path: '/' });
-    return json({ success: true });
-}
-
-export async function GET({ cookies }) {
-    const token = cookies.get('session');
-    if (token == undefined) return json({ success: false });
-    return json({ success: await sessionExist(token) });
 }
