@@ -27,8 +27,8 @@
 
     async function logout() {
         if (!user) return;
-        const response = await fetch('/api/login', {
-            method: 'DELETE',
+        const response = await fetch('/api/logout', {
+            method: 'POST',
         });
         user = null;
 
