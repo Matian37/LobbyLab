@@ -1,8 +1,8 @@
 <script>
-    import { goto } from '$app/navigation';
+    import { goto, invalidateAll } from '$app/navigation';
+    import { resolve } from '$app/paths';
     import { onMount } from 'svelte';
     import { page } from '$app/stores';
-    import { invalidateAll } from '$app/navigation';
 
     let buttonText = $state('Play');
     let rows = $state([]);
@@ -27,7 +27,7 @@
 
     async function logout() {
         if (!user) return;
-        const response = await fetch('/api/logout', {
+        await fetch('/api/logout', {
             method: 'POST',
         });
         user = null;
@@ -55,8 +55,8 @@
     }
 </script>
 
-<button onclick={() => goto('/login')} data-testid="login-page"> Login </button>
-<button onclick={() => goto('/register')}> Register </button>
+<button onclick={() => goto(resolve('/login'))} data-testid="login-page"> Login </button>
+<button onclick={() => goto(resolve('/register'))}> Register </button>
 <button onclick={() => logout()} data-testid="logout"> Log out </button>
 <button onclick={() => play()}>
     {buttonText}
@@ -68,7 +68,7 @@
     <thead>
         <tr>
             {#if rows.length > 0}
-                {#each Array(rows.players.length) as _, i}
+                {#each Array(rows.players.length) as _, i (i)}
                     <th>Player {i + 1}</th>
                 {/each}
                 <th>Winner</th>
@@ -77,9 +77,9 @@
     </thead>
     <tbody>
         {#if rows.length > 0}
-            {#each rows as row}
+            {#each rows as row, i (i)}
                 <tr>
-                    {#each row.players as player}
+                    {#each row.players as player (player)}
                         <td>{player}</td>
                     {/each}
                     <td>{row.winner}</td>

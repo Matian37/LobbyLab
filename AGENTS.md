@@ -58,7 +58,7 @@ It handles user login, game server management, and matchmaking logic. Runs every
 ## Linter
 
 - for golang use `golangci-lint run ./...`
-- for svelte-kit currently there is no linter configured
+- for svelte-kit use `npm run lint`
 
 ## When Writing/Reviewing Code
 - always run linter and formatter
