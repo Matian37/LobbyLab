@@ -6,8 +6,6 @@ vi.mock('$lib/db.js', () => {
     return {
         getLoginFromToken: vi.fn(),
         isWaiting: vi.fn(),
-        deleteFromWaiting: vi.fn(),
-        isWaiting: vi.fn(),
     };
 });
 

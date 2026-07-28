@@ -127,7 +127,6 @@ describe('extendQueueStatus', () => {
     it('sets user status to waiting in queue', async () => {
         expect(await db.addUser('alice', 'secret')).toBe(true);
         expect(await db.extendQueueStatus('alice')).toBe(true);
-        const now = Date.now();
         const rows = await helperSql`
             SELECT queued_until > NOW() as cond FROM users
         `;

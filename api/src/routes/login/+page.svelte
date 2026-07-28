@@ -1,5 +1,6 @@
 <script>
     import { goto } from '$app/navigation';
+    import { resolve } from '$app/paths';
 
     let login = $state(''),
         password = $state(''),
@@ -19,14 +20,14 @@
         if (success.success) {
             console.log('logged in successfully');
             errorMessage = '';
-            goto('/');
+            await goto(resolve('/'));
         } else {
             errorMessage = success.msg;
         }
     }
 </script>
 
-<button onclick={() => goto('/')}>Back</button>
+<button onclick={() => goto(resolve('/'))}>Back</button>
 Login <input bind:value={login} data-testid="login-input" />
 Password
 <input bind:value={password} type="password" data-testid="password-input" />

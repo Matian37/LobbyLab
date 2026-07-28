@@ -15,7 +15,7 @@ export async function GET({ cookies }) {
     let interval, dbInterval;
     return new Response(
         new ReadableStream({
-            start(controller){
+            async start(controller){
                 await listen(login, controller);
                 interval = setInterval(()=>{
                     console.debug("sending ping");
@@ -46,7 +46,7 @@ async function listen(login, controller) {
     // TODO: route notification instead of spawning connection per client
     const sql = postgres(process.env.DATABASE_URL);
 
-    await sql.listen('users_match_id_assigned', (payload) => {
+    await sql.listen('users_match_id_assigned', async (payload) => {
         const parsed = JSON.parse(payload);
         if (parsed.username != login) return;
 
