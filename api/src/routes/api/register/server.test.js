@@ -22,6 +22,30 @@ describe('POST', () => {
         vi.clearAllMocks();
     });
 
+    it('returns failure when login is not a string', async () => {
+        const response = await api.POST({
+            request: mockRequest({ login: 123, password: 'secret' }),
+        });
+
+        expect(await response.json()).toEqual({
+            success: false,
+            msg: 'Login and password must be strings',
+        });
+        expect(db.addUser).not.toHaveBeenCalled();
+    });
+
+    it('returns failure when password is not a string', async () => {
+        const response = await api.POST({
+            request: mockRequest({ login: 'alice', password: 123 }),
+        });
+
+        expect(await response.json()).toEqual({
+            success: false,
+            msg: 'Login and password must be strings',
+        });
+        expect(db.addUser).not.toHaveBeenCalled();
+    });
+
     it('returns failure when password is too short', async () => {
         const response = await api.POST({
             request: mockRequest({ login: 'alice', password: '1234' }),

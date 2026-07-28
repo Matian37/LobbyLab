@@ -4,6 +4,13 @@ import { json } from '@sveltejs/kit';
 export async function POST({ request, cookies }) {
     const { login, password } = await request.json();
 
+    if (typeof login !== 'string' || typeof password !== 'string') {
+        return json({
+            success: false,
+            msg: 'Login and password must be strings',
+        });
+    }
+
     if (password.length < 5 || password.length > 64) {
         return json({
             success: false,
