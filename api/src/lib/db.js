@@ -33,22 +33,25 @@ export async function verifyPassword(login, password) {
     return q.length > 0 && q[0].match;
 }
 
-export async function setUserStatus(login) {
-    try {
-        await sql`
-            UPDATE users SET queued_until = NOW() + INTERVAL '5 seconds' WHERE login = ${login}
-        `;
-        return true;
-    } catch {
-        return false;
-    }
+export async function extendQueueStatus(login) {
+    return tryQuery(
+        () => sql`
+            UPDATE users
+            SET queued_until = NOW() + INTERVAL '5 seconds'
+            WHERE login = ${login}
+        `
+    );
 }
 
-export async function findWaitingByLogin(login) {
+export async function isWaiting(login) {
     const q = await sql`
-        SELECT * FROM users WHERE login = ${login} AND queued_until > NOW()
+        SELECT * FROM users
+        WHERE
+            login = ${login} 
+            AND match_id IS NULL 
+            AND queued_until > NOW()
     `;
-    return q;
+    return q.length > 0;
 }
 
 export async function getLoginFromToken(token) {

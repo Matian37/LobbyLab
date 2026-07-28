@@ -1,4 +1,4 @@
-import { getLoginFromToken, setUserStatus } from '$lib/db.js';
+import { getLoginFromToken, extendQueueStatus } from '$lib/db.js';
 import { json } from '@sveltejs/kit';
 import { Client } from 'postgres';
 
@@ -23,7 +23,7 @@ export async function GET({ cookies }) {
                 }, 10000);
 
                 dbInterval = setInverval(()=>{
-                    setUserStatus(login);
+                    extendQueueStatus(login);
                 }, 1000);
             },
             async cancel() {

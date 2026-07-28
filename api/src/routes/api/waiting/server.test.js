@@ -5,7 +5,7 @@ import * as db from '$lib/db.js';
 vi.mock('$lib/db.js', () => {
     return {
         getLoginFromToken: vi.fn(),
-        findWaitingByLogin: vi.fn(),
+        isWaiting: vi.fn(),
         deleteFromWaiting: vi.fn(),
         isWaiting: vi.fn(),
     };
@@ -22,7 +22,7 @@ describe('GET', () => {
 
     it('returns true when user is waiting', async () => {
         db.getLoginFromToken.mockResolvedValue('user1');
-        db.findWaitingByLogin.mockResolvedValue([{}]);
+        db.isWaiting.mockResolvedValue(true);
 
         const response = await api.GET({ cookies: mockCookies('token-123') });
 
@@ -31,7 +31,7 @@ describe('GET', () => {
 
     it('returns false when user is not waiting', async () => {
         db.getLoginFromToken.mockResolvedValue('user1');
-        db.findWaitingByLogin.mockResolvedValue([]);
+        db.isWaiting.mockResolvedValue(false);
 
         const response = await api.GET({ cookies: mockCookies('token-123') });
 

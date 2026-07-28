@@ -123,10 +123,10 @@ describe('verifyPassword', () => {
     });
 });
 
-describe('setUserStatus', () => {
+describe('extendQueueStatus', () => {
     it('sets user status to waiting in queue', async () => {
         expect(await db.addUser('alice', 'secret')).toBe(true);
-        expect(await db.setUserStatus('alice')).toBe(true);
+        expect(await db.extendQueueStatus('alice')).toBe(true);
         const rows = await helperSql`SELECT queue_until FROM waiting`;
         expect(rows.length).toBe(1);
         expect(rows[0].queue_until.getTime()).toBeGreaterThanOrEqual(

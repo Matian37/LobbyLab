@@ -21,6 +21,7 @@ CREATE TABLE IF NOT EXISTS users(
     queued_until TIMESTAMP
 );
 CREATE INDEX IF NOT EXISTS idx_users_match_id ON users(match_id);
+CREATE INDEX IF NOT EXISTS idx_users_match_id ON users(login, match_id, queued_until);
 
 -- Stores matches in which users have participated
 CREATE TABLE IF NOT EXISTS user_matches (
