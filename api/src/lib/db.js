@@ -78,7 +78,7 @@ export async function deleteSession(token) {
     );
 }
 
-export async function tokenExists(token) {
+export async function sessionExist(token) {
     const q = await sql`
         SELECT 1 FROM sessions WHERE token = ${token}
     `;

@@ -214,15 +214,15 @@ describe('deleteSession', () => {
     });
 });
 
-describe('tokenExists', () => {
+describe('sessionExist', () => {
     it('returns true for an existing token', async () => {
         await db.addUser('alice', 'secret');
         const token = await db.addSession('alice');
-        expect(await db.tokenExists(token)).toBe(true);
+        expect(await db.sessionExist(token)).toBe(true);
     });
 
     it('returns false for a non-existent token', async () => {
-        expect(await db.tokenExists('nonexistent')).toBe(false);
+        expect(await db.sessionExist('nonexistent')).toBe(false);
     });
 });
 

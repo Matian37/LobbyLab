@@ -3,7 +3,7 @@ import {
     addSession,
     deleteSession,
     getLoginFromToken,
-    tokenExists,
+    sessionExist,
 } from '$lib/db.js';
 import { json } from '@sveltejs/kit';
 
@@ -43,5 +43,5 @@ export async function DELETE({ cookies }) {
 export async function GET({ cookies }) {
     const token = cookies.get('session');
     if (token == undefined) return json({ success: false });
-    return json({ success: await tokenExists(token) });
+    return json({ success: await sessionExist(token) });
 }

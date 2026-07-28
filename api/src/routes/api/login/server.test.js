@@ -7,7 +7,7 @@ vi.mock('$lib/db.js', () => {
         verifyPassword: vi.fn(),
         addSession: vi.fn(),
         deleteSession: vi.fn(),
-        tokenExists: vi.fn(),
+        sessionExist: vi.fn(),
     };
 });
 
@@ -107,7 +107,7 @@ describe('GET', () => {
     });
 
     it('returns true when session token is valid', async () => {
-        db.tokenExists.mockResolvedValue(true);
+        db.sessionExist.mockResolvedValue(true);
 
         const cookies = { get: vi.fn().mockReturnValue('session-token-123') };
         const response = await api.GET({ cookies });
@@ -116,7 +116,7 @@ describe('GET', () => {
     });
 
     it('returns false when session token is invalid', async () => {
-        db.tokenExists.mockResolvedValue(false);
+        db.sessionExist.mockResolvedValue(false);
 
         const cookies = { get: vi.fn().mockReturnValue('invalid-token') };
         const response = await api.GET({ cookies });
@@ -129,6 +129,6 @@ describe('GET', () => {
         const response = await api.GET({ cookies });
 
         expect(await response.json()).toEqual({ success: false });
-        expect(db.tokenExists).not.toHaveBeenCalled();
+        expect(db.sessionExist).not.toHaveBeenCalled();
     });
 });
