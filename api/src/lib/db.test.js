@@ -136,6 +136,37 @@ describe('extendQueueStatus', () => {
     });
 });
 
+describe('isWaiting', () => {
+    it('returns true when user is queued and not matched', async () => {
+        await db.addUser('alice', 'secret');
+        await db.extendQueueStatus('alice');
+        expect(await db.isWaiting('alice')).toBe(true);
+    });
+
+    it('returns false when user has an active match_id', async () => {
+        await helperSql`
+            INSERT INTO matches (id, host, port) VALUES (1, '', '0')
+        `;
+        await helperSql`
+            INSERT INTO users (login, password, match_id, queued_until)
+            VALUES ('alice', '', 1, NOW() + INTERVAL '5 hours')
+        `;
+        expect(await db.isWaiting('alice')).toBe(false);
+    });
+
+    it('returns false when queued_until has expired', async () => {
+        await helperSql`
+            INSERT INTO users (login, password, match_id, queued_until)
+            VALUES ('alice', '', NULL, NOW() - INTERVAL '5 hours')
+        `;
+        expect(await db.isWaiting('alice')).toBe(false);
+    });
+
+    it('returns false when user does not exist', async () => {
+        expect(await db.isWaiting('nobody')).toBe(false);
+    });
+});
+
 describe('addSession', () => {
     it('creates session and stores it', async () => {
         await db.addUser('alice', 'secret');
