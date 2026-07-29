@@ -95,4 +95,64 @@ describe('POST', () => {
             msg: 'Invalid login or password',
         });
     });
+
+    it('returns failure when login is too short', async () => {
+        const response = await api.POST({
+            request: mockRequest({
+                login: '',
+                password: EXAMPLE_PASSWORD,
+            }),
+        });
+
+        expect(await response.json()).toEqual({
+            success: false,
+            msg: 'Invalid login or password',
+        });
+        expect(db.verifyPassword).not.toHaveBeenCalled();
+    });
+
+    it('returns failure when login is too long', async () => {
+        const response = await api.POST({
+            request: mockRequest({
+                login: 'x'.repeat(LOGIN_MAX_LENGTH + 1),
+                password: EXAMPLE_PASSWORD,
+            }),
+        });
+
+        expect(await response.json()).toEqual({
+            success: false,
+            msg: 'Invalid login or password',
+        });
+        expect(db.verifyPassword).not.toHaveBeenCalled();
+    });
+
+    it('returns failure when password is too short', async () => {
+        const response = await api.POST({
+            request: mockRequest({
+                login: EXAMPLE_LOGIN,
+                password: '',
+            }),
+        });
+
+        expect(await response.json()).toEqual({
+            success: false,
+            msg: 'Invalid login or password',
+        });
+        expect(db.verifyPassword).not.toHaveBeenCalled();
+    });
+
+    it('returns failure when password is too long', async () => {
+        const response = await api.POST({
+            request: mockRequest({
+                login: EXAMPLE_LOGIN,
+                password: 'x'.repeat(PASSWORD_MAX_LENGTH + 1),
+            }),
+        });
+
+        expect(await response.json()).toEqual({
+            success: false,
+            msg: 'Invalid login or password',
+        });
+        expect(db.verifyPassword).not.toHaveBeenCalled();
+    });
 });
