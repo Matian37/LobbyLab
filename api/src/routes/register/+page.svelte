@@ -7,11 +7,6 @@
         errorText = $state('');
 
     async function submit() {
-        // TODO: enforce it by api
-        if (password.length < 3 || password.length > 64) {
-            errorText = 'Password must be between 3 and 64 characters';
-            return;
-        }
         let data = { login: login, password: password };
         let response = await fetch('/api/register', {
             method: 'POST',
