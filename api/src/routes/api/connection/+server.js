@@ -11,18 +11,18 @@ export async function GET({ cookies }) {
         console.debug('session with given token does not exist');
         return json({ success: false });
     }
-                    
+
     let interval, dbInterval;
     return new Response(
         new ReadableStream({
-            async start(controller){
+            async start(controller) {
                 await listen(login, controller);
-                interval = setInterval(()=>{
-                    console.debug("sending ping");
+                interval = setInterval(() => {
+                    console.debug('sending ping');
                     controller.enqueue('data: ping\n\n');
                 }, 10000);
 
-                dbInterval = setInverval(()=>{
+                dbInterval = setInverval(() => {
                     extendQueueStatus(login);
                 }, 1000);
             },
@@ -51,7 +51,7 @@ async function listen(login, controller) {
         if (parsed.username != login) return;
 
         parsed.match_auth_token = await getAuthToken(login);
-        
+
         console.debug('sending server socket');
         controller.equeue(`data: ${JSON.stringify(parsed)}\n\n`);
         controller.close();

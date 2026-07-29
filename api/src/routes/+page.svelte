@@ -55,7 +55,9 @@
     }
 </script>
 
-<button onclick={() => goto(resolve('/login'))} data-testid="login-page"> Login </button>
+<button onclick={() => goto(resolve('/login'))} data-testid="login-page">
+    Login
+</button>
 <button onclick={() => goto(resolve('/register'))}> Register </button>
 <button onclick={() => logout()} data-testid="logout"> Log out </button>
 <button onclick={() => play()}>
