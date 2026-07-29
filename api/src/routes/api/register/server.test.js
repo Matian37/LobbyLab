@@ -1,7 +1,12 @@
 import { vi, it, expect, describe, beforeEach } from 'vitest';
 import * as api from './+server.js';
 import * as db from '$lib/db.js';
-import { PASSWORD_MIN_LENGTH, PASSWORD_MAX_LENGTH, LOGIN_MIN_LENGTH, LOGIN_MAX_LENGTH } from '$lib/constants.js';
+import {
+    PASSWORD_MIN_LENGTH,
+    PASSWORD_MAX_LENGTH,
+    LOGIN_MIN_LENGTH,
+    LOGIN_MAX_LENGTH,
+} from '$lib/constants.js';
 
 const EXAMPLE_LOGIN = 'a'.repeat(LOGIN_MIN_LENGTH);
 const EXAMPLE_PASSWORD = 'a'.repeat(PASSWORD_MIN_LENGTH);
@@ -64,7 +69,10 @@ describe('POST', () => {
 
     it('returns failure when password is too long', async () => {
         const response = await api.POST({
-            request: mockRequest({ login: EXAMPLE_LOGIN, password: 'x'.repeat(PASSWORD_MAX_LENGTH + 1) }),
+            request: mockRequest({
+                login: EXAMPLE_LOGIN,
+                password: 'x'.repeat(PASSWORD_MAX_LENGTH + 1),
+            }),
         });
 
         expect(await response.json()).toEqual({
@@ -88,7 +96,10 @@ describe('POST', () => {
 
     it('returns failure when login is too long', async () => {
         const response = await api.POST({
-            request: mockRequest({ login: 'x'.repeat(LOGIN_MAX_LENGTH + 1), password: EXAMPLE_PASSWORD }),
+            request: mockRequest({
+                login: 'x'.repeat(LOGIN_MAX_LENGTH + 1),
+                password: EXAMPLE_PASSWORD,
+            }),
         });
 
         expect(await response.json()).toEqual({
@@ -104,12 +115,18 @@ describe('POST', () => {
 
         const cookies = { set: vi.fn() };
         const response = await api.POST({
-            request: mockRequest({ login: EXAMPLE_LOGIN, password: EXAMPLE_PASSWORD }),
+            request: mockRequest({
+                login: EXAMPLE_LOGIN,
+                password: EXAMPLE_PASSWORD,
+            }),
             cookies,
         });
 
         expect(await response.json()).toEqual({ success: true, msg: null });
-        expect(db.addUser).toHaveBeenCalledWith(EXAMPLE_LOGIN, EXAMPLE_PASSWORD);
+        expect(db.addUser).toHaveBeenCalledWith(
+            EXAMPLE_LOGIN,
+            EXAMPLE_PASSWORD
+        );
         expect(db.addSession).toHaveBeenCalledWith(EXAMPLE_LOGIN);
         expect(cookies.set).toHaveBeenCalledWith(
             'session',
@@ -126,7 +143,10 @@ describe('POST', () => {
         db.addUser.mockResolvedValue(false);
 
         const response = await api.POST({
-            request: mockRequest({ login: EXAMPLE_LOGIN, password: EXAMPLE_PASSWORD }),
+            request: mockRequest({
+                login: EXAMPLE_LOGIN,
+                password: EXAMPLE_PASSWORD,
+            }),
         });
 
         expect(await response.json()).toEqual({

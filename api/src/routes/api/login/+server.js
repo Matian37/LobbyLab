@@ -1,6 +1,11 @@
 import { json } from '@sveltejs/kit';
 import { verifyPassword, addSession } from '$lib/db.js';
-import { PASSWORD_MIN_LENGTH, PASSWORD_MAX_LENGTH, LOGIN_MIN_LENGTH, LOGIN_MAX_LENGTH } from '$lib/constants.js';
+import {
+    PASSWORD_MIN_LENGTH,
+    PASSWORD_MAX_LENGTH,
+    LOGIN_MIN_LENGTH,
+    LOGIN_MAX_LENGTH,
+} from '$lib/constants.js';
 
 export async function POST({ request, cookies }) {
     const { login, password } = await request.json();
