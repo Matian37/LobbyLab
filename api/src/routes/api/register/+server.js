@@ -1,5 +1,6 @@
 import { addUser, addSession } from '$lib/db.js';
 import { json } from '@sveltejs/kit';
+import { ERRORS } from '$lib/errors.js';
 import {
     PASSWORD_MIN_LENGTH,
     PASSWORD_MAX_LENGTH,
@@ -11,34 +12,22 @@ export async function POST({ request, cookies }) {
     const { login, password } = await request.json();
 
     if (typeof login !== 'string' || typeof password !== 'string') {
-        return json({
-            success: false,
-            msg: 'Login and password must be strings',
-        });
+        return ERRORS.invalidCredentialTypes();
     }
 
     if (login.length < LOGIN_MIN_LENGTH || login.length > LOGIN_MAX_LENGTH) {
-        return json({
-            success: false,
-            msg: `Login must be at least ${LOGIN_MIN_LENGTH} and at most ${LOGIN_MAX_LENGTH} characters`,
-        });
+        return ERRORS.invalidLoginLength();
     }
 
     if (
         password.length < PASSWORD_MIN_LENGTH ||
         password.length > PASSWORD_MAX_LENGTH
     ) {
-        return json({
-            success: false,
-            msg: `Password must be at least ${PASSWORD_MIN_LENGTH} and at most ${PASSWORD_MAX_LENGTH} characters`,
-        });
+        return ERRORS.invalidPasswordLength();
     }
 
     if (!(await addUser(login, password))) {
-        return json({
-            success: false,
-            msg: 'Login is already taken',
-        });
+        return ERRORS.loginTaken();
     }
 
     const token = await addSession(login);
@@ -49,8 +38,5 @@ export async function POST({ request, cookies }) {
         sameSite: 'strict',
     });
 
-    return json({
-        success: true,
-        msg: null,
-    });
+    return json({});
 }

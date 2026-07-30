@@ -1,6 +1,8 @@
 import { vi, it, expect, describe, beforeEach } from 'vitest';
 import * as api from './+server.js';
 import * as db from '$lib/db.js';
+import { ERRORS } from '$lib/errors.js';
+import { expectError } from '$lib/test-utils.js';
 
 vi.mock('$lib/db.js', () => {
     return {
@@ -18,37 +20,39 @@ describe('GET', () => {
         vi.clearAllMocks();
     });
 
-    it('returns true when user is waiting', async () => {
+    it('returns 200 with waiting: true when user is waiting', async () => {
         db.getLoginFromToken.mockResolvedValue('user1');
         db.isWaiting.mockResolvedValue(true);
 
         const response = await api.GET({ cookies: mockCookies('token-123') });
 
-        expect(await response.json()).toEqual({ success: true });
+        expect(response.status).toBe(200);
+        expect(await response.json()).toEqual({ waiting: true });
     });
 
-    it('returns false when user is not waiting', async () => {
+    it('returns 200 with waiting: false when user is not waiting', async () => {
         db.getLoginFromToken.mockResolvedValue('user1');
         db.isWaiting.mockResolvedValue(false);
 
         const response = await api.GET({ cookies: mockCookies('token-123') });
 
-        expect(await response.json()).toEqual({ success: false });
+        expect(response.status).toBe(200);
+        expect(await response.json()).toEqual({ waiting: false });
     });
 
-    it('returns failure when session cookie is missing', async () => {
+    it('returns error when session cookie is missing', async () => {
         const response = await api.GET({ cookies: mockCookies(undefined) });
 
-        expect(await response.json()).toEqual({ success: false });
+        await expectError(response, ERRORS.noSessionToken);
         expect(db.isWaiting).not.toHaveBeenCalled();
     });
 
-    it('returns failure when session token is invalid', async () => {
+    it('returns error when session token is invalid', async () => {
         db.getLoginFromToken.mockResolvedValue(null);
 
         const response = await api.GET({ cookies: mockCookies('invalid') });
 
-        expect(await response.json()).toEqual({ success: false });
+        await expectError(response, ERRORS.invalidSessionToken);
         expect(db.isWaiting).not.toHaveBeenCalled();
     });
 });

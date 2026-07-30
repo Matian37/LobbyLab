@@ -1,15 +1,16 @@
 import { getLoginFromToken, extendQueueStatus } from '$lib/db.js';
 import { json } from '@sveltejs/kit';
 import { Client } from 'postgres';
+import { ERRORS } from '$lib/errors.js';
 
 export async function GET({ cookies }) {
     const token = cookies.get('session');
-    if (token == undefined) return json({ success: false });
+    if (token == undefined) return ERRORS.noSessionToken();
 
     const login = await getLoginFromToken(token);
     if (login === null) {
         console.debug('session with given token does not exist');
-        return json({ success: false });
+        return ERRORS.invalidSessionToken();
     }
 
     let interval, dbInterval;

@@ -7,6 +7,8 @@ import {
     LOGIN_MIN_LENGTH,
     LOGIN_MAX_LENGTH,
 } from '$lib/constants.js';
+import { ERRORS } from '$lib/errors.js';
+import { expectError } from '$lib/test-utils.js';
 
 const EXAMPLE_LOGIN = 'a'.repeat(LOGIN_MIN_LENGTH);
 const EXAMPLE_PASSWORD = 'a'.repeat(PASSWORD_MIN_LENGTH);
@@ -31,31 +33,25 @@ describe('POST', () => {
         vi.clearAllMocks();
     });
 
-    it('returns failure when login is not a string', async () => {
+    it('returns error when login is not a string', async () => {
         const response = await api.POST({
             request: mockRequest({ login: 123, password: EXAMPLE_PASSWORD }),
         });
 
-        expect(await response.json()).toEqual({
-            success: false,
-            msg: 'Login and password must be strings',
-        });
+        await expectError(response, ERRORS.invalidCredentialTypes);
         expect(db.verifyPassword).not.toHaveBeenCalled();
     });
 
-    it('returns failure when password is not a string', async () => {
+    it('returns error when password is not a string', async () => {
         const response = await api.POST({
             request: mockRequest({ login: EXAMPLE_LOGIN, password: 123 }),
         });
 
-        expect(await response.json()).toEqual({
-            success: false,
-            msg: 'Login and password must be strings',
-        });
+        await expectError(response, ERRORS.invalidCredentialTypes);
         expect(db.verifyPassword).not.toHaveBeenCalled();
     });
 
-    it('returns success and sets session cookie when credentials are valid', async () => {
+    it('returns 200 and sets session cookie when credentials are valid', async () => {
         db.verifyPassword.mockResolvedValue(true);
         db.addSession.mockResolvedValue('session-token-123');
 
@@ -68,7 +64,8 @@ describe('POST', () => {
             cookies,
         });
 
-        expect(await response.json()).toEqual({ success: true, msg: null });
+        expect(response.status).toBe(200);
+        expect(await response.json()).toEqual({});
         expect(cookies.set).toHaveBeenCalledWith(
             'session',
             'session-token-123',
@@ -80,7 +77,7 @@ describe('POST', () => {
         );
     });
 
-    it('returns failure when verifyPassword return false', async () => {
+    it('returns error when credentials are invalid', async () => {
         db.verifyPassword.mockResolvedValue(false);
 
         const response = await api.POST({
@@ -90,13 +87,10 @@ describe('POST', () => {
             }),
         });
 
-        expect(await response.json()).toEqual({
-            success: false,
-            msg: 'Invalid login or password',
-        });
+        await expectError(response, ERRORS.invalidCredentials);
     });
 
-    it('returns failure when login is too short', async () => {
+    it('returns error when login is too short', async () => {
         const response = await api.POST({
             request: mockRequest({
                 login: '',
@@ -104,14 +98,11 @@ describe('POST', () => {
             }),
         });
 
-        expect(await response.json()).toEqual({
-            success: false,
-            msg: 'Invalid login or password',
-        });
+        await expectError(response, ERRORS.invalidCredentials);
         expect(db.verifyPassword).not.toHaveBeenCalled();
     });
 
-    it('returns failure when login is too long', async () => {
+    it('returns error when login is too long', async () => {
         const response = await api.POST({
             request: mockRequest({
                 login: 'x'.repeat(LOGIN_MAX_LENGTH + 1),
@@ -119,14 +110,11 @@ describe('POST', () => {
             }),
         });
 
-        expect(await response.json()).toEqual({
-            success: false,
-            msg: 'Invalid login or password',
-        });
+        await expectError(response, ERRORS.invalidCredentials);
         expect(db.verifyPassword).not.toHaveBeenCalled();
     });
 
-    it('returns failure when password is too short', async () => {
+    it('returns error when password is too short', async () => {
         const response = await api.POST({
             request: mockRequest({
                 login: EXAMPLE_LOGIN,
@@ -134,14 +122,11 @@ describe('POST', () => {
             }),
         });
 
-        expect(await response.json()).toEqual({
-            success: false,
-            msg: 'Invalid login or password',
-        });
+        await expectError(response, ERRORS.invalidCredentials);
         expect(db.verifyPassword).not.toHaveBeenCalled();
     });
 
-    it('returns failure when password is too long', async () => {
+    it('returns error when password is too long', async () => {
         const response = await api.POST({
             request: mockRequest({
                 login: EXAMPLE_LOGIN,
@@ -149,10 +134,7 @@ describe('POST', () => {
             }),
         });
 
-        expect(await response.json()).toEqual({
-            success: false,
-            msg: 'Invalid login or password',
-        });
+        await expectError(response, ERRORS.invalidCredentials);
         expect(db.verifyPassword).not.toHaveBeenCalled();
     });
 });
