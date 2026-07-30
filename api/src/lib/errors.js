@@ -20,14 +20,14 @@ export const ERRORS = Object.freeze({
     invalidLoginLength: () =>
         json(
             {
-                msg: `Login must be at least ${LOGIN_MIN_LENGTH} and at most ${LOGIN_MAX_LENGTH} characters`,
+                msg: `Login must be at least ${LOGIN_MIN_LENGTH} and at most ${LOGIN_MAX_LENGTH} characters long`,
             },
             { status: 422 }
         ),
     invalidPasswordLength: () =>
         json(
             {
-                msg: `Password must be at least ${PASSWORD_MIN_LENGTH} and at most ${PASSWORD_MAX_LENGTH} characters`,
+                msg: `Password must be at least ${PASSWORD_MIN_LENGTH} and at most ${PASSWORD_MAX_LENGTH} characters long`,
             },
             { status: 422 }
         ),
