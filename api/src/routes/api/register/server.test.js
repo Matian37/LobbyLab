@@ -80,6 +80,20 @@ describe('POST', () => {
         expect(db.addSession).not.toHaveBeenCalled();
     });
 
+    it('returns error when login is already taken', async () => {
+        db.addUser.mockResolvedValue(false);
+
+        const response = await api.POST({
+            request: mockRequest({
+                login: EXAMPLE_LOGIN,
+                password: EXAMPLE_PASSWORD,
+            }),
+        });
+
+        await expectError(response, ERRORS.loginTaken);
+        expect(db.addSession).not.toHaveBeenCalled();
+    });
+
     it('returns 200 and sets session cookie on success', async () => {
         db.addUser.mockResolvedValue(true);
         db.addSession.mockResolvedValue('session-token-123');
@@ -109,19 +123,5 @@ describe('POST', () => {
                 sameSite: 'strict',
             })
         );
-    });
-
-    it('returns error when login is already taken', async () => {
-        db.addUser.mockResolvedValue(false);
-
-        const response = await api.POST({
-            request: mockRequest({
-                login: EXAMPLE_LOGIN,
-                password: EXAMPLE_PASSWORD,
-            }),
-        });
-
-        await expectError(response, ERRORS.loginTaken);
-        expect(db.addSession).not.toHaveBeenCalled();
     });
 });

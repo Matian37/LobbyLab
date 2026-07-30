@@ -20,6 +20,25 @@ describe('GET', () => {
         vi.clearAllMocks();
     });
 
+    it('returns error when session cookie is missing', async () => {
+        const response = await api.GET({ cookies: mockCookies(undefined) });
+
+        await expectError(response, ERRORS.noSessionToken);
+        expect(db.getLoginFromToken).not.toHaveBeenCalled();
+    });
+
+    it('returns error when session token is invalid', async () => {
+        db.getLoginFromToken.mockResolvedValue(null);
+
+        const response = await api.GET({
+            cookies: mockCookies('invalid-token'),
+        });
+
+        await expectError(response, ERRORS.invalidSessionToken);
+        expect(db.getLoginFromToken).toHaveBeenCalledWith('invalid-token');
+        expect(db.getMatchResults).not.toHaveBeenCalled();
+    });
+
     it('returns 200 with matches when user is logged in', async () => {
         db.getLoginFromToken.mockResolvedValue('user1');
         db.getMatchResults.mockResolvedValue([
@@ -52,24 +71,5 @@ describe('GET', () => {
         });
         expect(db.getLoginFromToken).toHaveBeenCalledWith('session-token-123');
         expect(db.getMatchResults).toHaveBeenCalledWith('user1');
-    });
-
-    it('returns error when session cookie is missing', async () => {
-        const response = await api.GET({ cookies: mockCookies(undefined) });
-
-        await expectError(response, ERRORS.noSessionToken);
-        expect(db.getLoginFromToken).not.toHaveBeenCalled();
-    });
-
-    it('returns error when session token is invalid', async () => {
-        db.getLoginFromToken.mockResolvedValue(null);
-
-        const response = await api.GET({
-            cookies: mockCookies('invalid-token'),
-        });
-
-        await expectError(response, ERRORS.invalidSessionToken);
-        expect(db.getLoginFromToken).toHaveBeenCalledWith('invalid-token');
-        expect(db.getMatchResults).not.toHaveBeenCalled();
     });
 });

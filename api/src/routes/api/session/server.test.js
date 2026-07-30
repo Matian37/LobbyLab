@@ -15,6 +15,14 @@ describe('GET', () => {
         vi.clearAllMocks();
     });
 
+    it('returns error when no session cookie', async () => {
+        const cookies = { get: vi.fn().mockReturnValue(undefined) };
+        const response = await api.GET({ cookies });
+
+        await expectError(response, ERRORS.noSessionToken);
+        expect(db.sessionExist).not.toHaveBeenCalled();
+    });
+
     it('returns 200 with exists: true when session token is valid', async () => {
         db.sessionExist.mockResolvedValue(true);
 
@@ -35,13 +43,5 @@ describe('GET', () => {
         expect(response.status).toBe(200);
         expect(await response.json()).toEqual({ exists: false });
         expect(db.sessionExist).toHaveBeenCalledWith('invalid-token');
-    });
-
-    it('returns error when no session cookie', async () => {
-        const cookies = { get: vi.fn().mockReturnValue(undefined) };
-        const response = await api.GET({ cookies });
-
-        await expectError(response, ERRORS.noSessionToken);
-        expect(db.sessionExist).not.toHaveBeenCalled();
     });
 });
