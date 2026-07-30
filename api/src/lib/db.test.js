@@ -112,14 +112,18 @@ describe('verifyPassword', () => {
 });
 
 describe('extendQueueStatus', () => {
-    it('sets user status to waiting in queue', async () => {
-        await db.addUser('alice', 'secret');
-        await db.extendQueueStatus('alice');
+    it('returns true and extends user queue status', async () => {
+        expect(await db.addUser('alice', 'secret')).toBe(true);
+        expect(await db.extendQueueStatus('alice')).toBe(true);
         const rows = await helperSql`
             SELECT queued_until > NOW() as cond FROM users
         `;
         expect(rows.length).toBe(1);
         expect(rows[0].cond).toBe(true);
+    });
+
+    it('return false when user does not exist', async () => {
+        expect(await db.extendQueueStatus('nonexistent')).toBe(false);
     });
 });
 

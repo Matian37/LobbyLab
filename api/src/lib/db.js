@@ -31,11 +31,12 @@ export async function verifyPassword(login, password) {
 }
 
 export async function extendQueueStatus(login) {
-    await sql`
+    const q = await sql`
         UPDATE users
         SET queued_until = NOW() + INTERVAL '5 seconds'
         WHERE login = ${login}
     `;
+    return q.count != 0;
 }
 
 export async function isWaiting(login) {

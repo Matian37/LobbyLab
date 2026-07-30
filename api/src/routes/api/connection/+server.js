@@ -24,6 +24,7 @@ export async function GET({ cookies }) {
                 }, 10000);
 
                 dbInterval = setInverval(() => {
+                    // TODO: on false, stop connection
                     extendQueueStatus(login);
                 }, 1000);
             },
