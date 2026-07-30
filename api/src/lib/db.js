@@ -58,12 +58,22 @@ export async function getLoginFromToken(token) {
 }
 
 export async function addSession(login) {
-    const q = await sql`
-        INSERT INTO sessions (token, login, date)
-        VALUES (encode(gen_random_bytes(32), 'hex'), ${login}, NOW())
-        RETURNING token
-    `;
-    return q[0].token;
+    try {
+        const q = await sql`
+            INSERT INTO sessions (token, login, date)
+            VALUES (encode(gen_random_bytes(32), 'hex'), ${login}, NOW())
+            RETURNING token
+        `;
+        return q[0].token;
+    } catch (err) {
+        if (!(err instanceof postgres.PostgresError)) throw err;
+        if (
+            err.code !== '23503' ||
+            err.constraint_name !== 'sessions_login_fkey'
+        )
+            throw err;
+        return null;
+    }
 }
 
 export async function deleteSession(token) {

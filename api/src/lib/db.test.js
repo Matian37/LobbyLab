@@ -174,6 +174,34 @@ describe('addSession', () => {
         expect(rows.length).toBe(1);
         expect(rows[0].login).toBe('alice');
     });
+
+    it('returns null when user does not exist', async () => {
+        const token = await db.addSession('nonexistent');
+        expect(token).toBe(null);
+    });
+
+    it('re-throws non-PostgresError', async () => {
+        await expect(db.addSession(undefined)).rejects.toMatchObject({
+            code: 'UNDEFINED_VALUE',
+        });
+    });
+
+    it('re-throws PostgresError with different code', async () => {
+        await expect(db.addSession(null)).rejects.toMatchObject({
+            code: '23502',
+        });
+    });
+
+    it('re-throws PostgresError with same code but different constraint', async () => {
+        await helperSql`
+            ALTER TABLE sessions ADD COLUMN x TEXT REFERENCES users(login) DEFAULT ''
+        `;
+        expect(await db.addUser('alice', '')).toBe(true);
+        await expect(db.addSession('alice')).rejects.toMatchObject({
+            code: '23503',
+            constraint_name: 'sessions_x_fkey',
+        });
+    });
 });
 
 describe('getLoginFromToken', () => {

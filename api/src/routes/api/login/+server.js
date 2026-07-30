@@ -29,6 +29,12 @@ export async function POST({ request, cookies }) {
     }
 
     const token = await addSession(login);
+
+    if (token === null) {
+        // user gone, so credentials are no longer valid from user perspective
+        return ERRORS.invalidCredentials();
+    }
+
     cookies.set('session', token, {
         path: '/',
         httpOnly: true,

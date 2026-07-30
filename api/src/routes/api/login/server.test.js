@@ -90,6 +90,29 @@ describe('POST', () => {
         await expectError(response, ERRORS.invalidCredentials);
     });
 
+    it('returns error when user gone during request', async () => {
+        db.verifyPassword.mockResolvedValue(true);
+        db.addSession.mockResolvedValue(null);
+
+        const cookies = { set: vi.fn() };
+        const response = await api.POST({
+            request: mockRequest({
+                login: EXAMPLE_LOGIN,
+                password: EXAMPLE_PASSWORD,
+            }),
+            cookies,
+        });
+
+        await expectError(response, ERRORS.invalidCredentials);
+
+        expect(db.verifyPassword).toHaveBeenCalledWith(
+            EXAMPLE_LOGIN,
+            EXAMPLE_PASSWORD
+        );
+        expect(db.addSession).toHaveBeenCalled();
+        expect(cookies.set).not.toHaveBeenCalled();
+    });
+
     it('returns error when login is too short', async () => {
         const response = await api.POST({
             request: mockRequest({
