@@ -9,7 +9,6 @@ export async function addUser(login, password) {
         await sql`
             INSERT INTO users (login, password)
             VALUES(${login}, crypt(${password}, gen_salt('bf')))
-            RETURNING *
         `;
     } catch (err) {
         if (!(err instanceof postgres.PostgresError)) throw err;
