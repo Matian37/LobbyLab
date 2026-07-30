@@ -1,13 +1,4 @@
-import {
-    expect,
-    it,
-    beforeEach,
-    afterEach,
-    beforeAll,
-    afterAll,
-    describe,
-    vi,
-} from 'vitest';
+import { expect, it, beforeEach, beforeAll, afterAll, describe } from 'vitest';
 import { PostgreSqlContainer } from '@testcontainers/postgresql';
 import postgres from 'postgres';
 import fs from 'fs';
@@ -63,34 +54,10 @@ beforeEach(async () => {
     await helperSql.unsafe(process.env.DATABASE_INIT_SQL);
 });
 
-describe('tryQuery', () => {
-    beforeEach(() => {
-        vi.spyOn(console, 'debug').mockImplementation(() => {});
-    });
-    afterEach(() => {
-        vi.restoreAllMocks();
-    });
-
-    it('returns false and logs when the callback throws', async () => {
-        const result = await db.tryQuery(async () => {
-            throw new Error('Test Error Message');
-        });
-        expect(result).toBe(false);
-        expect(console.debug).toHaveBeenCalled();
-        expect(console.debug).toHaveBeenCalledWith(
-            expect.objectContaining({ message: 'Test Error Message' })
-        );
-    });
-
-    it('returns true when the callback succeeds', async () => {
-        const result = await db.tryQuery(async () => {});
-        expect(result).toBe(true);
-    });
-});
-
 describe('addUser', () => {
-    it('inserts user into the database', async () => {
-        await db.addUser('alice', 'secret');
+    it('inserts user into the database and returns true', async () => {
+        const result = await db.addUser('alice', 'secret');
+        expect(result).toBe(true);
         const rows = await helperSql`
             SELECT login, password = crypt('secret', password) AS match
             FROM users
@@ -104,6 +71,27 @@ describe('addUser', () => {
         await db.addUser('alice', 'secret');
         const result = await db.addUser('alice', 'other');
         expect(result).toBe(false);
+    });
+
+    it('re-throws non-PostgresError', async () => {
+        await expect(db.addUser(undefined, 'secret')).rejects.toMatchObject({
+            code: 'UNDEFINED_VALUE',
+        });
+    });
+
+    it('re-throws PostgresError with different code', async () => {
+        await expect(db.addUser('alice', null)).rejects.toMatchObject({
+            code: '23502',
+        });
+    });
+
+    it('re-throws PostgresError with same code but different constraint', async () => {
+        await helperSql`ALTER TABLE users ADD COLUMN x TEXT UNIQUE DEFAULT 'same'`;
+        await db.addUser('alice', 'secret');
+        await expect(db.addUser('bob', 'secret')).rejects.toMatchObject({
+            code: '23505',
+            constraint_name: 'users_x_key',
+        });
     });
 });
 
@@ -125,8 +113,8 @@ describe('verifyPassword', () => {
 
 describe('extendQueueStatus', () => {
     it('sets user status to waiting in queue', async () => {
-        expect(await db.addUser('alice', 'secret')).toBe(true);
-        expect(await db.extendQueueStatus('alice')).toBe(true);
+        await db.addUser('alice', 'secret');
+        await db.extendQueueStatus('alice');
         const rows = await helperSql`
             SELECT queued_until > NOW() as cond FROM users
         `;
@@ -208,8 +196,8 @@ describe('deleteSession', () => {
         expect(rows.length).toBe(0);
     });
 
-    it('returns true even when the token does not exist', async () => {
-        expect(await db.deleteSession('nonexistent')).toBe(true);
+    it('resolves even when the token does not exist', async () => {
+        await db.deleteSession('nonexistent');
     });
 });
 

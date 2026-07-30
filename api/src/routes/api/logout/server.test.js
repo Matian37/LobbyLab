@@ -16,8 +16,6 @@ describe('POST', () => {
     });
 
     it('returns 200 and removes session from db and user cookies', async () => {
-        db.deleteSession.mockResolvedValue(true);
-
         const cookies = {
             get: vi.fn().mockReturnValue('session-token-123'),
             delete: vi.fn(),
