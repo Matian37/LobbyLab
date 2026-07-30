@@ -19,9 +19,10 @@
         const query = await fetch(`/api/results`, {
             method: 'GET',
         });
+        if (!query.ok) return;
+
         const response = await query.json();
 
-        if (!response.success) return;
         rows = response.matches;
     }
 
@@ -50,8 +51,9 @@
         let response = await fetch(`/api/waiting`, {
             method: 'GET',
         });
-        let wynik = await response.json();
-        return wynik.success;
+        if (!response.ok) return false;
+        let data = await response.json();
+        return data.waiting;
     }
 </script>
 

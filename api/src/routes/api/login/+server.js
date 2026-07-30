@@ -1,5 +1,6 @@
 import { json } from '@sveltejs/kit';
 import { verifyPassword, addSession } from '$lib/db.js';
+import { ERRORS } from '$lib/errors.js';
 import {
     PASSWORD_MIN_LENGTH,
     PASSWORD_MAX_LENGTH,
@@ -11,10 +12,7 @@ export async function POST({ request, cookies }) {
     const { login, password } = await request.json();
 
     if (typeof login !== 'string' || typeof password !== 'string') {
-        return json({
-            success: false,
-            msg: 'Login and password must be strings',
-        });
+        return ERRORS.invalidCredentialTypes();
     }
 
     if (
@@ -23,17 +21,11 @@ export async function POST({ request, cookies }) {
         password.length < PASSWORD_MIN_LENGTH ||
         password.length > PASSWORD_MAX_LENGTH
     ) {
-        return json({
-            success: false,
-            msg: 'Invalid login or password',
-        });
+        return ERRORS.invalidCredentials();
     }
 
     if (!(await verifyPassword(login, password))) {
-        return json({
-            success: false,
-            msg: 'Invalid login or password',
-        });
+        return ERRORS.invalidCredentials();
     }
 
     const token = await addSession(login);
@@ -44,8 +36,5 @@ export async function POST({ request, cookies }) {
         sameSite: 'strict',
     });
 
-    return json({
-        success: true,
-        msg: null,
-    });
+    return json({});
 }

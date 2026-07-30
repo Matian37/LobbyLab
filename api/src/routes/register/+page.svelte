@@ -1,6 +1,7 @@
 <script>
     import { goto } from '$app/navigation';
     import { resolve } from '$app/paths';
+    import { UNEXPECTED_ERROR_MSG } from '$lib/errors.js';
 
     let login = $state(''),
         password = $state(''),
@@ -15,12 +16,14 @@
             },
             body: JSON.stringify(data),
         });
-        const result = await response.json();
-        if (!result.success) {
-            errorText = result.msg;
-        } else {
+        if (response.ok) {
             console.debug('registered successfully');
             await goto(resolve('/'));
+        } else {
+            const err = await response
+                .json()
+                .catch(() => ({ msg: UNEXPECTED_ERROR_MSG }));
+            errorText = err.msg;
         }
     }
 </script>

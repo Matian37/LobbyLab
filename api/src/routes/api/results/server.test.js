@@ -1,6 +1,8 @@
 import { vi, it, expect, describe, beforeEach } from 'vitest';
 import * as api from './+server.js';
 import * as db from '$lib/db.js';
+import { ERRORS } from '$lib/errors.js';
+import { expectError } from '$lib/test-utils.js';
 
 vi.mock('$lib/db.js', () => {
     return {
@@ -18,7 +20,7 @@ describe('GET', () => {
         vi.clearAllMocks();
     });
 
-    it('returns matches for a logged-in user', async () => {
+    it('returns 200 with matches when user is logged in', async () => {
         db.getLoginFromToken.mockResolvedValue('user1');
         db.getMatchResults.mockResolvedValue([
             {
@@ -35,8 +37,8 @@ describe('GET', () => {
             cookies: mockCookies('session-token-123'),
         });
 
+        expect(response.status).toBe(200);
         expect(await response.json()).toEqual({
-            success: true,
             matches: [
                 {
                     details: { players: ['user1', 'user2'], winner: 'user1' },
@@ -52,27 +54,21 @@ describe('GET', () => {
         expect(db.getMatchResults).toHaveBeenCalledWith('user1');
     });
 
-    it('returns failure when session cookie is missing', async () => {
+    it('returns error when session cookie is missing', async () => {
         const response = await api.GET({ cookies: mockCookies(undefined) });
 
-        expect(await response.json()).toEqual({
-            success: false,
-            matches: null,
-        });
+        await expectError(response, ERRORS.noSessionToken);
         expect(db.getLoginFromToken).not.toHaveBeenCalled();
     });
 
-    it('returns failure when session token is invalid', async () => {
+    it('returns error when session token is invalid', async () => {
         db.getLoginFromToken.mockResolvedValue(null);
 
         const response = await api.GET({
             cookies: mockCookies('invalid-token'),
         });
 
-        expect(await response.json()).toEqual({
-            success: false,
-            matches: null,
-        });
+        await expectError(response, ERRORS.invalidSessionToken);
         expect(db.getMatchResults).not.toHaveBeenCalled();
     });
 });
