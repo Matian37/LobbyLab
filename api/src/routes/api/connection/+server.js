@@ -1,6 +1,6 @@
-import { getLoginFromToken, extendQueueStatus } from '$lib/db.js';
+import { getLoginFromToken, extendQueueStatus, getAuthToken } from '$lib/db.js';
 import { json } from '@sveltejs/kit';
-import { Client } from 'postgres';
+import postgres from 'postgres';
 import { ERRORS } from '$lib/errors.js';
 
 export async function GET({ cookies }) {
@@ -23,7 +23,7 @@ export async function GET({ cookies }) {
                     controller.enqueue('data: ping\n\n');
                 }, 10000);
 
-                dbInterval = setInverval(() => {
+                dbInterval = setInterval(() => {
                     // TODO: on false, stop connection
                     extendQueueStatus(login);
                 }, 1000);
@@ -55,7 +55,7 @@ async function listen(login, controller) {
         parsed.match_auth_token = await getAuthToken(login);
 
         console.debug('sending server socket');
-        controller.equeue(`data: ${JSON.stringify(parsed)}\n\n`);
+        controller.enqueue(`data: ${JSON.stringify(parsed)}\n\n`);
         controller.close();
     });
 }
