@@ -33,64 +33,51 @@ describe('POST', () => {
         vi.clearAllMocks();
     });
 
-    it('returns error when login is not a string', async () => {
+    it.each([
+        {
+            name: 'login is not a string',
+            login: 123,
+            password: EXAMPLE_PASSWORD,
+            error: ERRORS.invalidCredentialTypes,
+        },
+        {
+            name: 'password is not a string',
+            login: EXAMPLE_LOGIN,
+            password: 123,
+            error: ERRORS.invalidCredentialTypes,
+        },
+        {
+            name: 'password is too short',
+            login: EXAMPLE_LOGIN,
+            password: '',
+            error: ERRORS.invalidPasswordLength,
+        },
+        {
+            name: 'password is too long',
+            login: EXAMPLE_LOGIN,
+            password: 'x'.repeat(PASSWORD_MAX_LENGTH + 1),
+            error: ERRORS.invalidPasswordLength,
+        },
+        {
+            name: 'login is too short',
+            login: '',
+            password: EXAMPLE_PASSWORD,
+            error: ERRORS.invalidLoginLength,
+        },
+        {
+            name: 'login is too long',
+            login: 'x'.repeat(LOGIN_MAX_LENGTH + 1),
+            password: EXAMPLE_PASSWORD,
+            error: ERRORS.invalidLoginLength,
+        },
+    ])('returns error when $name', async ({ login, password, error }) => {
         const response = await api.POST({
-            request: mockRequest({ login: 123, password: EXAMPLE_PASSWORD }),
+            request: mockRequest({ login, password }),
         });
 
-        await expectError(response, ERRORS.invalidCredentialTypes);
+        await expectError(response, error);
         expect(db.addUser).not.toHaveBeenCalled();
-    });
-
-    it('returns error when password is not a string', async () => {
-        const response = await api.POST({
-            request: mockRequest({ login: EXAMPLE_LOGIN, password: 123 }),
-        });
-
-        await expectError(response, ERRORS.invalidCredentialTypes);
-        expect(db.addUser).not.toHaveBeenCalled();
-    });
-
-    it('returns error when password is too short', async () => {
-        const response = await api.POST({
-            request: mockRequest({ login: EXAMPLE_LOGIN, password: '' }),
-        });
-
-        await expectError(response, ERRORS.invalidPasswordLength);
-        expect(db.addUser).not.toHaveBeenCalled();
-    });
-
-    it('returns error when password is too long', async () => {
-        const response = await api.POST({
-            request: mockRequest({
-                login: EXAMPLE_LOGIN,
-                password: 'x'.repeat(PASSWORD_MAX_LENGTH + 1),
-            }),
-        });
-
-        await expectError(response, ERRORS.invalidPasswordLength);
-        expect(db.addUser).not.toHaveBeenCalled();
-    });
-
-    it('returns error when login is too short', async () => {
-        const response = await api.POST({
-            request: mockRequest({ login: '', password: EXAMPLE_PASSWORD }),
-        });
-
-        await expectError(response, ERRORS.invalidLoginLength);
-        expect(db.addUser).not.toHaveBeenCalled();
-    });
-
-    it('returns error when login is too long', async () => {
-        const response = await api.POST({
-            request: mockRequest({
-                login: 'x'.repeat(LOGIN_MAX_LENGTH + 1),
-                password: EXAMPLE_PASSWORD,
-            }),
-        });
-
-        await expectError(response, ERRORS.invalidLoginLength);
-        expect(db.addUser).not.toHaveBeenCalled();
+        expect(db.addSession).not.toHaveBeenCalled();
     });
 
     it('returns 200 and sets session cookie on success', async () => {

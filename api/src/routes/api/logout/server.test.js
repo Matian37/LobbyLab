@@ -24,15 +24,20 @@ describe('POST', () => {
 
         expect(response.status).toBe(200);
         expect(await response.json()).toEqual({});
+        expect(cookies.get).toHaveBeenCalledWith('session');
         expect(db.deleteSession).toHaveBeenCalledWith('session-token-123');
         expect(cookies.delete).toHaveBeenCalledWith('session', { path: '/' });
     });
 
     it('returns error when no session cookie', async () => {
-        const cookies = { get: vi.fn().mockReturnValue(undefined) };
+        const cookies = {
+            get: vi.fn().mockReturnValue(undefined),
+            delete: vi.fn(),
+        };
         const response = await api.POST({ cookies });
 
         await expectError(response, ERRORS.noSessionToken);
         expect(db.deleteSession).not.toHaveBeenCalled();
+        expect(cookies.delete).not.toHaveBeenCalled();
     });
 });

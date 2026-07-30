@@ -69,6 +69,7 @@ describe('GET', () => {
         });
 
         await expectError(response, ERRORS.invalidSessionToken);
+        expect(db.getLoginFromToken).toHaveBeenCalledWith('invalid-token');
         expect(db.getMatchResults).not.toHaveBeenCalled();
     });
 });

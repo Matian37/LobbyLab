@@ -23,6 +23,7 @@ describe('GET', () => {
 
         expect(response.status).toBe(200);
         expect(await response.json()).toEqual({ exists: true });
+        expect(db.sessionExist).toHaveBeenCalledWith('session-token-123');
     });
 
     it('returns 200 with exists: false when session token is invalid', async () => {
@@ -33,6 +34,7 @@ describe('GET', () => {
 
         expect(response.status).toBe(200);
         expect(await response.json()).toEqual({ exists: false });
+        expect(db.sessionExist).toHaveBeenCalledWith('invalid-token');
     });
 
     it('returns error when no session cookie', async () => {

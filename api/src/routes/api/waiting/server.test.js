@@ -28,6 +28,8 @@ describe('GET', () => {
 
         expect(response.status).toBe(200);
         expect(await response.json()).toEqual({ waiting: true });
+        expect(db.getLoginFromToken).toHaveBeenCalledWith('token-123');
+        expect(db.isWaiting).toHaveBeenCalledWith('user1');
     });
 
     it('returns 200 with waiting: false when user is not waiting', async () => {
@@ -38,6 +40,8 @@ describe('GET', () => {
 
         expect(response.status).toBe(200);
         expect(await response.json()).toEqual({ waiting: false });
+        expect(db.getLoginFromToken).toHaveBeenCalledWith('token-123');
+        expect(db.isWaiting).toHaveBeenCalledWith('user1');
     });
 
     it('returns error when session cookie is missing', async () => {
