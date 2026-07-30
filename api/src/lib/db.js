@@ -23,7 +23,7 @@ export async function addUser(login, password) {
 
 export async function verifyPassword(login, password) {
     const q = await sql`
-        SELECT (password = crypt(${password}, password)) AS match 
+        SELECT password = crypt(${password}, password) AS match 
         FROM users
         WHERE login = ${login}
     `;
@@ -40,7 +40,7 @@ export async function extendQueueStatus(login) {
 
 export async function isWaiting(login) {
     const q = await sql`
-        SELECT * FROM users
+        SELECT 1 FROM users
         WHERE
             login = ${login} 
             AND match_id IS NULL 
