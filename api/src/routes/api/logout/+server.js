@@ -1,12 +1,13 @@
 import { json } from '@sveltejs/kit';
 import { deleteSession } from '$lib/db.js';
-import { ERRORS } from '$lib/errors.js';
+import { validateSession } from '$lib/validate.js';
 
 export async function POST({ cookies }) {
-    const token = cookies.get('session');
-    if (token == undefined) return ERRORS.noSessionToken();
+    const result = validateSession(cookies);
+    if (result.error !== undefined) return result.error;
 
-    await deleteSession(token);
+    await deleteSession(result.data.token);
+
     cookies.delete('session', { path: '/' });
     return json({});
 }

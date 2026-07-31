@@ -1,32 +1,29 @@
 import postgres from 'postgres';
+import { SESSION_TOKEN_LENGTH } from './constants.js';
 
 const DATABASE_URL = process.env.DATABASE_URL;
 
 export const sql = postgres(DATABASE_URL);
 
-export async function tryQuery(fn) {
+export async function addUser(login, password) {
     try {
-        await fn();
-        return true;
+        await sql`
+            INSERT INTO users (login, password)
+            VALUES(${login}, crypt(${password}, gen_salt('bf')))
+        `;
     } catch (err) {
-        console.debug(err);
+        if (!(err instanceof postgres.PostgresError)) throw err;
+        if (err.code !== '23505' || err.constraint_name !== 'users_pkey')
+            throw err;
         return false;
     }
-}
 
-export async function addUser(login, password) {
-    return tryQuery(
-        () => sql`
-            INSERT INTO users (login, password)
-            VALUES(${login}, crypt(${password}, gen_salt('bf'))) 
-            RETURNING *
-        `
-    );
+    return true;
 }
 
 export async function verifyPassword(login, password) {
     const q = await sql`
-        SELECT (password = crypt(${password}, password)) AS match 
+        SELECT password = crypt(${password}, password) AS match 
         FROM users
         WHERE login = ${login}
     `;
@@ -34,18 +31,17 @@ export async function verifyPassword(login, password) {
 }
 
 export async function extendQueueStatus(login) {
-    return tryQuery(
-        () => sql`
-            UPDATE users
-            SET queued_until = NOW() + INTERVAL '5 seconds'
-            WHERE login = ${login}
-        `
-    );
+    const q = await sql`
+        UPDATE users
+        SET queued_until = NOW() + INTERVAL '5 seconds'
+        WHERE login = ${login}
+    `;
+    return q.count != 0;
 }
 
 export async function isWaiting(login) {
     const q = await sql`
-        SELECT * FROM users
+        SELECT 1 FROM users
         WHERE
             login = ${login} 
             AND match_id IS NULL 
@@ -62,20 +58,26 @@ export async function getLoginFromToken(token) {
 }
 
 export async function addSession(login) {
-    const q = await sql`
-        INSERT INTO sessions (token, login, date)
-        VALUES (encode(gen_random_bytes(32), 'hex'), ${login}, NOW())
-        RETURNING token
-    `;
-    return q[0].token;
+    try {
+        const q = await sql`
+            INSERT INTO sessions (token, login, date)
+            VALUES (encode(gen_random_bytes(${SESSION_TOKEN_LENGTH / 2}), 'hex'), ${login}, NOW())
+            RETURNING token
+        `;
+        return q[0].token;
+    } catch (err) {
+        if (!(err instanceof postgres.PostgresError)) throw err;
+        if (
+            err.code !== '23503' ||
+            err.constraint_name !== 'sessions_login_fkey'
+        )
+            throw err;
+        return null;
+    }
 }
 
 export async function deleteSession(token) {
-    return tryQuery(
-        () => sql`
-            DELETE FROM sessions WHERE token = ${token}
-        `
-    );
+    await sql`DELETE FROM sessions WHERE token = ${token}`;
 }
 
 export async function sessionExist(token) {
