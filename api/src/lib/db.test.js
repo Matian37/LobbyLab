@@ -27,14 +27,14 @@ beforeAll(async () => {
     const initSql = fs.readFileSync(initSqlPath, 'utf8');
     process.env.DATABASE_INIT_SQL = initSql;
 
-    const pg = postgres(databaseUrl);
+    const pg = postgres(databaseUrl, { onnotice: () => {} });
     await pg.unsafe(initSql);
     await pg.end();
     console.log('[test-db] schema initialized');
 
     console.log('[test-db] importing $lib/db.js...');
     db = await import('$lib/db.js');
-    helperSql = postgres(databaseUrl);
+    helperSql = postgres(databaseUrl, { onnotice: () => {} });
     console.log('[test-db] $lib/db.js loaded, connection pool ready');
 }, 30000);
 
