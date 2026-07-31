@@ -1,35 +1,17 @@
 import { json } from '@sveltejs/kit';
 import { verifyPassword, addSession } from '$lib/db.js';
 import { ERRORS } from '$lib/errors.js';
-import {
-    PASSWORD_MIN_LENGTH,
-    PASSWORD_MAX_LENGTH,
-    LOGIN_MIN_LENGTH,
-    LOGIN_MAX_LENGTH,
-} from '$lib/constants.js';
+import { validateCredentialsSchema } from '$lib/validate.js';
 
 export async function POST({ request, cookies }) {
-    const { login, password } = await request.json();
+    const result = await validateCredentialsSchema(request);
+    if (result.error !== undefined) return result.error;
 
-    if (typeof login !== 'string' || typeof password !== 'string') {
-        return ERRORS.invalidCredentialTypes();
-    }
-
-    if (
-        login.length < LOGIN_MIN_LENGTH ||
-        login.length > LOGIN_MAX_LENGTH ||
-        password.length < PASSWORD_MIN_LENGTH ||
-        password.length > PASSWORD_MAX_LENGTH
-    ) {
+    if (!(await verifyPassword(result.data.login, result.data.password))) {
         return ERRORS.invalidCredentials();
     }
 
-    if (!(await verifyPassword(login, password))) {
-        return ERRORS.invalidCredentials();
-    }
-
-    const token = await addSession(login);
-
+    const token = await addSession(result.data.login);
     if (token === null) {
         // user gone, so credentials are no longer valid from user perspective
         return ERRORS.invalidCredentials();
@@ -41,6 +23,5 @@ export async function POST({ request, cookies }) {
         secure: true,
         sameSite: 'strict',
     });
-
     return json({});
 }

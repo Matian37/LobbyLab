@@ -8,15 +8,22 @@ import {
 
 export const UNEXPECTED_ERROR_MSG = 'An unexpected error occurred';
 
+// TODO: use func instead of json syntax
 export const ERRORS = Object.freeze({
+    invalidJSON: () => json({ msg: 'Invalid JSON' }, { status: 400 }),
+    missingLogin: () => json({ msg: 'Login is missing' }, { status: 422 }),
+    missingPassword: () =>
+        json({ msg: 'Password is missing' }, { status: 422 }),
+    invalidLoginType: () =>
+        json({ msg: 'Login must be a string' }, { status: 422 }),
+    invalidPasswordType: () =>
+        json({ msg: 'Password must be a string' }, { status: 422 }),
     invalidCredentials: () =>
         json({ msg: 'Invalid login or password' }, { status: 401 }),
     noSessionToken: () =>
         json({ msg: 'No session token provided' }, { status: 401 }),
     invalidSessionToken: () =>
         json({ msg: 'Invalid session token' }, { status: 401 }),
-    invalidCredentialTypes: () =>
-        json({ msg: 'Login and password must be strings' }, { status: 422 }),
     invalidLoginLength: () =>
         json(
             {

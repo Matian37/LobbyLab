@@ -4,6 +4,7 @@ import postgres from 'postgres';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { SESSION_TOKEN_LENGTH } from '$lib/constants.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -160,7 +161,8 @@ describe('addSession', () => {
 
         const token = await db.addSession('user');
         expect(token).toBeTypeOf('string');
-        expect(token).toMatch(/^[0-9a-f]{64}$/);
+        expect(token).toMatch(/^[0-9a-f]+$/);
+        expect(token.length).toBe(SESSION_TOKEN_LENGTH);
 
         const rows = await helperSql`
             SELECT login

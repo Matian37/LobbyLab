@@ -1,4 +1,5 @@
 import postgres from 'postgres';
+import { SESSION_TOKEN_LENGTH } from './constants.js';
 
 const DATABASE_URL = process.env.DATABASE_URL;
 
@@ -60,7 +61,7 @@ export async function addSession(login) {
     try {
         const q = await sql`
             INSERT INTO sessions (token, login, date)
-            VALUES (encode(gen_random_bytes(32), 'hex'), ${login}, NOW())
+            VALUES (encode(gen_random_bytes(${SESSION_TOKEN_LENGTH / 2}), 'hex'), ${login}, NOW())
             RETURNING token
         `;
         return q[0].token;
