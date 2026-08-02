@@ -5,6 +5,35 @@ const DATABASE_URL = process.env.DATABASE_URL;
 
 export const sql = postgres(DATABASE_URL);
 
+export async function getConnectionStatuses(logins) {
+    if (logins.length === 0) return new Map();
+
+    const rows = await sql`
+        SELECT
+            u.login,
+            u.last_websocket_id,
+            u.match_id::int,
+            u.match_auth_token,
+            m.host,
+            m.port
+        FROM users u
+        LEFT JOIN matches m ON m.id = u.match_id
+        WHERE u.login = ANY(${sql.array(logins)})
+    `;
+    return new Map(
+        rows.map((row) => [
+            row.login,
+            {
+                websocketId: row.last_websocket_id,
+                matchId: row.match_id,
+                matchAuthToken: row.match_auth_token,
+                host: row.host,
+                port: row.port,
+            },
+        ])
+    );
+}
+
 export async function addUser(login, password) {
     try {
         await sql`
@@ -30,11 +59,35 @@ export async function verifyPassword(login, password) {
     return q.length > 0 && q[0].match;
 }
 
-export async function extendQueueStatus(login) {
+export async function extendQueueStatuses(connections, ms) {
+    if (connections.length === 0) return new Set();
+
+    const rows = await sql`
+        UPDATE users u
+        SET queued_until = NOW() + ${ms} * INTERVAL '1 millisecond'
+        FROM (VALUES ${sql(connections.map((c) => [c.login, c.websocketId]))}) AS v(login, websocket_id)
+        WHERE u.login = v.login AND (u.last_websocket_id = v.websocket_id AND u.match_id IS NULL)
+        RETURNING u.login
+    `;
+    return new Set(rows.map((row) => row.login));
+}
+
+export async function setUserWebsocket(login, websocketId, ms) {
     const q = await sql`
         UPDATE users
-        SET queued_until = NOW() + INTERVAL '5 seconds'
-        WHERE login = ${login}
+        SET last_websocket_id = ${websocketId},
+            queued_until = NOW() + ${ms} * INTERVAL '1 millisecond'
+        WHERE login = ${login} AND match_id IS NULL
+    `;
+    return q.count != 0;
+}
+
+export async function removeQueueStatus(login, websocketId) {
+    const q = await sql`
+        UPDATE users
+        SET queued_until = NOW() - INTERVAL '1 second',
+            last_websocket_id = NULL
+        WHERE login = ${login} AND (last_websocket_id = ${websocketId} AND match_id IS NULL)
     `;
     return q.count != 0;
 }
@@ -102,11 +155,4 @@ export async function getMatchResults(login) {
         details: row.results,
         canceled: row.canceled,
     }));
-}
-
-export async function getAuthToken(login) {
-    const q = await sql`
-        SELECT match_auth_token FROM users WHERE login = ${login}
-    `;
-    return q[0]?.match_auth_token ?? null;
 }

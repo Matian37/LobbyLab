@@ -18,10 +18,11 @@ CREATE TABLE IF NOT EXISTS users(
     password TEXT NOT NULL,
     match_id BIGINT REFERENCES matches(id) ON DELETE SET NULL,
     match_auth_token TEXT,
-    queued_until TIMESTAMP
+    queued_until TIMESTAMP,
+    last_websocket_id TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_users_match_id ON users(match_id);
-CREATE INDEX IF NOT EXISTS idx_users_match_id ON users(login, match_id, queued_until);
+CREATE INDEX IF NOT EXISTS idx_users_login_match_id ON users(login, match_id, queued_until);
 
 -- Stores matches in which users have participated
 CREATE TABLE IF NOT EXISTS user_matches (
@@ -36,30 +37,3 @@ CREATE TABLE IF NOT EXISTS sessions(
     login TEXT NOT NULL REFERENCES users(login) ON DELETE CASCADE,
     date DATE
 );
-
-
-CREATE OR REPLACE FUNCTION notify_users_match_id()
-RETURNS trigger
-LANGUAGE plpgsql AS $$
-DECLARE
-    payload TEXT;
-BEGIN
-    SELECT json_build_object(
-        'username', NEW.login,
-        'host', m.host,
-        'port', m.port
-    )::TEXT
-    INTO payload
-    FROM matches m
-    WHERE m.id = NEW.match_id;
-    PERFORM pg_notify('users_match_id_assigned', payload);
-
-    RETURN NEW;
-END;
-$$;
-
-CREATE OR REPLACE TRIGGER trg_users_after_update
-AFTER UPDATE ON users
-FOR EACH ROW
-WHEN (OLD.match_id IS NULL AND NEW.match_id IS NOT NULL)
-EXECUTE FUNCTION notify_users_match_id();
