@@ -23,14 +23,8 @@ export const DEFAULT_OPTIONS = {
 const HARD_CLOSE = Symbol('hard close');
 
 export const State = Object.freeze({
-    INACTIVE: 'INACTIVE',
+    INIT: 'INIT',
     OPEN: 'OPEN',
-    CLOSED: 'CLOSED',
-});
-
-export const ServerState = Object.freeze({
-    NOT_STARTED: 'NOT_STARTED',
-    RUNNING: 'RUNNING',
     CLOSED: 'CLOSED',
 });
 
@@ -40,7 +34,7 @@ export class Connection extends EventEmitter {
         this.ws = ws;
         this.websocketId = websocketId;
 
-        this.state = State.INACTIVE;
+        this.state = State.INIT;
         this.missedPongs = 0;
 
         this.login = login;
@@ -50,8 +44,8 @@ export class Connection extends EventEmitter {
         this.pingSeq = 0;
     }
 
-    start() {
-        if (this.state !== State.INACTIVE) return;
+    open() {
+        if (this.state !== State.INIT) return;
         if (this.ws.readyState !== WebSocket.OPEN) {
             this.close();
             return;
@@ -199,16 +193,16 @@ export class ConnectionServer {
         this.wss = wss;
         this.connections = new Map();
         this.mutex = new Mutex();
-        this.state = ServerState.NOT_STARTED;
+        this.state = State.INIT;
         this.queueTimer = null;
         this.pollTimer = null;
         this.httpServer = null;
         this.upgradeHandler = null;
     }
 
-    start() {
-        if (this.state !== ServerState.NOT_STARTED) return;
-        this.state = ServerState.RUNNING;
+    open() {
+        if (this.state !== State.INIT) return;
+        this.state = State.OPEN;
 
         this.queueTimer = setInterval(
             () => this.mutex.runExclusive(() => this.extendQueues()),
@@ -226,7 +220,7 @@ export class ConnectionServer {
     }
 
     async extendQueues() {
-        if (this.state !== ServerState.RUNNING) return;
+        if (this.state !== State.OPEN) return;
 
         const queued = [...this.connections.values()].filter(
             (connection) => connection.state === State.OPEN
@@ -247,7 +241,7 @@ export class ConnectionServer {
     }
 
     async onPull() {
-        if (this.state !== ServerState.RUNNING) return;
+        if (this.state !== State.OPEN) return;
 
         const queued = [...this.connections.values()].filter(
             (connection) => connection.state === State.OPEN
@@ -290,7 +284,7 @@ export class ConnectionServer {
     }
 
     async onConnection(ws, request) {
-        if (this.state !== ServerState.RUNNING) {
+        if (this.state !== State.OPEN) {
             ws.close(1001, 'Server is shutting down');
             return;
         }
@@ -342,7 +336,7 @@ export class ConnectionServer {
         const connection = new Connection(ws, login, websocketId);
         connection.on('close', () => this.closeConnection(connection));
         this.connections.set(login, connection);
-        connection.start();
+        connection.open();
     }
 
     closeConnection(connection) {
@@ -355,8 +349,8 @@ export class ConnectionServer {
 
     async close() {
         await this.mutex.runExclusive(async () => {
-            if (this.state === ServerState.CLOSED) return;
-            this.state = ServerState.CLOSED;
+            if (this.state === State.CLOSED) return;
+            this.state = State.CLOSED;
 
             clearInterval(this.queueTimer);
             this.queueTimer = null;
@@ -406,7 +400,7 @@ export class ConnectionServer {
 
 export async function createWebSocketServer(httpServer) {
     const server = new ConnectionServer();
-    await server.start();
+    await server.open();
     server.attach(httpServer);
     return server;
 }

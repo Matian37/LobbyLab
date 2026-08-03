@@ -5,7 +5,6 @@ import {
     parseCookies,
     DEFAULT_OPTIONS,
     State,
-    ServerState,
 } from '$lib/connection.js';
 import * as db from '$lib/db.js';
 
@@ -97,14 +96,14 @@ describe('Connection', () => {
         const ws = new FakeWebSocket();
         const connection = new Connection(ws, 'user1');
 
-        expect(connection.state).toBe(State.INACTIVE);
+        expect(connection.state).toBe(State.INIT);
     });
 
     it('sends a ping periodically', async () => {
         const ws = new FakeWebSocket();
         const connection = new Connection(ws, 'user1');
 
-        connection.start();
+        connection.open();
 
         await vi.advanceTimersByTimeAsync(DEFAULT_OPTIONS.pingIntervalMs);
         expect(ws.pings).toBe(1);
@@ -120,7 +119,7 @@ describe('Connection', () => {
         };
         const connection = new Connection(ws, 'user1');
 
-        connection.start();
+        connection.open();
 
         await vi.advanceTimersByTimeAsync(DEFAULT_OPTIONS.pingIntervalMs);
 
@@ -135,7 +134,7 @@ describe('Connection', () => {
         const onClose = vi.fn();
         connection.on('close', onClose);
 
-        connection.start();
+        connection.open();
 
         expect(connection.state).toBe(State.CLOSED);
         expect(ws.closed).toBe(true);
@@ -147,7 +146,7 @@ describe('Connection', () => {
         const connection = new Connection(ws, 'user1');
 
         connection.close();
-        connection.start();
+        connection.open();
 
         expect(connection.state).toBe(State.CLOSED);
         await vi.advanceTimersByTimeAsync(DEFAULT_OPTIONS.pingIntervalMs);
@@ -158,7 +157,7 @@ describe('Connection', () => {
         const ws = new FakeWebSocket();
         const connection = new Connection(ws, 'user1');
 
-        connection.start();
+        connection.open();
 
         await vi.advanceTimersByTimeAsync(DEFAULT_OPTIONS.pingIntervalMs);
         await vi.advanceTimersByTimeAsync(DEFAULT_OPTIONS.pongTimeoutMs);
@@ -171,7 +170,7 @@ describe('Connection', () => {
         const ws = new FakeWebSocket();
         const connection = new Connection(ws, 'user1');
 
-        connection.start();
+        connection.open();
 
         await vi.advanceTimersByTimeAsync(DEFAULT_OPTIONS.pingIntervalMs);
         await vi.advanceTimersByTimeAsync(DEFAULT_OPTIONS.pongTimeoutMs);
@@ -191,7 +190,7 @@ describe('Connection', () => {
         const ws = new FakeWebSocket();
         const connection = new Connection(ws, 'user1');
 
-        connection.start();
+        connection.open();
 
         await vi.advanceTimersByTimeAsync(DEFAULT_OPTIONS.pingIntervalMs);
         await vi.advanceTimersByTimeAsync(DEFAULT_OPTIONS.pongTimeoutMs);
@@ -212,7 +211,7 @@ describe('Connection', () => {
         const ws = new FakeWebSocket();
         const connection = new Connection(ws, 'user1');
 
-        connection.start();
+        connection.open();
 
         await vi.advanceTimersByTimeAsync(DEFAULT_OPTIONS.pingIntervalMs);
         const answeredSeq = ws.latestPingPayload;
@@ -229,7 +228,7 @@ describe('Connection', () => {
         const ws = new FakeWebSocket();
         const connection = new Connection(ws, 'user1');
 
-        connection.start();
+        connection.open();
 
         ws.emit('pong');
 
@@ -245,7 +244,7 @@ describe('Connection', () => {
         const ws = new FakeWebSocket();
         const connection = new Connection(ws, 'user1');
 
-        connection.start();
+        connection.open();
 
         await vi.advanceTimersByTimeAsync(DEFAULT_OPTIONS.pingIntervalMs);
         await vi.advanceTimersByTimeAsync(DEFAULT_OPTIONS.pongTimeoutMs);
@@ -257,7 +256,7 @@ describe('Connection', () => {
         const ws = new FakeWebSocket();
         const connection = new Connection(ws, 'user1');
 
-        connection.start();
+        connection.open();
 
         for (let i = 0; i < DEFAULT_OPTIONS.maxMissedPongs + 1; i++) {
             await vi.advanceTimersByTimeAsync(DEFAULT_OPTIONS.pingIntervalMs);
@@ -272,7 +271,7 @@ describe('Connection', () => {
         const ws = new FakeWebSocket();
         const connection = new Connection(ws, 'user1');
 
-        connection.start();
+        connection.open();
         connection.sendMatchAndClose(
             { login: 'user1', host: 'h', port: 'p' },
             'TOKEN'
@@ -294,7 +293,7 @@ describe('Connection', () => {
         const ws = new FakeWebSocket();
         const connection = new Connection(ws, 'user1');
 
-        connection.start();
+        connection.open();
         connection.close();
         connection.sendMatchAndClose({ login: 'user1', host: 'h' }, 'TOKEN');
 
@@ -305,7 +304,7 @@ describe('Connection', () => {
         const ws = new FakeWebSocket();
         const connection = new Connection(ws, 'user1');
 
-        connection.start();
+        connection.open();
         ws.readyState = 3;
         connection.sendMatchAndClose({ login: 'user1', host: 'h' }, 'TOKEN');
 
@@ -318,7 +317,7 @@ describe('Connection', () => {
         const ws = new FakeWebSocket();
         const connection = new Connection(ws, 'user1');
 
-        connection.start();
+        connection.open();
 
         ws.emit('close', { code: 1000 });
 
@@ -333,7 +332,7 @@ describe('Connection', () => {
         const ws = new FakeWebSocket();
         const connection = new Connection(ws, 'user1');
 
-        connection.start();
+        connection.open();
         connection.close();
 
         await vi.advanceTimersByTimeAsync(DEFAULT_OPTIONS.pingIntervalMs * 3);
@@ -346,7 +345,7 @@ describe('Connection', () => {
         const ws = new FakeWebSocket();
         const connection = new Connection(ws, 'user1');
 
-        connection.start();
+        connection.open();
         connection.close();
         connection.close();
 
@@ -375,7 +374,7 @@ describe('Connection', () => {
         const connection = new Connection(ws, 'user1');
 
         connection.close();
-        connection.start();
+        connection.open();
 
         expect(connection.state).toBe(State.CLOSED);
         await vi.advanceTimersByTimeAsync(DEFAULT_OPTIONS.pingIntervalMs);
@@ -388,7 +387,7 @@ describe('Connection', () => {
         const onClose = vi.fn();
         connection.on('close', onClose);
 
-        connection.start();
+        connection.open();
         connection.close();
         connection.close();
 
@@ -433,7 +432,7 @@ describe('ConnectionServer', () => {
 
     async function createServer(wss) {
         const server = new ConnectionServer(wss);
-        await server.start();
+        await server.open();
         return server;
     }
 
@@ -792,7 +791,7 @@ describe('ConnectionServer', () => {
             headers: { cookie: 'session=TOKEN' },
         });
 
-        expect(server.state).toBe(ServerState.CLOSED);
+        expect(server.state).toBe(State.CLOSED);
         expect(server.connections.has('user1')).toBe(false);
         expect(ws.closed).toBe(true);
         expect(db.setUserWebsocket).not.toHaveBeenCalled();
@@ -813,13 +812,13 @@ describe('ConnectionServer', () => {
         };
         const server = new ConnectionServer(wss);
 
-        server.start();
-        expect(server.state).toBe(ServerState.RUNNING);
+        server.open();
+        expect(server.state).toBe(State.OPEN);
         expect(wss.on).toHaveBeenCalledTimes(1);
 
-        server.start();
+        server.open();
 
-        expect(server.state).toBe(ServerState.RUNNING);
+        expect(server.state).toBe(State.OPEN);
         expect(wss.on).toHaveBeenCalledTimes(1);
     });
 
@@ -829,12 +828,12 @@ describe('ConnectionServer', () => {
             close: vi.fn(),
         };
         const server = new ConnectionServer(wss);
-        server.start();
+        server.open();
 
         await server.close();
         await server.close();
 
-        expect(server.state).toBe(ServerState.CLOSED);
+        expect(server.state).toBe(State.CLOSED);
         expect(wss.close).toHaveBeenCalledTimes(1);
     });
 
