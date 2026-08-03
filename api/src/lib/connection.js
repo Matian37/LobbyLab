@@ -29,110 +29,134 @@ export const State = Object.freeze({
 });
 
 export class Connection extends EventEmitter {
+    #ws;
+    #websocketId;
+    #login;
+    #state = State.INIT;
+    #missedPongs = 0;
+    #pingTimer = null;
+    #pongTimer = null;
+    #pingSeq = 0;
+    #onPongHandler = null;
+    #onCloseHandler = null;
+    #onErrorHandler = null;
+
     constructor(ws, login, websocketId = randomUUID()) {
         super();
-        this.ws = ws;
-        this.websocketId = websocketId;
+        this.#ws = ws;
+        this.#websocketId = websocketId;
+        this.#login = login;
+    }
 
-        this.state = State.INIT;
-        this.missedPongs = 0;
+    get websocketId() {
+        return this.#websocketId;
+    }
 
-        this.login = login;
+    get login() {
+        return this.#login;
+    }
 
-        this.pingTimer = null;
-        this.pongTimer = null;
-        this.pingSeq = 0;
+    get state() {
+        return this.#state;
+    }
+
+    get missedPongs() {
+        return this.#missedPongs;
+    }
+
+    get pingTimer() {
+        return this.#pingTimer;
     }
 
     open() {
-        if (this.state !== State.INIT) return;
-        if (this.ws.readyState !== WebSocket.OPEN) {
+        if (this.#state !== State.INIT) return;
+        if (this.#ws.readyState !== WebSocket.OPEN) {
             this.close();
             return;
         }
 
-        this.state = State.OPEN;
+        this.#state = State.OPEN;
 
-        this.onPongHandler = (data) => this.onPong(data);
-        this.onCloseHandler = () => this.close();
-        this.onErrorHandler = () => this.close();
+        this.#onPongHandler = (data) => this.onPong(data);
+        this.#onCloseHandler = () => this.close();
+        this.#onErrorHandler = () => this.close();
 
-        this.ws.on('pong', this.onPongHandler);
-        this.ws.on('close', this.onCloseHandler);
-        this.ws.on('error', this.onErrorHandler);
+        this.#ws.on('pong', this.#onPongHandler);
+        this.#ws.on('close', this.#onCloseHandler);
+        this.#ws.on('error', this.#onErrorHandler);
 
-        this.pingTimer = setInterval(
+        this.#pingTimer = setInterval(
             () => this.sendPing(),
             DEFAULT_OPTIONS.pingIntervalMs
         );
     }
 
     sendPing() {
-        if (this.state !== State.OPEN) return;
-        if (this.ws.readyState !== WebSocket.OPEN) {
+        if (this.#state !== State.OPEN) return;
+        if (this.#ws.readyState !== WebSocket.OPEN) {
             this.close();
             return;
         }
 
-        clearTimeout(this.pongTimer);
+        clearTimeout(this.#pongTimer);
 
-        const seq = ++this.pingSeq;
+        const seq = ++this.#pingSeq;
         try {
-            this.ws.ping(String(seq));
+            this.#ws.ping(String(seq));
         } catch (err) {
             console.debug('failed to send ping:', err);
             this.close();
             return;
         }
 
-        this.pongTimer = setTimeout(
+        this.#pongTimer = setTimeout(
             () => this.onPongMiss(seq),
             DEFAULT_OPTIONS.pongTimeoutMs
         );
     }
 
     onPong(data) {
-        if (this.state !== State.OPEN) return;
-        if (String(data ?? '') !== String(this.pingSeq)) return;
+        if (this.#state !== State.OPEN) return;
+        if (String(data ?? '') !== String(this.#pingSeq)) return;
 
-        this.missedPongs = 0;
+        this.#missedPongs = 0;
 
-        clearTimeout(this.pongTimer);
-        this.pongTimer = null;
+        clearTimeout(this.#pongTimer);
+        this.#pongTimer = null;
     }
 
     onPongMiss(seq) {
-        if (this.state !== State.OPEN) return;
-        if (seq !== this.pingSeq) return;
-        if (this.pongTimer === null) return;
+        if (this.#state !== State.OPEN) return;
+        if (seq !== this.#pingSeq) return;
+        if (this.#pongTimer === null) return;
 
-        clearTimeout(this.pongTimer);
-        this.pongTimer = null;
+        clearTimeout(this.#pongTimer);
+        this.#pongTimer = null;
 
-        this.missedPongs += 1;
+        this.#missedPongs += 1;
 
-        if (this.missedPongs > DEFAULT_OPTIONS.maxMissedPongs) {
+        if (this.#missedPongs > DEFAULT_OPTIONS.maxMissedPongs) {
             console.debug(
-                `closing connection for ${this.login} after ${this.missedPongs} missed pongs`
+                `closing connection for ${this.#login} after ${this.#missedPongs} missed pongs`
             );
             this.close(HARD_CLOSE);
             return;
         }
 
         console.debug(
-            `missed pong ${this.missedPongs}/${DEFAULT_OPTIONS.maxMissedPongs} for ${this.login}`
+            `missed pong ${this.#missedPongs}/${DEFAULT_OPTIONS.maxMissedPongs} for ${this.#login}`
         );
     }
 
     sendMatchAndClose(payload, match_auth_token) {
-        if (this.state !== State.OPEN) return;
-        if (this.ws.readyState !== WebSocket.OPEN) {
+        if (this.#state !== State.OPEN) return;
+        if (this.#ws.readyState !== WebSocket.OPEN) {
             this.close();
             return;
         }
 
         try {
-            this.ws.send(JSON.stringify({ ...payload, match_auth_token }));
+            this.#ws.send(JSON.stringify({ ...payload, match_auth_token }));
         } catch (err) {
             console.debug('Failed to send match payload:', err);
         } finally {
@@ -141,28 +165,34 @@ export class Connection extends EventEmitter {
     }
 
     close(code = 1000, reason = '') {
-        if (this.state === State.CLOSED) return;
+        if (this.#state === State.CLOSED) return;
 
-        this.state = State.CLOSED;
+        this.#state = State.CLOSED;
         this.cleanup();
         if (code === HARD_CLOSE) {
-            this.ws.terminate();
+            this.#ws.terminate();
         } else {
-            this.ws.close(code, reason);
+            this.#ws.close(code, reason);
         }
         this.emit('close');
     }
 
     cleanup() {
-        clearInterval(this.pingTimer);
-        clearTimeout(this.pongTimer);
+        clearInterval(this.#pingTimer);
+        clearTimeout(this.#pongTimer);
 
-        this.pingTimer = null;
-        this.pongTimer = null;
+        this.#pingTimer = null;
+        this.#pongTimer = null;
 
-        if (this.onPongHandler) this.ws.off?.('pong', this.onPongHandler);
-        if (this.onCloseHandler) this.ws.off?.('close', this.onCloseHandler);
-        if (this.onErrorHandler) this.ws.off?.('error', this.onErrorHandler);
+        if (this.#onPongHandler) {
+            this.#ws.off?.('pong', this.#onPongHandler);
+        }
+        if (this.#onCloseHandler) {
+            this.#ws.off?.('close', this.#onCloseHandler);
+        }
+        if (this.#onErrorHandler) {
+            this.#ws.off?.('error', this.#onErrorHandler);
+        }
     }
 }
 
@@ -189,40 +219,58 @@ function decodeCookieValue(value) {
 }
 
 export class ConnectionServer {
+    #wss;
+    #connections = new Map();
+    #mutex = new Mutex();
+    #state = State.INIT;
+    #queueTimer = null;
+    #pollTimer = null;
+    #httpServer = null;
+    #upgradeHandler = null;
+
     constructor(wss = new WebSocketServer({ noServer: true })) {
-        this.wss = wss;
-        this.connections = new Map();
-        this.mutex = new Mutex();
-        this.state = State.INIT;
-        this.queueTimer = null;
-        this.pollTimer = null;
-        this.httpServer = null;
-        this.upgradeHandler = null;
+        this.#wss = wss;
+    }
+
+    get state() {
+        return this.#state;
+    }
+
+    get connections() {
+        return this.#connections;
+    }
+
+    get httpServer() {
+        return this.#httpServer;
+    }
+
+    get upgradeHandler() {
+        return this.#upgradeHandler;
     }
 
     open() {
-        if (this.state !== State.INIT) return;
-        this.state = State.OPEN;
+        if (this.#state !== State.INIT) return;
+        this.#state = State.OPEN;
 
-        this.queueTimer = setInterval(
-            () => this.mutex.runExclusive(() => this.extendQueues()),
+        this.#queueTimer = setInterval(
+            () => this.#mutex.runExclusive(() => this.extendQueues()),
             DEFAULT_OPTIONS.queueExtensionIntervalMs
         );
 
-        this.pollTimer = setInterval(
-            () => this.mutex.runExclusive(() => this.onPull()),
+        this.#pollTimer = setInterval(
+            () => this.#mutex.runExclusive(() => this.onPull()),
             DEFAULT_OPTIONS.pollIntervalMs
         );
 
-        this.wss.on('connection', (ws, request) =>
-            this.mutex.runExclusive(() => this.onConnection(ws, request))
+        this.#wss.on('connection', (ws, request) =>
+            this.#mutex.runExclusive(() => this.onConnection(ws, request))
         );
     }
 
     async extendQueues() {
-        if (this.state !== State.OPEN) return;
+        if (this.#state !== State.OPEN) return;
 
-        const queued = [...this.connections.values()].filter(
+        const queued = [...this.#connections.values()].filter(
             (connection) => connection.state === State.OPEN
         );
         if (queued.length === 0) return;
@@ -241,9 +289,9 @@ export class ConnectionServer {
     }
 
     async onPull() {
-        if (this.state !== State.OPEN) return;
+        if (this.#state !== State.OPEN) return;
 
-        const queued = [...this.connections.values()].filter(
+        const queued = [...this.#connections.values()].filter(
             (connection) => connection.state === State.OPEN
         );
         if (queued.length === 0) return;
@@ -284,7 +332,7 @@ export class ConnectionServer {
     }
 
     async onConnection(ws, request) {
-        if (this.state !== State.OPEN) {
+        if (this.#state !== State.OPEN) {
             ws.close(1001, 'Server is shutting down');
             return;
         }
@@ -328,51 +376,51 @@ export class ConnectionServer {
             return;
         }
 
-        const existingConnection = this.connections.get(login);
+        const existingConnection = this.#connections.get(login);
         if (existingConnection !== undefined) {
             existingConnection.close(4001, 'Replaced by new connection');
         }
 
         const connection = new Connection(ws, login, websocketId);
         connection.on('close', () => this.closeConnection(connection));
-        this.connections.set(login, connection);
+        this.#connections.set(login, connection);
         connection.open();
     }
 
     closeConnection(connection) {
-        if (this.connections.get(connection.login) !== connection) return;
-        this.connections.delete(connection.login);
+        if (this.#connections.get(connection.login) !== connection) return;
+        this.#connections.delete(connection.login);
         void removeQueueStatus(connection.login, connection.websocketId).catch(
             (err) => console.debug('failed to remove queue status', err)
         );
     }
 
     async close() {
-        await this.mutex.runExclusive(async () => {
-            if (this.state === State.CLOSED) return;
-            this.state = State.CLOSED;
+        await this.#mutex.runExclusive(async () => {
+            if (this.#state === State.CLOSED) return;
+            this.#state = State.CLOSED;
 
-            clearInterval(this.queueTimer);
-            this.queueTimer = null;
+            clearInterval(this.#queueTimer);
+            this.#queueTimer = null;
 
-            clearInterval(this.pollTimer);
-            this.pollTimer = null;
+            clearInterval(this.#pollTimer);
+            this.#pollTimer = null;
 
-            for (const connection of [...this.connections.values()]) {
+            for (const connection of [...this.#connections.values()]) {
                 connection.close();
             }
-            this.connections.clear();
+            this.#connections.clear();
 
             this.detach();
-            this.wss.close?.();
+            this.#wss.close?.();
         });
     }
 
     attach(httpServer) {
-        if (this.httpServer !== null) return;
+        if (this.#httpServer !== null) return;
 
-        this.httpServer = httpServer;
-        this.upgradeHandler = (request, socket, head) => {
+        this.#httpServer = httpServer;
+        this.#upgradeHandler = (request, socket, head) => {
             let pathname;
             try {
                 ({ pathname } = new URL(request.url, 'http://localhost'));
@@ -382,19 +430,19 @@ export class ConnectionServer {
             }
             if (pathname !== DEFAULT_OPTIONS.connectionPath) return;
 
-            this.wss.handleUpgrade(request, socket, head, (ws) => {
-                this.wss.emit('connection', ws, request);
+            this.#wss.handleUpgrade(request, socket, head, (ws) => {
+                this.#wss.emit('connection', ws, request);
             });
         };
-        this.httpServer.on('upgrade', this.upgradeHandler);
+        this.#httpServer.on('upgrade', this.#upgradeHandler);
     }
 
     detach() {
-        if (this.httpServer === null || this.upgradeHandler === null) return;
+        if (this.#httpServer === null || this.#upgradeHandler === null) return;
 
-        this.httpServer.off('upgrade', this.upgradeHandler);
-        this.httpServer = null;
-        this.upgradeHandler = null;
+        this.#httpServer.off('upgrade', this.#upgradeHandler);
+        this.#httpServer = null;
+        this.#upgradeHandler = null;
     }
 }
 
