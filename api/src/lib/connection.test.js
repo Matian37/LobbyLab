@@ -2,7 +2,6 @@ import { vi, it, expect, describe, beforeEach, afterEach } from 'vitest';
 import {
     Connection,
     ConnectionServer,
-    parseCookies,
     DEFAULT_OPTIONS,
     State,
 } from '$lib/connection.js';
@@ -411,39 +410,9 @@ describe('Connection', () => {
     });
 });
 
-describe('parseCookies', () => {
-    it('returns an empty object for an undefined header', () => {
-        expect(parseCookies(undefined)).toEqual({});
-    });
-
-    it('returns an empty object for an empty header', () => {
-        expect(parseCookies('')).toEqual({});
-    });
-
-    it('parses a cookie header', () => {
-        expect(parseCookies('session=abc; theme=dark')).toEqual({
-            session: 'abc',
-            theme: 'dark',
-        });
-    });
-
-    it('keeps values containing "="', () => {
-        expect(parseCookies('data=a=b=c')).toEqual({ data: 'a=b=c' });
-    });
-
-    it('URL decodes names and values', () => {
-        expect(parseCookies('my%20name=%20value')).toEqual({
-            'my name': ' value',
-        });
-    });
-
-    it('keeps the raw value when URL decoding fails', () => {
-        expect(parseCookies('a=%')).toEqual({ a: '%' });
-    });
-});
-
 describe('ConnectionServer', () => {
     let lastWebsocketIds;
+    const VALID_TOKEN = 'a'.repeat(64);
 
     async function createServer(wss) {
         const server = new ConnectionServer(wss);
@@ -491,7 +460,7 @@ describe('ConnectionServer', () => {
         const ws = new FakeWebSocket();
 
         await server.onConnection(ws, {
-            headers: { cookie: 'session=TOKEN' },
+            headers: { cookie: `session=${VALID_TOKEN}` },
         });
 
         await vi.advanceTimersByTimeAsync(DEFAULT_OPTIONS.pollIntervalMs);
@@ -511,8 +480,7 @@ describe('ConnectionServer', () => {
         expect(db.getLoginFromToken).not.toHaveBeenCalled();
     });
 
-    it('rejects the connection when the session token is invalid', async () => {
-        db.getLoginFromToken.mockResolvedValue(null);
+    it('rejects a session token with an invalid format', async () => {
         const server = await createServer();
         const ws = new FakeWebSocket();
 
@@ -520,7 +488,21 @@ describe('ConnectionServer', () => {
             headers: { cookie: 'session=TOKEN' },
         });
 
-        expect(db.getLoginFromToken).toHaveBeenCalledWith('TOKEN');
+        expect(db.getLoginFromToken).not.toHaveBeenCalled();
+        expect(ws.closed).toBe(true);
+        expect(ws.closeCode).toBe(4401);
+    });
+
+    it('rejects a session token with a valid format that does not exist', async () => {
+        db.getLoginFromToken.mockResolvedValue(null);
+        const server = await createServer();
+        const ws = new FakeWebSocket();
+
+        await server.onConnection(ws, {
+            headers: { cookie: `session=${VALID_TOKEN}` },
+        });
+
+        expect(db.getLoginFromToken).toHaveBeenCalledWith(VALID_TOKEN);
         expect(ws.closed).toBe(true);
         expect(ws.closeCode).toBe(4401);
     });
@@ -531,7 +513,7 @@ describe('ConnectionServer', () => {
         const ws = new FakeWebSocket();
 
         await server.onConnection(ws, {
-            headers: { cookie: 'session=TOKEN' },
+            headers: { cookie: `session=${VALID_TOKEN}` },
         });
 
         expect(ws.closed).toBe(true);
@@ -544,7 +526,7 @@ describe('ConnectionServer', () => {
         const ws = new FakeWebSocket();
 
         await server.onConnection(ws, {
-            headers: { cookie: 'session=TOKEN' },
+            headers: { cookie: `session=${VALID_TOKEN}` },
         });
 
         expect(server.connections.has('user1')).toBe(true);
@@ -568,7 +550,7 @@ describe('ConnectionServer', () => {
         const ws = new FakeWebSocket();
 
         await server.onConnection(ws, {
-            headers: { cookie: 'session=TOKEN' },
+            headers: { cookie: `session=${VALID_TOKEN}` },
         });
 
         expect(ws.closed).toBe(true);
@@ -582,7 +564,7 @@ describe('ConnectionServer', () => {
         const ws = new FakeWebSocket();
 
         await server.onConnection(ws, {
-            headers: { cookie: 'session=TOKEN' },
+            headers: { cookie: `session=${VALID_TOKEN}` },
         });
 
         const websocketId = server.connections.get('user1').websocketId;
@@ -623,7 +605,7 @@ describe('ConnectionServer', () => {
         const ws = new FakeWebSocket();
 
         await server.onConnection(ws, {
-            headers: { cookie: 'session=TOKEN' },
+            headers: { cookie: `session=${VALID_TOKEN}` },
         });
 
         db.getConnectionStatuses.mockResolvedValue(
@@ -657,7 +639,7 @@ describe('ConnectionServer', () => {
         const ws = new FakeWebSocket();
 
         await server.onConnection(ws, {
-            headers: { cookie: 'session=TOKEN' },
+            headers: { cookie: `session=${VALID_TOKEN}` },
         });
 
         db.getConnectionStatuses.mockResolvedValue(new Map());
@@ -678,13 +660,13 @@ describe('ConnectionServer', () => {
 
         const firstWs = new FakeWebSocket();
         await server.onConnection(firstWs, {
-            headers: { cookie: 'session=TOKEN' },
+            headers: { cookie: `session=${VALID_TOKEN}` },
         });
         expect(server.connections.has('user1')).toBe(true);
 
         const secondWs = new FakeWebSocket();
         await server.onConnection(secondWs, {
-            headers: { cookie: 'session=TOKEN' },
+            headers: { cookie: `session=${VALID_TOKEN}` },
         });
 
         expect(firstWs.closed).toBe(true);
@@ -704,7 +686,7 @@ describe('ConnectionServer', () => {
         const ws = new FakeWebSocket();
 
         await server.onConnection(ws, {
-            headers: { cookie: 'session=TOKEN' },
+            headers: { cookie: `session=${VALID_TOKEN}` },
         });
         const connection = server.connections.get('user1');
 
@@ -723,13 +705,13 @@ describe('ConnectionServer', () => {
 
         const firstWs = new FakeWebSocket();
         await server.onConnection(firstWs, {
-            headers: { cookie: 'session=TOKEN' },
+            headers: { cookie: `session=${VALID_TOKEN}` },
         });
         const firstConnection = server.connections.get('user1');
 
         const secondWs = new FakeWebSocket();
         await server.onConnection(secondWs, {
-            headers: { cookie: 'session=TOKEN' },
+            headers: { cookie: `session=${VALID_TOKEN}` },
         });
         const secondConnection = server.connections.get('user1');
 
@@ -746,7 +728,7 @@ describe('ConnectionServer', () => {
         const ws = new FakeWebSocket();
 
         await server.onConnection(ws, {
-            headers: { cookie: 'session=TOKEN' },
+            headers: { cookie: `session=${VALID_TOKEN}` },
         });
 
         await vi.advanceTimersByTimeAsync(
@@ -766,7 +748,7 @@ describe('ConnectionServer', () => {
         const ws = new FakeWebSocket();
 
         await server.onConnection(ws, {
-            headers: { cookie: 'session=TOKEN' },
+            headers: { cookie: `session=${VALID_TOKEN}` },
         });
         db.extendQueueStatuses.mockClear();
         await server.connections
@@ -786,7 +768,7 @@ describe('ConnectionServer', () => {
         const ws = new FakeWebSocket();
 
         await server.onConnection(ws, {
-            headers: { cookie: 'session=TOKEN' },
+            headers: { cookie: `session=${VALID_TOKEN}` },
         });
 
         await server.close();
@@ -803,7 +785,7 @@ describe('ConnectionServer', () => {
         await server.close();
 
         await server.onConnection(ws, {
-            headers: { cookie: 'session=TOKEN' },
+            headers: { cookie: `session=${VALID_TOKEN}` },
         });
 
         expect(server.state).toBe(State.CLOSED);

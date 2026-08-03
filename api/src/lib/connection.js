@@ -1,6 +1,7 @@
 import { EventEmitter } from 'node:events';
 import { randomUUID } from 'node:crypto';
 import { Mutex } from 'async-mutex';
+import { parseCookie } from 'cookie';
 import { WebSocket, WebSocketServer } from 'ws';
 import {
     getLoginFromToken,
@@ -8,7 +9,8 @@ import {
     removeQueueStatus,
     setUserWebsocket,
     getConnectionStatuses,
-} from './db.js';
+} from '$lib/db.js';
+import { isValidToken } from '$lib/validate.js';
 
 export const DEFAULT_OPTIONS = {
     connectionPath: '/api/connection',
@@ -204,26 +206,19 @@ export class Connection extends EventEmitter {
     }
 }
 
-export function parseCookies(cookieHeader) {
-    if (cookieHeader === undefined || cookieHeader === '') return {};
+function parseSessionToken(request) {
+    const cookie = request.headers.cookie;
 
-    return Object.fromEntries(
-        cookieHeader.split(';').map((part) => {
-            const [name, ...rest] = part.trim().split('=');
-            return [
-                decodeCookieValue(name.trim()),
-                decodeCookieValue(rest.join('=').trim()),
-            ];
-        })
-    );
-}
+    if (cookie === undefined) return { error: 'No cookie', code: 4401 };
+    if (cookie.length > 8192)
+        return { error: 'Cookie header too large', code: 4401 };
 
-function decodeCookieValue(value) {
-    try {
-        return decodeURIComponent(value);
-    } catch {
-        return value;
-    }
+    const session = parseCookie(cookie).session;
+
+    if (session === undefined) return { error: 'No session token', code: 4401 };
+    if (!isValidToken(session))
+        return { error: 'Invalid session token', code: 4401 };
+    return { data: session };
 }
 
 export class ConnectionServer {
@@ -345,11 +340,12 @@ export class ConnectionServer {
             return;
         }
 
-        const token = parseCookies(request.headers.cookie).session;
-        if (token === undefined) {
-            ws.close(4401, 'No session token');
+        const result = parseSessionToken(request);
+        if (result.error !== undefined) {
+            ws.close(result.code, result.error);
             return;
         }
+        const token = result.data;
 
         let login;
         try {
