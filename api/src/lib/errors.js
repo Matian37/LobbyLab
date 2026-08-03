@@ -4,7 +4,7 @@ import {
     PASSWORD_MAX_LENGTH,
     LOGIN_MIN_LENGTH,
     LOGIN_MAX_LENGTH,
-} from '$lib/constants.js';
+} from './constants.js';
 
 export const UNEXPECTED_ERROR_MSG = 'An unexpected error occurred';
 

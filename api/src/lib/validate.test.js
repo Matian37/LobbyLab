@@ -4,16 +4,16 @@ import {
     validateCredentialsSchema,
     validateSession,
     isValidToken,
-} from '$lib/validate.js';
-import { ERRORS } from '$lib/errors.js';
+} from './validate.js';
+import { ERRORS } from './errors.js';
 import {
     LOGIN_MIN_LENGTH,
     LOGIN_MAX_LENGTH,
     PASSWORD_MIN_LENGTH,
     PASSWORD_MAX_LENGTH,
     SESSION_TOKEN_LENGTH,
-} from '$lib/constants.js';
-import { expectError } from '$lib/test-utils.js';
+} from './constants.js';
+import { expectError } from './test-utils.js';
 
 const VALID_LOGIN = 'a'.repeat(LOGIN_MIN_LENGTH);
 const VALID_PASSWORD = 'a'.repeat(PASSWORD_MIN_LENGTH);
