@@ -60,16 +60,21 @@ export async function verifyPassword(login, password) {
 }
 
 export async function extendQueueStatuses(connections, ms) {
-    if (connections.length === 0) return new Set();
+    if (connections.length === 0) return;
 
-    const rows = await sql`
+    const rows = sql(
+        connections.map(({ login, websocketId }) => [login, websocketId])
+    );
+
+    await sql`
         UPDATE users u
         SET queued_until = NOW() + ${ms} * INTERVAL '1 millisecond'
-        FROM (VALUES ${sql(connections.map((c) => [c.login, c.websocketId]))}) AS v(login, websocket_id)
-        WHERE u.login = v.login AND (u.last_websocket_id = v.websocket_id AND u.match_id IS NULL)
-        RETURNING u.login
+        FROM (VALUES ${rows}) AS v(login, websocket_id)
+        WHERE 
+            u.login = v.login 
+            AND u.last_websocket_id = v.websocket_id 
+            AND u.match_id IS NULL
     `;
-    return new Set(rows.map((row) => row.login));
 }
 
 export async function setUserWebsocket(login, websocketId, ms) {
@@ -83,13 +88,15 @@ export async function setUserWebsocket(login, websocketId, ms) {
 }
 
 export async function removeQueueStatus(login, websocketId) {
-    const q = await sql`
+    await sql`
         UPDATE users
         SET queued_until = NOW() - INTERVAL '1 second',
             last_websocket_id = NULL
-        WHERE login = ${login} AND (last_websocket_id = ${websocketId} AND match_id IS NULL)
+        WHERE
+            login = ${login}
+            AND last_websocket_id = ${websocketId}
+            AND match_id IS NULL
     `;
-    return q.count != 0;
 }
 
 export async function isWaiting(login) {

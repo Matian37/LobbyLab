@@ -286,17 +286,19 @@ describe('Connection', () => {
         const connection = new Connection(ws, 'user1');
 
         connection.open();
-        connection.sendMatchAndClose(
-            { login: 'user1', host: 'h', port: 'p' },
-            'TOKEN'
-        );
+        connection.sendMatchAndClose({
+            login: 'user1',
+            host: 'h',
+            port: 'p',
+            matchAuthToken: 'TOKEN',
+        });
 
         expect(ws.sent).toEqual([
             JSON.stringify({
                 login: 'user1',
                 host: 'h',
                 port: 'p',
-                match_auth_token: 'TOKEN',
+                matchAuthToken: 'TOKEN',
             }),
         ]);
         expect(connection.state).toBe(State.CLOSED);
@@ -309,7 +311,7 @@ describe('Connection', () => {
 
         connection.open();
         connection.close();
-        connection.sendMatchAndClose({ login: 'user1', host: 'h' }, 'TOKEN');
+        connection.sendMatchAndClose({ login: 'user1', host: 'h' });
 
         expect(ws.sent).toEqual([]);
     });
@@ -320,7 +322,7 @@ describe('Connection', () => {
 
         connection.open();
         ws.readyState = 3;
-        connection.sendMatchAndClose({ login: 'user1', host: 'h' }, 'TOKEN');
+        connection.sendMatchAndClose({ login: 'user1', host: 'h' });
 
         expect(ws.sent).toEqual([]);
         expect(connection.state).toBe(State.CLOSED);
@@ -590,7 +592,7 @@ describe('ConnectionServer', () => {
                 login: 'user1',
                 host: 'h',
                 port: 'p',
-                match_auth_token: 'TOKEN',
+                matchAuthToken: 'TOKEN',
             }),
         ]);
         expect(ws.closed).toBe(true);
@@ -736,10 +738,7 @@ describe('ConnectionServer', () => {
         );
 
         const connection = server.connections.get('user1');
-        expect(db.extendQueueStatuses).toHaveBeenCalledWith(
-            [{ login: 'user1', websocketId: connection.websocketId }],
-            5000
-        );
+        expect(db.extendQueueStatuses).toHaveBeenCalledWith([connection], 5000);
     });
 
     it('does not extend the queue status for matched connections', async () => {
@@ -751,9 +750,9 @@ describe('ConnectionServer', () => {
             headers: { cookie: `session=${VALID_TOKEN}` },
         });
         db.extendQueueStatuses.mockClear();
-        await server.connections
-            .get('user1')
-            .sendMatchAndClose({ login: 'user1' }, 'TOKEN');
+        await server.connections.get('user1').sendMatchAndClose({
+            login: 'user1',
+        });
 
         await vi.advanceTimersByTimeAsync(
             DEFAULT_OPTIONS.queueExtensionIntervalMs
@@ -865,7 +864,8 @@ describe('ConnectionServer', () => {
         );
 
         const otherRequest = { url: '/api/other', headers: {} };
-        handlers.upgrade(otherRequest, socket, 'head');
+        const otherSocket = { destroyed: false, destroy() {} };
+        handlers.upgrade(otherRequest, otherSocket, 'head');
         expect(wss.handleUpgrade).toHaveBeenCalledTimes(1);
     });
 

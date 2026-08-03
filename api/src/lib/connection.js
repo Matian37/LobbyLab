@@ -158,7 +158,7 @@ export class Connection extends EventEmitter {
         );
     }
 
-    sendMatchAndClose(payload, match_auth_token) {
+    sendMatchAndClose(payload) {
         if (this.#state !== State.OPEN) return;
         if (this.#ws.readyState !== WebSocket.OPEN) {
             this.close();
@@ -166,7 +166,7 @@ export class Connection extends EventEmitter {
         }
 
         try {
-            this.#ws.send(JSON.stringify({ ...payload, match_auth_token }));
+            this.#ws.send(JSON.stringify(payload));
         } catch (err) {
             console.debug('Failed to send match payload:', err);
         } finally {
@@ -278,17 +278,10 @@ export class ConnectionServer {
         );
         if (queued.length === 0) return;
 
-        try {
-            await extendQueueStatuses(
-                queued.map((connection) => ({
-                    login: connection.login,
-                    websocketId: connection.websocketId,
-                })),
-                DEFAULT_OPTIONS.queueExtensionMs
-            );
-        } catch (err) {
-            console.debug('failed to extend queue status', err);
-        }
+        await extendQueueStatuses(
+            queued,
+            DEFAULT_OPTIONS.queueExtensionMs
+        ).catch((err) => console.debug('failed to extend queue status', err));
     }
 
     async onPull() {
@@ -321,16 +314,14 @@ export class ConnectionServer {
                 continue;
             }
 
-            if (status.matchId !== null) {
-                connection.sendMatchAndClose(
-                    {
-                        login: connection.login,
-                        host: status.host,
-                        port: status.port,
-                    },
-                    status.matchAuthToken
-                );
-            }
+            if (status.matchId === null) continue;
+
+            connection.sendMatchAndClose({
+                login: connection.login,
+                host: status.host,
+                port: status.port,
+                matchAuthToken: status.matchAuthToken,
+            });
         }
     }
 
@@ -394,7 +385,7 @@ export class ConnectionServer {
     closeConnection(connection) {
         if (this.#connections.get(connection.login) !== connection) return;
         this.#connections.delete(connection.login);
-        void removeQueueStatus(connection.login, connection.websocketId).catch(
+        removeQueueStatus(connection.login, connection.websocketId).catch(
             (err) => console.debug('failed to remove queue status', err)
         );
     }
@@ -432,7 +423,10 @@ export class ConnectionServer {
                 socket.destroy();
                 return;
             }
-            if (pathname !== DEFAULT_OPTIONS.connectionPath) return;
+            if (pathname !== DEFAULT_OPTIONS.connectionPath) {
+                socket.destroy();
+                return;
+            }
 
             this.#wss.handleUpgrade(request, socket, head, (ws) => {
                 this.#wss.emit('connection', ws, request);

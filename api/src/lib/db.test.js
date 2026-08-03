@@ -109,42 +109,55 @@ describe('verifyPassword', () => {
 });
 
 describe('extendQueueStatuses', () => {
-    it('returns the logins whose queue status was extended', async () => {
+    it('extends the queue status of matching users', async () => {
         expect(await db.addUser('user', 'pass')).toBeTruthy();
         expect(await db.addUser('other', 'pass')).toBeTruthy();
         await db.setUserWebsocket('user', 'ws1', 5000);
         await db.setUserWebsocket('other', 'ws2', 5000);
-        const extended = await db.extendQueueStatuses(
+        await db.extendQueueStatuses(
             [
                 { login: 'user', websocketId: 'ws1' },
                 { login: 'other', websocketId: 'ws2' },
             ],
             5000
         );
-        expect(extended).toEqual(new Set(['user', 'other']));
+        const rows = await helperSql`
+            SELECT queued_until > NOW() as cond
+            FROM users
+            ORDER BY login
+        `;
+        expect(rows.every((row) => row.cond)).toBeTruthy();
     });
 
-    it('returns only the logins that exist', async () => {
+    it('ignores users that do not exist', async () => {
         expect(await db.addUser('user', 'pass')).toBeTruthy();
         await db.setUserWebsocket('user', 'ws1', 5000);
-        const extended = await db.extendQueueStatuses(
+        await db.extendQueueStatuses(
             [
                 { login: 'user', websocketId: 'ws1' },
                 { login: 'missing', websocketId: 'ws2' },
             ],
             5000
         );
-        expect(extended).toEqual(new Set(['user']));
+        const rows = await helperSql`
+            SELECT queued_until > NOW() as cond
+            FROM users
+        `;
+        expect(rows[0].cond).toBeTruthy();
     });
 
     it('does not extend when the websocket id does not match', async () => {
         expect(await db.addUser('user', 'pass')).toBeTruthy();
-        await db.setUserWebsocket('user', 'ws1', 5000);
-        const extended = await db.extendQueueStatuses(
+        await db.setUserWebsocket('user', 'ws1', -1);
+        await db.extendQueueStatuses(
             [{ login: 'user', websocketId: 'stale-ws' }],
             5000
         );
-        expect(extended).toEqual(new Set());
+        const rows = await helperSql`
+            SELECT queued_until > NOW() as cond
+            FROM users
+        `;
+        expect(rows[0].cond).toBeFalsy();
     });
 
     it('extends the queue status by the given number of milliseconds', async () => {
@@ -161,12 +174,13 @@ describe('extendQueueStatuses', () => {
         expect(rows[0].cond).toBeTruthy();
     });
 
-    it('returns an empty set when no user exists', async () => {
-        const extended = await db.extendQueueStatuses(
-            [{ login: 'user', websocketId: 'ws1' }],
-            5000
-        );
-        expect(extended).toEqual(new Set());
+    it('does nothing when no user exists', async () => {
+        await expect(
+            db.extendQueueStatuses(
+                [{ login: 'user', websocketId: 'ws1' }],
+                5000
+            )
+        ).resolves.toBeUndefined();
     });
 });
 
@@ -209,15 +223,13 @@ describe('removeQueueStatus', () => {
     it('sets queued_until to the past and removes the user from the queue', async () => {
         expect(await db.addUser('user', 'pass')).toBeTruthy();
         await db.setUserWebsocket('user', 'ws1', 5000);
-        expect(
-            await db.extendQueueStatuses(
-                [{ login: 'user', websocketId: 'ws1' }],
-                5000
-            )
-        ).toBeTruthy();
+        await db.extendQueueStatuses(
+            [{ login: 'user', websocketId: 'ws1' }],
+            5000
+        );
         expect(await db.isWaiting('user')).toBeTruthy();
 
-        expect(await db.removeQueueStatus('user', 'ws1')).toBeTruthy();
+        await db.removeQueueStatus('user', 'ws1');
 
         const rows = await helperSql`
             SELECT queued_until > NOW() as cond, last_websocket_id FROM users
@@ -230,20 +242,20 @@ describe('removeQueueStatus', () => {
     it('does not remove the queue status when the websocket id does not match', async () => {
         expect(await db.addUser('user', 'pass')).toBeTruthy();
         await db.setUserWebsocket('user', 'ws1', 5000);
-        expect(
-            await db.extendQueueStatuses(
-                [{ login: 'user', websocketId: 'ws1' }],
-                5000
-            )
-        ).toBeTruthy();
+        await db.extendQueueStatuses(
+            [{ login: 'user', websocketId: 'ws1' }],
+            5000
+        );
 
-        expect(await db.removeQueueStatus('user', 'stale-ws')).toBeFalsy();
+        await db.removeQueueStatus('user', 'stale-ws');
 
         expect(await db.isWaiting('user')).toBeTruthy();
     });
 
-    it('returns false when user does not exist', async () => {
-        expect(await db.removeQueueStatus('user', 'ws1')).toBeFalsy();
+    it('does nothing when user does not exist', async () => {
+        await expect(
+            db.removeQueueStatus('user', 'ws1')
+        ).resolves.toBeUndefined();
     });
 });
 
@@ -251,12 +263,10 @@ describe('isWaiting', () => {
     it('returns true when user is queued and not matched', async () => {
         expect(await db.addUser('user', 'pass')).toBeTruthy();
         await db.setUserWebsocket('user', 'ws1', 5000);
-        expect(
-            await db.extendQueueStatuses(
-                [{ login: 'user', websocketId: 'ws1' }],
-                5000
-            )
-        ).toBeTruthy();
+        await db.extendQueueStatuses(
+            [{ login: 'user', websocketId: 'ws1' }],
+            5000
+        );
         expect(await db.isWaiting('user')).toBeTruthy();
     });
 
