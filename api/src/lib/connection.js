@@ -1,7 +1,7 @@
 import { EventEmitter } from 'node:events';
 import { randomUUID } from 'node:crypto';
 import { Mutex } from 'async-mutex';
-import { parseCookie } from 'cookie';
+import { parse } from 'cookie-es';
 import { WebSocket, WebSocketServer } from 'ws';
 import {
     getLoginFromToken,
@@ -9,8 +9,8 @@ import {
     removeQueueStatus,
     setUserWebsocket,
     getConnectionStatuses,
-} from '$lib/db.js';
-import { isValidToken } from '$lib/validate.js';
+} from './db.js';
+import { isValidToken } from './validate.js';
 
 export const DEFAULT_OPTIONS = {
     connectionPath: '/api/connection',
@@ -213,7 +213,7 @@ function parseSessionToken(request) {
     if (cookie.length > 8192)
         return { error: 'Cookie header too large', code: 4401 };
 
-    const session = parseCookie(cookie).session;
+    const session = parse(cookie).session;
 
     if (session === undefined) return { error: 'No session token', code: 4401 };
     if (!isValidToken(session))
