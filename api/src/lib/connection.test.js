@@ -112,6 +112,21 @@ describe('Connection', () => {
         expect(ws.pings).toBe(2);
     });
 
+    it('advances the ping sequence after a pong is received', async () => {
+        const ws = new FakeWebSocket();
+        const connection = new Connection(ws, 'user1');
+
+        connection.open();
+
+        await vi.advanceTimersByTimeAsync(DEFAULT_OPTIONS.pingIntervalMs);
+        const firstSeq = ws.latestPingPayload;
+
+        ws.emit('pong', firstSeq);
+
+        await vi.advanceTimersByTimeAsync(DEFAULT_OPTIONS.pingIntervalMs);
+        expect(ws.latestPingPayload).not.toBe(firstSeq);
+    });
+
     it('closes the connection when a ping fails', async () => {
         const ws = new FakeWebSocket();
         ws.ping = () => {

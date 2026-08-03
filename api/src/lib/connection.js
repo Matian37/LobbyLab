@@ -37,6 +37,7 @@ export class Connection extends EventEmitter {
     #pingTimer = null;
     #pongTimer = null;
     #pingSeq = 0;
+    #waitingForPing = false;
     #onPongHandler = null;
     #onCloseHandler = null;
     #onErrorHandler = null;
@@ -97,12 +98,14 @@ export class Connection extends EventEmitter {
             this.close();
             return;
         }
+        if (this.#waitingForPing) {
+            console.warn('skipping sending new ping, still waiting for pong');
+            return;
+        }
 
-        clearTimeout(this.#pongTimer);
-
-        const seq = ++this.#pingSeq;
+        this.#waitingForPing = true;
         try {
-            this.#ws.ping(String(seq));
+            this.#ws.ping(String(this.#pingSeq));
         } catch (err) {
             console.debug('failed to send ping:', err);
             this.close();
@@ -110,16 +113,19 @@ export class Connection extends EventEmitter {
         }
 
         this.#pongTimer = setTimeout(
-            () => this.onPongMiss(seq),
+            () => this.onPongMiss(this.#pingSeq),
             DEFAULT_OPTIONS.pongTimeoutMs
         );
     }
 
     onPong(data) {
         if (this.#state !== State.OPEN) return;
+        if (!this.#waitingForPing) return;
         if (String(data ?? '') !== String(this.#pingSeq)) return;
 
+        this.#waitingForPing = false;
         this.#missedPongs = 0;
+        this.#pingSeq++;
 
         clearTimeout(this.#pongTimer);
         this.#pongTimer = null;
@@ -127,13 +133,15 @@ export class Connection extends EventEmitter {
 
     onPongMiss(seq) {
         if (this.#state !== State.OPEN) return;
+        if (!this.#waitingForPing) return;
         if (seq !== this.#pingSeq) return;
-        if (this.#pongTimer === null) return;
+
+        this.#waitingForPing = false;
+        this.#missedPongs++;
+        this.#pingSeq++;
 
         clearTimeout(this.#pongTimer);
         this.#pongTimer = null;
-
-        this.#missedPongs += 1;
 
         if (this.#missedPongs > DEFAULT_OPTIONS.maxMissedPongs) {
             console.debug(
