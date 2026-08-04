@@ -9,11 +9,12 @@ import {
 } from 'vitest';
 import { once } from 'node:events';
 import { WebSocket, WebSocketServer } from 'ws';
-import { Connection, DEFAULT_OPTIONS, State } from '$lib/connection.js';
+import { Connection } from '$lib/connection.js';
+import { CONNECTION_DEFAULT_OPTIONS, State } from '$lib/constants.js';
 import { ConnectionStateError } from '$lib/errors.js';
 
 const OPTIONS = Object.freeze({
-    ...DEFAULT_OPTIONS,
+    ...CONNECTION_DEFAULT_OPTIONS,
     pingIntervalMs: 10_000,
     pongTimeoutMs: 40,
     maxMissedPongs: 2,

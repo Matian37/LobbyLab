@@ -11,7 +11,8 @@ import {
 } from './db.js';
 import { isValidToken } from './validate.js';
 import { CONNECTION_ERRORS } from './errors.js';
-import { State, DEFAULT_OPTIONS, Connection } from './connection.js';
+import { SERVER_DEFAULT_OPTIONS, State } from './constants.js';
+import { Connection } from './connection.js';
 
 function parseSessionToken(request) {
     const cookie = request.headers.cookie;
@@ -41,7 +42,7 @@ export class ConnectionServer {
 
     constructor(
         wss = new WebSocketServer({ noServer: true }),
-        options = DEFAULT_OPTIONS
+        options = SERVER_DEFAULT_OPTIONS
     ) {
         this.#wss = wss;
         this.#options = options;

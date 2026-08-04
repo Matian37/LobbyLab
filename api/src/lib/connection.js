@@ -2,24 +2,9 @@ import { EventEmitter } from 'node:events';
 import { randomUUID } from 'node:crypto';
 import { WebSocket } from 'ws';
 import { CONNECTION_ERRORS } from './errors.js';
-
-export const DEFAULT_OPTIONS = Object.freeze({
-    connectionPath: '/api/connection',
-    pingIntervalMs: 5_000,
-    pongTimeoutMs: 3_000,
-    maxMissedPongs: 2,
-    queueExtensionIntervalMs: 3_000,
-    queueExtensionMs: 5_000,
-    pollIntervalMs: 2_500,
-});
+import { CONNECTION_DEFAULT_OPTIONS, State } from './constants.js';
 
 const HARD_CLOSE = Symbol('hard close');
-
-export const State = Object.freeze({
-    INIT: 'INIT',
-    OPEN: 'OPEN',
-    CLOSED: 'CLOSED',
-});
 
 export class Connection extends EventEmitter {
     #ws;
@@ -40,7 +25,7 @@ export class Connection extends EventEmitter {
         ws,
         login,
         websocketId = randomUUID(),
-        options = DEFAULT_OPTIONS
+        options = CONNECTION_DEFAULT_OPTIONS
     ) {
         super();
         this.#ws = ws;
