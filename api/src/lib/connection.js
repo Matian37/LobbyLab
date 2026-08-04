@@ -59,6 +59,10 @@ export class Connection extends EventEmitter {
         this.#options = options;
     }
 
+    get options() {
+        return this.#options;
+    }
+
     get websocketId() {
         return this.#websocketId;
     }
@@ -77,6 +81,14 @@ export class Connection extends EventEmitter {
 
     get pingTimer() {
         return this.#pingTimer;
+    }
+
+    get pongTimer() {
+        return this.#pongTimer;
+    }
+
+    get waitingForPing() {
+        return this.#waitingForPing;
     }
 
     open() {
@@ -248,6 +260,10 @@ export class ConnectionServer {
     ) {
         this.#wss = wss;
         this.#options = options;
+    }
+
+    get options() {
+        return this.#options;
     }
 
     get state() {
