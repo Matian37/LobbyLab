@@ -11,6 +11,7 @@ import {
     getConnectionStatuses,
 } from './db.js';
 import { isValidToken } from './validate.js';
+import { CONNECTION_ERRORS } from './errors.js';
 
 export const DEFAULT_OPTIONS = {
     connectionPath: '/api/connection',
@@ -72,7 +73,9 @@ export class Connection extends EventEmitter {
     }
 
     open() {
-        if (this.#state !== State.INIT) return;
+        if (this.#state !== State.INIT) {
+            throw CONNECTION_ERRORS.cannotOpenConnection(this.#state);
+        }
         if (this.#ws.readyState !== WebSocket.OPEN) {
             this.close();
             return;
@@ -252,7 +255,9 @@ export class ConnectionServer {
     }
 
     open() {
-        if (this.#state !== State.INIT) return;
+        if (this.#state !== State.INIT) {
+            throw CONNECTION_ERRORS.cannotOpenServer(this.#state);
+        }
         this.#state = State.OPEN;
 
         this.#queueTimer = setInterval(
@@ -406,13 +411,17 @@ export class ConnectionServer {
             }
             this.#connections.clear();
 
-            this.detach();
+            if (this.#httpServer !== null) {
+                this.detach();
+            }
             this.#wss.close?.();
         });
     }
 
     attach(httpServer) {
-        if (this.#httpServer !== null) return;
+        if (this.#httpServer !== null) {
+            throw CONNECTION_ERRORS.alreadyAttached();
+        }
 
         this.#httpServer = httpServer;
         this.#upgradeHandler = (request, socket, head) => {
@@ -436,7 +445,9 @@ export class ConnectionServer {
     }
 
     detach() {
-        if (this.#httpServer === null || this.#upgradeHandler === null) return;
+        if (this.#httpServer === null || this.#upgradeHandler === null) {
+            throw CONNECTION_ERRORS.notAttached();
+        }
 
         this.#httpServer.off('upgrade', this.#upgradeHandler);
         this.#httpServer = null;
