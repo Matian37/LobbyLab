@@ -13,7 +13,7 @@ import {
 import { isValidToken } from './validate.js';
 import { CONNECTION_ERRORS } from './errors.js';
 
-export const DEFAULT_OPTIONS = {
+export const DEFAULT_OPTIONS = Object.freeze({
     connectionPath: '/api/connection',
     pingIntervalMs: 5_000,
     pongTimeoutMs: 3_000,
@@ -21,7 +21,7 @@ export const DEFAULT_OPTIONS = {
     queueExtensionIntervalMs: 3_000,
     queueExtensionMs: 5_000,
     pollIntervalMs: 2_500,
-};
+});
 
 const HARD_CLOSE = Symbol('hard close');
 
@@ -35,6 +35,7 @@ export class Connection extends EventEmitter {
     #ws;
     #websocketId;
     #login;
+    #options;
     #state = State.INIT;
     #missedPongs = 0;
     #pingTimer = null;
@@ -45,11 +46,17 @@ export class Connection extends EventEmitter {
     #onCloseHandler = null;
     #onErrorHandler = null;
 
-    constructor(ws, login, websocketId = randomUUID()) {
+    constructor(
+        ws,
+        login,
+        websocketId = randomUUID(),
+        options = DEFAULT_OPTIONS
+    ) {
         super();
         this.#ws = ws;
         this.#websocketId = websocketId;
         this.#login = login;
+        this.#options = options;
     }
 
     get websocketId() {
@@ -93,7 +100,7 @@ export class Connection extends EventEmitter {
 
         this.#pingTimer = setInterval(
             () => this.sendPing(),
-            DEFAULT_OPTIONS.pingIntervalMs
+            this.#options.pingIntervalMs
         );
     }
 
@@ -119,7 +126,7 @@ export class Connection extends EventEmitter {
 
         this.#pongTimer = setTimeout(
             () => this.onPongMiss(this.#pingSeq),
-            DEFAULT_OPTIONS.pongTimeoutMs
+            this.#options.pongTimeoutMs
         );
     }
 
@@ -148,7 +155,7 @@ export class Connection extends EventEmitter {
         clearTimeout(this.#pongTimer);
         this.#pongTimer = null;
 
-        if (this.#missedPongs > DEFAULT_OPTIONS.maxMissedPongs) {
+        if (this.#missedPongs > this.#options.maxMissedPongs) {
             console.debug(
                 `closing connection for ${this.#login} after ${this.#missedPongs} missed pongs`
             );
@@ -157,7 +164,7 @@ export class Connection extends EventEmitter {
         }
 
         console.debug(
-            `missed pong ${this.#missedPongs}/${DEFAULT_OPTIONS.maxMissedPongs} for ${this.#login}`
+            `missed pong ${this.#missedPongs}/${this.#options.maxMissedPongs} for ${this.#login}`
         );
     }
 
@@ -226,6 +233,7 @@ function parseSessionToken(request) {
 
 export class ConnectionServer {
     #wss;
+    #options;
     #connections = new Map();
     #mutex = new Mutex();
     #state = State.INIT;
@@ -234,8 +242,12 @@ export class ConnectionServer {
     #httpServer = null;
     #upgradeHandler = null;
 
-    constructor(wss = new WebSocketServer({ noServer: true })) {
+    constructor(
+        wss = new WebSocketServer({ noServer: true }),
+        options = DEFAULT_OPTIONS
+    ) {
         this.#wss = wss;
+        this.#options = options;
     }
 
     get state() {
@@ -262,12 +274,12 @@ export class ConnectionServer {
 
         this.#queueTimer = setInterval(
             () => this.#mutex.runExclusive(() => this.extendQueues()),
-            DEFAULT_OPTIONS.queueExtensionIntervalMs
+            this.#options.queueExtensionIntervalMs
         );
 
         this.#pollTimer = setInterval(
             () => this.#mutex.runExclusive(() => this.onPull()),
-            DEFAULT_OPTIONS.pollIntervalMs
+            this.#options.pollIntervalMs
         );
 
         this.#wss.on('connection', (ws, request) =>
@@ -283,10 +295,9 @@ export class ConnectionServer {
         );
         if (queued.length === 0) return;
 
-        await extendQueueStatuses(
-            queued,
-            DEFAULT_OPTIONS.queueExtensionMs
-        ).catch((err) => console.debug('failed to extend queue status', err));
+        await extendQueueStatuses(queued, this.#options.queueExtensionMs).catch(
+            (err) => console.debug('failed to extend queue status', err)
+        );
     }
 
     async onPull() {
@@ -363,7 +374,7 @@ export class ConnectionServer {
             registered = await setUserWebsocket(
                 login,
                 websocketId,
-                DEFAULT_OPTIONS.queueExtensionMs
+                this.#options.queueExtensionMs
             );
         } catch (err) {
             console.debug('failed to register websocket', err);
@@ -381,7 +392,12 @@ export class ConnectionServer {
             existingConnection.close(4001, 'Replaced by new connection');
         }
 
-        const connection = new Connection(ws, login, websocketId);
+        const connection = new Connection(
+            ws,
+            login,
+            websocketId,
+            this.#options
+        );
         connection.on('close', () => this.closeConnection(connection));
         this.#connections.set(login, connection);
         connection.open();
@@ -432,7 +448,7 @@ export class ConnectionServer {
                 socket.destroy();
                 return;
             }
-            if (pathname !== DEFAULT_OPTIONS.connectionPath) {
+            if (pathname !== this.#options.connectionPath) {
                 socket.destroy();
                 return;
             }
@@ -455,8 +471,8 @@ export class ConnectionServer {
     }
 }
 
-export async function createWebSocketServer(httpServer) {
-    const server = new ConnectionServer();
+export async function createWebSocketServer(httpServer, options) {
+    const server = new ConnectionServer(undefined, options);
     await server.open();
     server.attach(httpServer);
     return server;
