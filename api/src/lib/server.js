@@ -35,7 +35,8 @@ export class Connections {
             existingConnection !== undefined &&
             existingConnection.websocketId > connection.websocketId
         ) {
-            return false;
+            connection.close(4001, 'Replaced by new connection');
+            return;
         }
 
         this.#connections.delete(connection.login);
@@ -48,7 +49,7 @@ export class Connections {
             existingConnection.close(4001, 'Replaced by new connection');
         }
 
-        return true;
+        connection.open();
     }
 
     getQueued() {
@@ -256,12 +257,7 @@ export class ConnectionServer {
             return;
         }
 
-        const success = this.#connections.set(connection);
-        if (!success) {
-            ws.close(4001, 'Replaced by existing connection');
-            return;
-        }
-        connection.open();
+        this.#connections.set(connection);
     }
 
     close() {
