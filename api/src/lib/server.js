@@ -89,6 +89,32 @@ export class ConnectionServer {
         );
     }
 
+    attach(httpServer) {
+        if (this.#httpServer !== null) {
+            throw CONNECTION_ERRORS.alreadyAttached();
+        }
+
+        this.#httpServer = httpServer;
+        this.#upgradeHandler = (request, socket, head) => {
+            let pathname;
+            try {
+                ({ pathname } = new URL(request.url, 'http://localhost'));
+            } catch {
+                socket.destroy();
+                return;
+            }
+            if (pathname !== this.#options.connectionPath) {
+                socket.destroy();
+                return;
+            }
+
+            this.#wss.handleUpgrade(request, socket, head, (ws) => {
+                this.#wss.emit('connection', ws, request);
+            });
+        };
+        this.#httpServer.on('upgrade', this.#upgradeHandler);
+    }
+
     async extendQueues() {
         if (this.#state !== State.OPEN) return;
 
@@ -234,32 +260,6 @@ export class ConnectionServer {
             }
             this.#wss.close?.();
         });
-    }
-
-    attach(httpServer) {
-        if (this.#httpServer !== null) {
-            throw CONNECTION_ERRORS.alreadyAttached();
-        }
-
-        this.#httpServer = httpServer;
-        this.#upgradeHandler = (request, socket, head) => {
-            let pathname;
-            try {
-                ({ pathname } = new URL(request.url, 'http://localhost'));
-            } catch {
-                socket.destroy();
-                return;
-            }
-            if (pathname !== this.#options.connectionPath) {
-                socket.destroy();
-                return;
-            }
-
-            this.#wss.handleUpgrade(request, socket, head, (ws) => {
-                this.#wss.emit('connection', ws, request);
-            });
-        };
-        this.#httpServer.on('upgrade', this.#upgradeHandler);
     }
 
     detach() {
