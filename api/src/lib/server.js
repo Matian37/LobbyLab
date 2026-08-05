@@ -1,5 +1,4 @@
 import { WebSocketServer } from 'ws';
-import { Mutex } from 'async-mutex';
 import { parse } from 'cookie-es';
 import {
     getLoginFromToken,
@@ -103,7 +102,6 @@ export class ConnectionServer {
     #wss;
     #options;
     #connections = new Connections();
-    #mutex = new Mutex();
     #state = State.INIT;
     #queueTimer = null;
     #pollTimer = null;
@@ -142,17 +140,17 @@ export class ConnectionServer {
         this.#state = State.OPEN;
 
         this.#queueTimer = setInterval(
-            () => this.#mutex.runExclusive(() => this.extendQueues()),
+            () => this.extendQueues(),
             this.#options.queueExtensionIntervalMs
         );
 
         this.#pollTimer = setInterval(
-            () => this.#mutex.runExclusive(() => this.onPull()),
+            () => this.onPull(),
             this.#options.pollIntervalMs
         );
 
         this.#wss.on('connection', (ws, request) =>
-            this.#mutex.runExclusive(() => this.onConnection(ws, request))
+            this.onConnection(ws, request)
         );
 
         this.#httpServer.on('upgrade', this.#upgradeHandler);
@@ -251,6 +249,13 @@ export class ConnectionServer {
         const connection = await createConnection(ws, login, this.#options);
         if (connection === null) return;
 
+        // prevent adding websocket to connections
+        // when close was already called during await
+        if (this.#state !== State.OPEN) {
+            ws.close(1001, 'Server is shutting down');
+            return;
+        }
+
         const success = this.#connections.set(connection);
         if (!success) {
             ws.close(4001, 'Replaced by existing connection');
@@ -259,30 +264,27 @@ export class ConnectionServer {
         connection.open();
     }
 
-    async close() {
-        await this.#mutex.runExclusive(async () => {
-            if (this.#state === State.CLOSED) return;
-            this.#state = State.CLOSED;
+    close() {
+        if (this.#state === State.CLOSED) return;
+        this.#state = State.CLOSED;
 
-            clearInterval(this.#queueTimer);
-            this.#queueTimer = null;
+        clearInterval(this.#queueTimer);
+        this.#queueTimer = null;
 
-            clearInterval(this.#pollTimer);
-            this.#pollTimer = null;
+        clearInterval(this.#pollTimer);
+        this.#pollTimer = null;
 
-            // TODO: turn upgrade off then close connections
-            this.#connections.close();
+        this.#httpServer.off('upgrade', this.#upgradeHandler);
+        this.#httpServer = null;
 
-            this.#httpServer.off('upgrade', this.#upgradeHandler);
-            this.#httpServer = null;
+        this.#connections.close();
 
-            this.#wss.close?.();
-        });
+        this.#wss.close?.();
     }
 }
 
 export async function createWebSocketServer(httpServer, options) {
     const server = new ConnectionServer(httpServer, undefined, options);
-    await server.open();
+    server.open();
     return server;
 }

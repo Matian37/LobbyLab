@@ -174,6 +174,23 @@ describe('extendQueueStatuses', () => {
         expect(rows[0].cond).toBeTruthy();
     });
 
+    it('does not extend the queue of a user who is no longer queued', async () => {
+        expect(await db.addUser('user', 'pass')).toBeTruthy();
+        const ws1 = await db.setQueueStatus('user', 5000);
+        await db.removeQueueStatus('user', ws1);
+
+        await db.extendQueueStatuses(
+            [{ login: 'user', websocketId: ws1 }],
+            5000
+        );
+
+        const rows = await helperSql`
+            SELECT queued_until > NOW() as cond
+            FROM users
+        `;
+        expect(rows[0].cond).toBeFalsy();
+    });
+
     it('does nothing when no user exists', async () => {
         await expect(
             db.extendQueueStatuses([{ login: 'user', websocketId: 1 }], 5000)
@@ -225,7 +242,7 @@ describe('setQueueStatus', () => {
 });
 
 describe('removeQueueStatus', () => {
-    it('sets queued_until to the past and removes the user from the queue', async () => {
+    it('sets queued_until to null and removes the user from the queue', async () => {
         expect(await db.addUser('user', 'pass')).toBeTruthy();
         const ws1 = await db.setQueueStatus('user', 5000);
         await db.extendQueueStatuses(
@@ -237,9 +254,9 @@ describe('removeQueueStatus', () => {
         await db.removeQueueStatus('user', ws1);
 
         const rows = await helperSql`
-            SELECT queued_until > NOW() as cond, last_websocket_id FROM users
+            SELECT queued_until IS NULL as removed, last_websocket_id FROM users
         `;
-        expect(rows[0].cond).toBeFalsy();
+        expect(rows[0].removed).toBe(true);
         expect(Number(rows[0].last_websocket_id)).toBe(ws1);
         expect(await db.isWaiting('user')).toBeFalsy();
     });

@@ -76,6 +76,7 @@ export async function extendQueueStatuses(connections, ms) {
             u.login = v.login 
             AND u.last_websocket_id = v.websocket_id::bigint 
             AND u.match_id IS NULL
+            AND u.queued_until IS NOT NULL
     `;
 }
 
@@ -93,7 +94,7 @@ export async function setQueueStatus(login, ms) {
 export async function removeQueueStatus(login, websocketId) {
     await sql`
         UPDATE users
-        SET queued_until = NOW() - INTERVAL '1 second'
+        SET queued_until = NULL
         WHERE
             login = ${login}
             AND last_websocket_id = ${websocketId}
