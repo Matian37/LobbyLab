@@ -19,7 +19,7 @@ CREATE TABLE IF NOT EXISTS users(
     match_id BIGINT REFERENCES matches(id) ON DELETE SET NULL,
     match_auth_token TEXT,
     queued_until TIMESTAMP,
-    last_websocket_id TEXT
+    last_websocket_id BIGINT NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS idx_users_match_id ON users(match_id);
 CREATE INDEX IF NOT EXISTS idx_users_login_match_id ON users(login, match_id, queued_until);

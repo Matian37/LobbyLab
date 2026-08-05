@@ -24,7 +24,7 @@ export async function getConnectionStatuses(logins) {
         rows.map((row) => [
             row.login,
             {
-                websocketId: row.last_websocket_id,
+                websocketId: Number(row.last_websocket_id),
                 matchId: row.match_id,
                 matchAuthToken: row.match_auth_token,
                 host: row.host,
@@ -72,26 +72,26 @@ export async function extendQueueStatuses(connections, ms) {
         FROM (VALUES ${rows}) AS v(login, websocket_id)
         WHERE 
             u.login = v.login 
-            AND u.last_websocket_id = v.websocket_id 
+            AND u.last_websocket_id = v.websocket_id::bigint 
             AND u.match_id IS NULL
     `;
 }
 
-export async function setUserWebsocket(login, websocketId, ms) {
+export async function setUserWebsocket(login, ms) {
     const q = await sql`
         UPDATE users
-        SET last_websocket_id = ${websocketId},
+        SET last_websocket_id = last_websocket_id + 1,
             queued_until = NOW() + ${ms} * INTERVAL '1 millisecond'
         WHERE login = ${login} AND match_id IS NULL
+        RETURNING last_websocket_id
     `;
-    return q.count != 0;
+    return Number(q[0]?.last_websocket_id) || null;
 }
 
 export async function removeQueueStatus(login, websocketId) {
     await sql`
         UPDATE users
-        SET queued_until = NOW() - INTERVAL '1 second',
-            last_websocket_id = NULL
+        SET queued_until = NOW() - INTERVAL '1 second'
         WHERE
             login = ${login}
             AND last_websocket_id = ${websocketId}

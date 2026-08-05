@@ -1,5 +1,4 @@
 import { EventEmitter } from 'node:events';
-import { randomUUID } from 'node:crypto';
 import { WebSocket } from 'ws';
 import { CONNECTION_ERRORS } from './errors.js';
 import { CONNECTION_DEFAULT_OPTIONS, State } from './constants.js';
@@ -21,12 +20,7 @@ export class Connection extends EventEmitter {
     #onCloseHandler = null;
     #onErrorHandler = null;
 
-    constructor(
-        ws,
-        login,
-        websocketId = randomUUID(),
-        options = CONNECTION_DEFAULT_OPTIONS
-    ) {
+    constructor(ws, login, websocketId, options = CONNECTION_DEFAULT_OPTIONS) {
         super();
         this.#ws = ws;
         this.#websocketId = websocketId;

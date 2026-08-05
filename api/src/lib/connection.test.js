@@ -21,12 +21,7 @@ const OPTIONS = Object.freeze({
 });
 
 function makeConnection(serverSocket, options = OPTIONS) {
-    const connection = new Connection(
-        serverSocket,
-        'user1',
-        undefined,
-        options
-    );
+    const connection = new Connection(serverSocket, 'user1', 1, options);
     onTestFinished(() => connection.close());
     return connection;
 }

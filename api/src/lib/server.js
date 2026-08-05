@@ -1,4 +1,3 @@
-import { randomUUID } from 'node:crypto';
 import { WebSocketServer } from 'ws';
 import { Mutex } from 'async-mutex';
 import { parse } from 'cookie-es';
@@ -187,12 +186,10 @@ export class ConnectionServer {
             return;
         }
 
-        const websocketId = randomUUID();
-        let registered;
+        let websocketId;
         try {
-            registered = await setUserWebsocket(
+            websocketId = await setUserWebsocket(
                 login,
-                websocketId,
                 this.#options.queueExtensionMs
             );
         } catch (err) {
@@ -201,13 +198,17 @@ export class ConnectionServer {
             return;
         }
 
-        if (!registered) {
+        if (websocketId === null) {
             ws.close(4000, 'Already in match');
             return;
         }
 
         const existingConnection = this.#connections.get(login);
         if (existingConnection !== undefined) {
+            if (websocketId < existingConnection.websocketId) {
+                ws.close(4001, 'Replaced by new connection');
+                return;
+            }
             existingConnection.close(4001, 'Replaced by new connection');
         }
 
