@@ -15,19 +15,6 @@ import { Connection } from './connection.js';
 export class Connections {
     #connections = new Map();
 
-    delete(login, websocketId) {
-        const connection = this.#connections.get(login);
-
-        if (connection === undefined) return;
-        if (connection.websocketId !== websocketId) return;
-
-        this.#connections.delete(login);
-        connection.close();
-        removeQueueStatus(login, websocketId).catch((err) =>
-            console.debug('failed to remove queue status', err)
-        );
-    }
-
     set(connection) {
         const existingConnection = this.#connections.get(connection.login);
 
@@ -50,6 +37,19 @@ export class Connections {
         }
 
         connection.open();
+    }
+
+    delete(login, websocketId) {
+        const connection = this.#connections.get(login);
+
+        if (connection === undefined) return;
+        if (connection.websocketId !== websocketId) return;
+
+        this.#connections.delete(login);
+        connection.close();
+        removeQueueStatus(login, websocketId).catch((err) =>
+            console.debug('failed to remove queue status', err)
+        );
     }
 
     getQueued() {
