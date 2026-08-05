@@ -41,9 +41,11 @@ export class ConnectionServer {
     #upgradeHandler = null;
 
     constructor(
+        httpServer,
         wss = new WebSocketServer({ noServer: true }),
         options = SERVER_DEFAULT_OPTIONS
     ) {
+        this.#httpServer = httpServer;
         this.#wss = wss;
         this.#options = options;
     }
@@ -87,14 +89,11 @@ export class ConnectionServer {
         this.#wss.on('connection', (ws, request) =>
             this.#mutex.runExclusive(() => this.onConnection(ws, request))
         );
+
+        this.attachServer();
     }
 
-    attach(httpServer) {
-        if (this.#httpServer !== null) {
-            throw CONNECTION_ERRORS.alreadyAttached();
-        }
-
-        this.#httpServer = httpServer;
+    attachServer() {
         this.#upgradeHandler = (request, socket, head) => {
             let pathname;
             try {
@@ -255,18 +254,12 @@ export class ConnectionServer {
             }
             this.#connections.clear();
 
-            if (this.#httpServer !== null) {
-                this.detach();
-            }
+            this.detachServer();
             this.#wss.close?.();
         });
     }
 
-    detach() {
-        if (this.#httpServer === null || this.#upgradeHandler === null) {
-            throw CONNECTION_ERRORS.notAttached();
-        }
-
+    detachServer() {
         this.#httpServer.off('upgrade', this.#upgradeHandler);
         this.#httpServer = null;
         this.#upgradeHandler = null;
@@ -274,8 +267,7 @@ export class ConnectionServer {
 }
 
 export async function createWebSocketServer(httpServer, options) {
-    const server = new ConnectionServer(undefined, options);
+    const server = new ConnectionServer(httpServer, undefined, options);
     await server.open();
-    server.attach(httpServer);
     return server;
 }
