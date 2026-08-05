@@ -5,13 +5,84 @@ import {
     getLoginFromToken,
     extendQueueStatuses,
     removeQueueStatus,
-    setUserWebsocket,
+    setQueueStatus,
     getConnectionStatuses,
 } from './db.js';
 import { isValidToken } from './validate.js';
 import { CONNECTION_ERRORS } from './errors.js';
 import { SERVER_DEFAULT_OPTIONS, State } from './constants.js';
 import { Connection } from './connection.js';
+
+export class Connections {
+    #connections = new Map();
+
+    delete(login, websocketId) {
+        const connection = this.#connections.get(login);
+
+        if (connection === undefined) return;
+        if (connection.websocketId !== websocketId) return;
+
+        this.#connections.delete(login);
+        connection.close();
+        removeQueueStatus(login, websocketId).catch((err) =>
+            console.debug('failed to remove queue status', err)
+        );
+    }
+
+    set(connection) {
+        const existingConnection = this.#connections.get(connection.login);
+
+        if (
+            existingConnection !== undefined &&
+            existingConnection.websocketId > connection.websocketId
+        ) {
+            return false;
+        }
+
+        this.#connections.delete(connection.login);
+        this.#connections.set(connection.login, connection);
+        connection.on('close', () =>
+            this.delete(connection.login, connection.websocketId)
+        );
+
+        if (existingConnection !== undefined) {
+            existingConnection.close(4001, 'Replaced by new connection');
+        }
+
+        return true;
+    }
+
+    getQueued() {
+        return [...this.#connections.values()].filter(
+            (connection) => connection.state === State.OPEN
+        );
+    }
+
+    close() {
+        for (const connection of this.#connections.values()) {
+            connection.close();
+        }
+        this.#connections.clear();
+    }
+}
+
+async function createConnection(ws, login, options) {
+    let websocketId;
+    try {
+        websocketId = await setQueueStatus(login, options.queueExtensionMs);
+    } catch (err) {
+        console.debug('failed to register websocket', err);
+        ws.close(1011, 'Internal error');
+        return null;
+    }
+
+    if (websocketId === null) {
+        ws.close(4000, 'Already in match');
+        return null;
+    }
+
+    return new Connection(ws, login, websocketId, options);
+}
 
 function parseSessionToken(request) {
     const cookie = request.headers.cookie;
@@ -31,7 +102,7 @@ function parseSessionToken(request) {
 export class ConnectionServer {
     #wss;
     #options;
-    #connections = new Map();
+    #connections = new Connections();
     #mutex = new Mutex();
     #state = State.INIT;
     #queueTimer = null;
@@ -108,10 +179,7 @@ export class ConnectionServer {
     async extendQueues() {
         if (this.#state !== State.OPEN) return;
 
-        const queued = [...this.#connections.values()].filter(
-            (connection) => connection.state === State.OPEN
-        );
-        if (queued.length === 0) return;
+        const queued = this.#connections.getQueued();
 
         await extendQueueStatuses(queued, this.#options.queueExtensionMs).catch(
             (err) => console.debug('failed to extend queue status', err)
@@ -121,16 +189,11 @@ export class ConnectionServer {
     async onPull() {
         if (this.#state !== State.OPEN) return;
 
-        const queued = [...this.#connections.values()].filter(
-            (connection) => connection.state === State.OPEN
-        );
-        if (queued.length === 0) return;
+        const queued = this.#connections.getQueued();
 
         let statuses;
         try {
-            statuses = await getConnectionStatuses(
-                queued.map((connection) => connection.login)
-            );
+            statuses = await getConnectionStatuses(queued);
         } catch (err) {
             console.debug('failed to pull connection statuses', err);
             return;
@@ -180,55 +243,20 @@ export class ConnectionServer {
             ws.close(1011, 'Internal error');
             return;
         }
-
         if (login === null) {
             ws.close(4401, 'Invalid session token');
             return;
         }
 
-        let websocketId;
-        try {
-            websocketId = await setUserWebsocket(
-                login,
-                this.#options.queueExtensionMs
-            );
-        } catch (err) {
-            console.debug('failed to register websocket', err);
-            ws.close(1011, 'Internal error');
+        const connection = await createConnection(ws, login, this.#options);
+        if (connection === null) return;
+
+        const success = this.#connections.set(connection);
+        if (!success) {
+            ws.close(4001, 'Replaced by existing connection');
             return;
         }
-
-        if (websocketId === null) {
-            ws.close(4000, 'Already in match');
-            return;
-        }
-
-        const existingConnection = this.#connections.get(login);
-        if (existingConnection !== undefined) {
-            if (websocketId < existingConnection.websocketId) {
-                ws.close(4001, 'Replaced by new connection');
-                return;
-            }
-            existingConnection.close(4001, 'Replaced by new connection');
-        }
-
-        const connection = new Connection(
-            ws,
-            login,
-            websocketId,
-            this.#options
-        );
-        connection.on('close', () => this.closeConnection(connection));
-        this.#connections.set(login, connection);
         connection.open();
-    }
-
-    closeConnection(connection) {
-        if (this.#connections.get(connection.login) !== connection) return;
-        this.#connections.delete(connection.login);
-        removeQueueStatus(connection.login, connection.websocketId).catch(
-            (err) => console.debug('failed to remove queue status', err)
-        );
     }
 
     async close() {
@@ -242,10 +270,8 @@ export class ConnectionServer {
             clearInterval(this.#pollTimer);
             this.#pollTimer = null;
 
-            for (const connection of [...this.#connections.values()]) {
-                connection.close();
-            }
-            this.#connections.clear();
+            // TODO: turn upgrade off then close connections
+            this.#connections.close();
 
             this.#httpServer.off('upgrade', this.#upgradeHandler);
             this.#httpServer = null;

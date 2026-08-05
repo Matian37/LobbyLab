@@ -5,8 +5,10 @@ const DATABASE_URL = process.env.DATABASE_URL;
 
 export const sql = postgres(DATABASE_URL);
 
-export async function getConnectionStatuses(logins) {
-    if (logins.length === 0) return new Map();
+export async function getConnectionStatuses(connections) {
+    if (connections.length === 0) return new Map();
+
+    const logins = sql.array(connections.map((c) => c.login));
 
     const rows = await sql`
         SELECT
@@ -18,7 +20,7 @@ export async function getConnectionStatuses(logins) {
             m.port
         FROM users u
         LEFT JOIN matches m ON m.id = u.match_id
-        WHERE u.login = ANY(${sql.array(logins)})
+        WHERE u.login = ANY(${logins})
     `;
     return new Map(
         rows.map((row) => [
@@ -77,7 +79,7 @@ export async function extendQueueStatuses(connections, ms) {
     `;
 }
 
-export async function setUserWebsocket(login, ms) {
+export async function setQueueStatus(login, ms) {
     const q = await sql`
         UPDATE users
         SET last_websocket_id = last_websocket_id + 1,
