@@ -38,7 +38,6 @@ export class ConnectionServer {
     #queueTimer = null;
     #pollTimer = null;
     #httpServer = null;
-    #upgradeHandler = null;
 
     constructor(
         httpServer,
@@ -66,10 +65,6 @@ export class ConnectionServer {
         return this.#httpServer;
     }
 
-    get upgradeHandler() {
-        return this.#upgradeHandler;
-    }
-
     open() {
         if (this.#state !== State.INIT) {
             throw CONNECTION_ERRORS.cannotOpenServer(this.#state);
@@ -90,29 +85,26 @@ export class ConnectionServer {
             this.#mutex.runExclusive(() => this.onConnection(ws, request))
         );
 
-        this.attachServer();
-    }
-
-    attachServer() {
-        this.#upgradeHandler = (request, socket, head) => {
-            let pathname;
-            try {
-                ({ pathname } = new URL(request.url, 'http://localhost'));
-            } catch {
-                socket.destroy();
-                return;
-            }
-            if (pathname !== this.#options.connectionPath) {
-                socket.destroy();
-                return;
-            }
-
-            this.#wss.handleUpgrade(request, socket, head, (ws) => {
-                this.#wss.emit('connection', ws, request);
-            });
-        };
         this.#httpServer.on('upgrade', this.#upgradeHandler);
     }
+
+    #upgradeHandler = (request, socket, head) => {
+        let pathname;
+        try {
+            ({ pathname } = new URL(request.url, 'http://localhost'));
+        } catch {
+            socket.destroy();
+            return;
+        }
+        if (pathname !== this.#options.connectionPath) {
+            socket.destroy();
+            return;
+        }
+
+        this.#wss.handleUpgrade(request, socket, head, (ws) => {
+            this.#wss.emit('connection', ws, request);
+        });
+    };
 
     async extendQueues() {
         if (this.#state !== State.OPEN) return;
@@ -254,15 +246,11 @@ export class ConnectionServer {
             }
             this.#connections.clear();
 
-            this.detachServer();
+            this.#httpServer.off('upgrade', this.#upgradeHandler);
+            this.#httpServer = null;
+
             this.#wss.close?.();
         });
-    }
-
-    detachServer() {
-        this.#httpServer.off('upgrade', this.#upgradeHandler);
-        this.#httpServer = null;
-        this.#upgradeHandler = null;
     }
 }
 
