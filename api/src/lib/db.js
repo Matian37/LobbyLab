@@ -1,9 +1,17 @@
 import postgres from 'postgres';
 import { SESSION_TOKEN_LENGTH } from './constants.js';
+import { databaseLogger } from './logger.js';
 
 const DATABASE_URL = process.env.DATABASE_URL;
 
-export const sql = postgres(DATABASE_URL);
+export const sql = postgres(DATABASE_URL, {
+    onnotice: (notice) => databaseLogger.warn('database notice', notice),
+    onconnect: (conn) => databaseLogger.debug('database connected', { conn }),
+    onclose: (conn) =>
+        databaseLogger.debug('database connection closed', { conn }),
+    debug: (conn, query, params) =>
+        databaseLogger.debug('database query', { conn, query, params }),
+});
 
 export async function getConnectionStatuses(connections) {
     if (connections.length === 0) return new Map();

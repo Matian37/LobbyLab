@@ -1,6 +1,7 @@
 import { sveltekit } from '@sveltejs/kit/vite';
 import { defineConfig } from 'vite';
 import { fileURLToPath } from 'node:url';
+import { websocketLogger } from './src/lib/logger.js';
 
 // Track servers we've already attached to, so restarts don't double-bind
 const attachedServers = new WeakSet();
@@ -16,15 +17,16 @@ function attachWebSocketServer(server) {
         .ssrLoadModule('$lib/server/server.js')
         .then(async ({ createWebSocketServer }) => {
             const wss = await createWebSocketServer(httpServer);
+            websocketLogger.info('websocket server attached');
             httpServer.once('close', () => {
-                console.log('[websocket-server] closing');
+                websocketLogger.info('websocket server closing');
                 wss.close();
                 attachedServers.delete(httpServer);
             });
         })
         .catch((err) => {
             attachedServers.delete(httpServer);
-            console.error('[websocket-server] failed to attach:', err);
+            websocketLogger.error({ err }, 'websocket server failed to attach');
         });
 }
 
@@ -54,6 +56,9 @@ export default defineConfig({
     test: {
         environment: 'jsdom',
         alias,
+        env: {
+            LOG_LEVEL: 'silent',
+        },
         chaiConfig: { truncateThreshold: 0 },
     },
     resolve: {
