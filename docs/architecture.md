@@ -63,7 +63,7 @@ Result payload:
 
 ## Matchmaking flow
 
-1. User registers, logs in, clicks Play. API adds them to the DB waiting queue and opens an SSE connection.
+1. User registers, logs in, clicks Play. API adds them to the DB waiting queue and opens a WebSocket connection.
 2. Server manager waits for a free worker.
 3. Server manager polls the DB for enough players, gets a match ID, and looks up the worker's game port via Docker.
 4. Server manager sends the match config to `workers.assign.<container_id>` and saves the match in the DB.

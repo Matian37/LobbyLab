@@ -1,11 +1,11 @@
-import { ERRORS } from '$lib/errors';
+import { ERRORS } from './errors.js';
 import {
     LOGIN_MIN_LENGTH,
     PASSWORD_MIN_LENGTH,
     LOGIN_MAX_LENGTH,
     PASSWORD_MAX_LENGTH,
     SESSION_TOKEN_LENGTH,
-} from '$lib/constants';
+} from './constants.js';
 
 export async function validateRequest(request) {
     let body;

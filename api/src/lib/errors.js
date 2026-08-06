@@ -4,7 +4,7 @@ import {
     PASSWORD_MAX_LENGTH,
     LOGIN_MIN_LENGTH,
     LOGIN_MAX_LENGTH,
-} from '$lib/constants.js';
+} from './constants.js';
 
 export const UNEXPECTED_ERROR_MSG = 'An unexpected error occurred';
 
@@ -39,4 +39,28 @@ export const ERRORS = Object.freeze({
             { status: 422 }
         ),
     loginTaken: () => json({ msg: 'Login is already taken' }, { status: 409 }),
+});
+
+export class ConnectionStateError extends Error {
+    constructor(message) {
+        super(message);
+        this.name = 'ConnectionStateError';
+    }
+}
+
+export const CONNECTION_ERRORS = Object.freeze({
+    cannotOpenConnection: (state) =>
+        new ConnectionStateError(`Cannot open a connection in state ${state}`),
+    cannotOpenServer: (state) =>
+        new ConnectionStateError(
+            `Cannot open a connection server in state ${state}`
+        ),
+    alreadyAttached: () =>
+        new ConnectionStateError(
+            'Connection server is already attached to an http server'
+        ),
+    notAttached: () =>
+        new ConnectionStateError(
+            'Connection server is not attached to an http server'
+        ),
 });
