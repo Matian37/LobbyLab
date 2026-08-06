@@ -423,29 +423,34 @@ describe('safeSocketDestroy', () => {
         const request = { headers: {} };
         vi.stubEnv('NODE_ENV', 'production');
 
-        safeSocketDestroy(request, socket);
+        expect(safeSocketDestroy(request, socket)).toBeUndefined();
 
         expect(socket.destroy).toHaveBeenCalledTimes(1);
         vi.unstubAllEnvs();
     });
 
-    it('does not destroy a vite-hmr socket outside production', () => {
-        const socket = { destroy: vi.fn() };
-        const request = { headers: { 'sec-websocket-protocol': 'vite-hmr' } };
-        vi.stubEnv('NODE_ENV', 'development');
+    it.each(['vite-hmr', 'vite-ping', 'vite-any'])(
+        'does not destroy a %s socket outside production',
+        (protocol) => {
+            const socket = { destroy: vi.fn() };
+            const request = {
+                headers: { 'sec-websocket-protocol': protocol },
+            };
+            vi.stubEnv('NODE_ENV', 'development');
 
-        safeSocketDestroy(request, socket);
+            expect(safeSocketDestroy(request, socket)).toBeUndefined();
 
-        expect(socket.destroy).not.toHaveBeenCalled();
-        vi.unstubAllEnvs();
-    });
+            expect(socket.destroy).not.toHaveBeenCalled();
+            vi.unstubAllEnvs();
+        }
+    );
 
     it('destroys a non-hmr socket outside production', () => {
         const socket = { destroy: vi.fn() };
         const request = { headers: { 'sec-websocket-protocol': 'foo' } };
         vi.stubEnv('NODE_ENV', 'development');
 
-        safeSocketDestroy(request, socket);
+        expect(safeSocketDestroy(request, socket)).toBeUndefined();
 
         expect(socket.destroy).toHaveBeenCalledTimes(1);
         vi.unstubAllEnvs();
@@ -456,7 +461,7 @@ describe('safeSocketDestroy', () => {
         const request = { headers: {} };
         vi.stubEnv('NODE_ENV', 'development');
 
-        safeSocketDestroy(request, socket);
+        expect(safeSocketDestroy(request, socket)).toBeUndefined();
 
         expect(socket.destroy).toHaveBeenCalledTimes(1);
         vi.unstubAllEnvs();
