@@ -105,7 +105,7 @@ export function safeSocketDestroy(request, socket) {
         return;
     }
 
-    if (request.headers['sec-websocket-protocol'] === 'vite-hmr') return;
+    if (request.headers['sec-websocket-protocol']?.startsWith('vite')) return;
 
     socket.destroy();
 }
