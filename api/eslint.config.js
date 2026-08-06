@@ -22,7 +22,7 @@ export default [
         },
     },
     {
-        ignores: ['.svelte-kit/', 'build/', 'src/routes/api/connection/'],
+        ignores: ['.svelte-kit/', 'build/'],
     },
     prettier,
 ];

@@ -1,5 +1,4 @@
 import { validateSession } from '$lib/validate.js';
-import { ERRORS } from '$lib/errors.js';
 
 // The connection endpoint is served over WebSocket, which is set up outside of
 // SvelteKit (see src/lib/server.js). A plain HTTP GET cannot be upgraded,
