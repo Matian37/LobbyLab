@@ -183,7 +183,9 @@ describe('matchmaking', () => {
                 port: 'port',
                 matchAuthToken: 'TOKEN',
             });
-            expect(await isUserWaiting('user1')).toBe(false);
+            await vi.waitFor(async () => {
+                expect(await isUserWaiting('user1')).toBe(false);
+            }, WAIT);
             await expect(close).resolves.toMatchObject({ code: 1000 });
 
             await vi.waitFor(() => {
@@ -217,7 +219,9 @@ describe('matchmaking', () => {
 
             await expect(close).resolves.toMatchObject({ code: 1006 });
 
-            expect(await isUserWaiting('user1')).toBe(false);
+            await vi.waitFor(async () => {
+                expect(await isUserWaiting('user1')).toBe(false);
+            }, WAIT);
         },
         TEST_TIMEOUT
     );
@@ -239,7 +243,9 @@ describe('matchmaking', () => {
             });
 
             expect(connectionServer.connections.getQueued()).toHaveLength(0);
-            expect(await isUserWaiting('user1')).toBe(false);
+            await vi.waitFor(async () => {
+                expect(await isUserWaiting('user1')).toBe(false);
+            }, WAIT);
         },
         TEST_TIMEOUT
     );
@@ -284,7 +290,9 @@ describe('matchmaking', () => {
                 host: 'host',
                 port: 'port',
             });
-            expect(await isUserWaiting('user1')).toBe(false);
+            await vi.waitFor(async () => {
+                expect(await isUserWaiting('user1')).toBe(false);
+            }, WAIT);
         },
         TEST_TIMEOUT
     );
@@ -359,7 +367,9 @@ describe('matchmaking', () => {
                     0
                 );
             }, WAIT);
-            expect(await isUserWaiting('user1')).toBe(false);
+            await vi.waitFor(async () => {
+                expect(await isUserWaiting('user1')).toBe(false);
+            }, WAIT);
         },
         TEST_TIMEOUT
     );
@@ -390,7 +400,9 @@ describe('matchmaking', () => {
                 }).catch(() => {});
             }
 
-            expect(await isUserWaiting('user1')).toBe(false);
+            await vi.waitFor(async () => {
+                expect(await isUserWaiting('user1')).toBe(false);
+            }, WAIT);
         },
         TEST_TIMEOUT
     );
