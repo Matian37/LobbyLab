@@ -66,7 +66,7 @@ export class Connections {
     }
 }
 
-async function createConnection(ws, login, options) {
+export async function createConnection(ws, login, options) {
     let websocketId;
     try {
         websocketId = await setQueueStatus(login, options.queueExtensionMs);
@@ -84,7 +84,7 @@ async function createConnection(ws, login, options) {
     return new Connection(ws, login, websocketId, options);
 }
 
-function parseSessionToken(request) {
+export function parseSessionToken(request) {
     const cookie = request.headers.cookie;
 
     if (cookie === undefined) return { error: 'No cookie', code: 4401 };
