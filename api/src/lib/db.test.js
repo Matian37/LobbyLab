@@ -236,10 +236,26 @@ describe('removeQueueStatus', () => {
             [{ login: 'user', websocketId: ws1 }],
             5000
         );
-
         await db.removeQueueStatus('user', ws1 + 100);
 
         expect(await db.isWaiting('user')).toBeTruthy();
+    });
+
+    it('does not remove the queue status when the user is matched', async () => {
+        await helperSql`
+            INSERT INTO matches (id, host, port) VALUES (1, 'h', 'p')
+        `;
+        await helperSql`
+            INSERT INTO users (login, password, match_id, queued_until)
+            VALUES ('user', 'pass', 1, NOW() + INTERVAL '5 hours')
+        `;
+
+        await expect(db.removeQueueStatus('user', 1)).resolves.toBeUndefined();
+
+        const rows = await helperSql`
+            SELECT queued_until IS NOT NULL as kept FROM users
+        `;
+        expect(rows[0].kept).toBe(true);
     });
 
     it('does nothing when user does not exist', async () => {
