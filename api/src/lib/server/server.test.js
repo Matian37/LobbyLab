@@ -418,6 +418,10 @@ describe('ConnectionServer.open', () => {
 });
 
 describe('safeSocketDestroy', () => {
+    afterEach(() => {
+        vi.unstubAllEnvs();
+    });
+
     it('destroys the socket in production', () => {
         const socket = { destroy: vi.fn() };
         const request = { headers: {} };
@@ -426,7 +430,6 @@ describe('safeSocketDestroy', () => {
         expect(safeSocketDestroy(request, socket)).toBeUndefined();
 
         expect(socket.destroy).toHaveBeenCalledTimes(1);
-        vi.unstubAllEnvs();
     });
 
     it.each(['vite-hmr', 'vite-ping', 'vite-any'])(
@@ -441,7 +444,6 @@ describe('safeSocketDestroy', () => {
             expect(safeSocketDestroy(request, socket)).toBeUndefined();
 
             expect(socket.destroy).not.toHaveBeenCalled();
-            vi.unstubAllEnvs();
         }
     );
 
@@ -453,7 +455,6 @@ describe('safeSocketDestroy', () => {
         expect(safeSocketDestroy(request, socket)).toBeUndefined();
 
         expect(socket.destroy).toHaveBeenCalledTimes(1);
-        vi.unstubAllEnvs();
     });
 
     it('destroys a socket with no websocket protocol outside production', () => {
@@ -464,7 +465,6 @@ describe('safeSocketDestroy', () => {
         expect(safeSocketDestroy(request, socket)).toBeUndefined();
 
         expect(socket.destroy).toHaveBeenCalledTimes(1);
-        vi.unstubAllEnvs();
     });
 });
 
