@@ -14,7 +14,7 @@ import {
     createConnection,
     parseSessionToken,
     createWebSocketServer,
-} from '$lib/server.js';
+} from '$lib/server/server.js';
 import {
     State,
     SESSION_TOKEN_LENGTH,
@@ -25,7 +25,7 @@ import * as db from '$lib/db.js';
 
 const { Connection } = vi.hoisted(() => ({ Connection: vi.fn() }));
 
-vi.mock('$lib/connection.js', () => ({ Connection }));
+vi.mock('$lib/server/connection.js', () => ({ Connection }));
 
 vi.mock('$lib/db.js', () => ({
     getLoginFromToken: vi.fn(),

@@ -1,6 +1,6 @@
 import http from 'node:http';
 import { handler } from './build/handler.js';
-import { createWebSocketServer } from './src/lib/server.js';
+import { createWebSocketServer } from './src/lib/server/server.js';
 
 const server = http.createServer(handler);
 const wss = await createWebSocketServer(server);

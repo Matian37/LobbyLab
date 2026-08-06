@@ -35,7 +35,7 @@ let db, serverModule, helperSql, container;
 beforeAll(async () => {
     ({ container, helperSql } = await setupDatabase());
     db = await import('$lib/db.js');
-    serverModule = await import('$lib/server.js');
+    serverModule = await import('$lib/server/server.js');
 }, 60000);
 
 beforeEach(async () => {

@@ -9,7 +9,7 @@ import {
 } from 'vitest';
 import { once } from 'node:events';
 import { WebSocket, WebSocketServer } from 'ws';
-import { Connection } from '$lib/connection.js';
+import { Connection } from '$lib/server/connection.js';
 import { CONNECTION_DEFAULT_OPTIONS, State } from '$lib/constants.js';
 import { ConnectionStateError } from '$lib/errors.js';
 

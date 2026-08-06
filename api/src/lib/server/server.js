@@ -6,10 +6,10 @@ import {
     removeQueueStatus,
     setQueueStatus,
     getConnectionStatuses,
-} from './db.js';
-import { isValidToken } from './validate.js';
-import { CONNECTION_ERRORS } from './errors.js';
-import { SERVER_DEFAULT_OPTIONS, State } from './constants.js';
+} from './../db.js';
+import { isValidToken } from './../validate.js';
+import { CONNECTION_ERRORS } from './../errors.js';
+import { SERVER_DEFAULT_OPTIONS, State } from './../constants.js';
 import { Connection } from './connection.js';
 
 export class Connections {

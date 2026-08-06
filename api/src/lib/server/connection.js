@@ -1,7 +1,7 @@
 import { EventEmitter } from 'node:events';
 import { WebSocket } from 'ws';
-import { CONNECTION_ERRORS } from './errors.js';
-import { CONNECTION_DEFAULT_OPTIONS, State } from './constants.js';
+import { CONNECTION_ERRORS } from './../errors.js';
+import { CONNECTION_DEFAULT_OPTIONS, State } from './../constants.js';
 
 const HARD_CLOSE = Symbol('hard close');
 

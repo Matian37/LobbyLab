@@ -13,7 +13,7 @@ function attachWebSocketServer(server) {
     attachedServers.add(httpServer);
 
     return server
-        .ssrLoadModule('$lib/server.js')
+        .ssrLoadModule('$lib/server/server.js')
         .then(async ({ createWebSocketServer }) => {
             const wss = await createWebSocketServer(httpServer);
             httpServer.once('close', () => {
