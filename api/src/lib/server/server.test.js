@@ -14,6 +14,7 @@ import {
     createConnection,
     parseSessionToken,
     createWebSocketServer,
+    safeSocketDestroy,
 } from '$lib/server/server.js';
 import {
     State,
@@ -416,6 +417,57 @@ describe('ConnectionServer.open', () => {
     });
 });
 
+describe('safeSocketDestroy', () => {
+    afterEach(() => {
+        vi.unstubAllEnvs();
+    });
+
+    it('destroys the socket in production', () => {
+        const socket = { destroy: vi.fn() };
+        const request = { headers: {} };
+        vi.stubEnv('NODE_ENV', 'production');
+
+        expect(safeSocketDestroy(request, socket)).toBeUndefined();
+
+        expect(socket.destroy).toHaveBeenCalledTimes(1);
+    });
+
+    it.each(['vite-hmr', 'vite-ping', 'vite-any'])(
+        'does not destroy a %s socket outside production',
+        (protocol) => {
+            const socket = { destroy: vi.fn() };
+            const request = {
+                headers: { 'sec-websocket-protocol': protocol },
+            };
+            vi.stubEnv('NODE_ENV', 'development');
+
+            expect(safeSocketDestroy(request, socket)).toBeUndefined();
+
+            expect(socket.destroy).not.toHaveBeenCalled();
+        }
+    );
+
+    it('destroys a non-hmr socket outside production', () => {
+        const socket = { destroy: vi.fn() };
+        const request = { headers: { 'sec-websocket-protocol': 'foo' } };
+        vi.stubEnv('NODE_ENV', 'development');
+
+        expect(safeSocketDestroy(request, socket)).toBeUndefined();
+
+        expect(socket.destroy).toHaveBeenCalledTimes(1);
+    });
+
+    it('destroys a socket with no websocket protocol outside production', () => {
+        const socket = { destroy: vi.fn() };
+        const request = { headers: {} };
+        vi.stubEnv('NODE_ENV', 'development');
+
+        expect(safeSocketDestroy(request, socket)).toBeUndefined();
+
+        expect(socket.destroy).toHaveBeenCalledTimes(1);
+    });
+});
+
 describe('ConnectionServer.upgradeHandler', () => {
     it('upgrades when pathname matches', () => {
         const httpServer = new EventEmitter();
@@ -458,7 +510,12 @@ describe('ConnectionServer.upgradeHandler', () => {
         onTestFinished(() => server.close());
         const socket = { destroy: vi.fn() };
 
-        httpServer.emit('upgrade', { url: '/other' }, socket, Buffer.alloc(0));
+        httpServer.emit(
+            'upgrade',
+            { url: '/other', headers: {} },
+            socket,
+            Buffer.alloc(0)
+        );
 
         expect(socket.destroy).toHaveBeenCalledTimes(1);
         expect(wss.handleUpgrade).not.toHaveBeenCalled();

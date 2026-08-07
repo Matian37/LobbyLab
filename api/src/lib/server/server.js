@@ -143,6 +143,17 @@ export function parseSessionToken(request) {
     return { data: session };
 }
 
+export function safeSocketDestroy(request, socket) {
+    if (process.env.NODE_ENV === 'production') {
+        socket.destroy();
+        return;
+    }
+
+    if (request.headers['sec-websocket-protocol']?.startsWith('vite')) return;
+
+    socket.destroy();
+}
+
 export class ConnectionServer {
     #wss;
     #options;
@@ -241,7 +252,7 @@ export class ConnectionServer {
                 },
                 'rejecting websocket upgrade, path does not match'
             );
-            socket.destroy();
+            safeSocketDestroy(request, socket);
             return;
         }
 
