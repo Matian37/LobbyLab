@@ -8,9 +8,7 @@ export async function GET({ cookies }) {
     if (result.error !== undefined) return result.error;
 
     const login = await getLoginFromToken(result.data.token);
-    if (login === null) {
-        console.debug('session with given token does not exist');
-        return ERRORS.invalidSessionToken();
-    }
+    if (login === null) return ERRORS.invalidSessionToken();
+
     return json({ matches: await getMatchResults(login) });
 }
