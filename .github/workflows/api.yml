@@ -36,5 +36,8 @@ jobs:
       - name: Check Formatting
         run: npx prettier --check .
 
-      - name: Run Tests
-        run: NODE_OPTIONS='--no-webstorage' npm test
+      - name: Run Unit Tests
+        run: npm run test:unit
+
+      - name: Run Integration Tests
+        run: npm run test:integration

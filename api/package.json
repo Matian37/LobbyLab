@@ -9,6 +9,8 @@
     "preview": "vite preview",
     "prepare": "svelte-kit sync || echo ''",
     "test": "vitest run",
+    "test:unit": "vitest run --exclude '**/*.integrated.test.js'",
+    "test:integration": "vitest run .integrated.test.js",
     "lint": "eslint .",
     "format": "prettier --write ."
   },

@@ -1,7 +1,7 @@
 # Project Instructions
 
-This is monorepo written in golang and svelte-kit; run with docker and nats broker. 
-Project is a platform for running matchmaking with user provided game servers. 
+This is monorepo written in golang and svelte-kit; run with docker and nats broker.
+Project is a platform for running matchmaking with user provided game servers.
 It handles user login, game server management, and matchmaking logic. Runs everything in containers.
 
 ## Project Structure
@@ -37,6 +37,8 @@ It handles user login, game server management, and matchmaking logic. Runs every
   - to run all tests use `npm test`
   - to run specific test file use `npm test -- <filename>`
   - to run specific test use `npm test -- --testNamePattern=<test pattern string>`
+  - to run unit tests `npm run test:unit`
+  - to run integration tests `npm run test:integration`
 - server-manager:
   - to run specific test `go test -v --tags=<file test tag> -run=<testname> --timeout 1m ./...`
   - to run unit tests `go test -v --timeout 1m ./...`
@@ -61,11 +63,13 @@ It handles user login, game server management, and matchmaking logic. Runs every
 - for svelte-kit use `npm run lint`
 
 ## When Writing/Reviewing Code
+
 - always run linter and formatter
 - always run tests
   - firstly, run tests which only covers affected code
   - secondly, run a full test suite using `act` if possible
 
 ## When Blocked
+
 - If tests fail after 3 attempts: stop and report the failing test with full output
 - Never: delete files to resolve errors, or skip tests
