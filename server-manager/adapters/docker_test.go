@@ -36,6 +36,7 @@ func newTestConnWithPorts(t *testing.T, exposePorts []string, clientPort string)
 		Image:                  containerImage,
 		ExposePorts:            exposeSet,
 		ClientPort:             network.MustParsePort(clientPort),
+		BrokerNetworkName:      "bridge", // prevents docker network not found errors
 		TestMakeContainerDummy: true,
 	})
 	require.NoError(t, err)
@@ -52,6 +53,9 @@ func newTestConn(t *testing.T) *DockerConnection {
 // NOTE: CMD is required to make container hang forever
 func createContainer(t *testing.T, dc *DockerConnection) string {
 	t.Helper()
+
+	// prevents docker network not found errors
+	dc.config.BrokerNetworkName = "bridge"
 
 	portMap := network.PortMap{}
 	for port, _ := range dc.config.ExposePorts {
@@ -180,7 +184,8 @@ func TestIntegration_DockerConnection_containerCreateOptions(t *testing.T) {
 		assert.True(t, *opts.HostConfig.Init)
 
 		require.NotNil(t, opts.NetworkingConfig)
-		require.NotEmpty(t, opts.NetworkingConfig.EndpointsConfig)
+		require.Len(t, opts.NetworkingConfig.EndpointsConfig, 1)
+		require.Contains(t, opts.NetworkingConfig.EndpointsConfig, dc.config.BrokerNetworkName)
 	})
 
 	t.Run("TestContainerDummy env", func(t *testing.T) {

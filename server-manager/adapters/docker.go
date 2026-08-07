@@ -241,7 +241,7 @@ func (dc *DockerConnection) containerCreateOptions(portMap network.PortMap) clie
 		},
 		NetworkingConfig: &network.NetworkingConfig{
 			EndpointsConfig: map[string]*network.EndpointSettings{
-				"multiplayer-asset_nats-net": {}, // Network name
+				dc.config.BrokerNetworkName: {},
 			},
 		},
 	}

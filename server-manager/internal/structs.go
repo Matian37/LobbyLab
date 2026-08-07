@@ -8,15 +8,16 @@ import (
 )
 
 type EnvConfig struct {
-	Image          string
-	Workercount    int
-	ExposePorts    network.PortSet
-	ClientPort     network.Port
-	BrokerURI      string
-	PublicHost     string
-	DatabaseURI    string
-	PlayersPerRoom int
-	LogLevel       slog.Level
+	Image              string
+	Workercount        int
+	ExposePorts        network.PortSet
+	ClientPort         network.Port
+	BrokerURI          string
+	BrokerNetworkName  string
+	PublicHost         string
+	DatabaseURI        string
+	PlayersPerRoom     int
+	LogLevel           slog.Level
 	GameServerLogLevel slog.Level
 
 	// must not be exposed for production use

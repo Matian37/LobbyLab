@@ -249,6 +249,7 @@ func TestE2E_GracefulShutdown(t *testing.T) {
 		ExposePorts:            network.PortSet{network.MustParsePort("8080"): {}},
 		ClientPort:             network.MustParsePort("8080"),
 		BrokerURI:              natsURI,
+		BrokerNetworkName:      "bridge", // prevents docker network not found errors
 		PublicHost:             "127.0.0.1",
 		DatabaseURI:            dbConnString,
 		PlayersPerRoom:         2,
@@ -319,6 +320,7 @@ func TestE2E_RemoveZombieWorkers(t *testing.T) {
 		ExposePorts:            network.PortSet{network.MustParsePort("8080"): {}},
 		ClientPort:             network.MustParsePort("8080"),
 		BrokerURI:              natsURI,
+		BrokerNetworkName:      "bridge", // prevents docker network not found errors
 		PublicHost:             "127.0.0.1",
 		DatabaseURI:            dbConnString,
 		PlayersPerRoom:         2,
@@ -365,6 +367,7 @@ func TestE2E_AppLifecycle(t *testing.T) {
 		ExposePorts:            network.PortSet{network.MustParsePort("8080"): {}},
 		ClientPort:             network.MustParsePort("8080"),
 		BrokerURI:              natsURI,
+		BrokerNetworkName:      "bridge", // prevents docker network not found errors
 		PublicHost:             "127.0.0.1",
 		DatabaseURI:            dbConnString,
 		PlayersPerRoom:         2,
@@ -476,6 +479,7 @@ func TestE2E_WorkersOverloadWithMatches(t *testing.T) {
 		ExposePorts:            network.PortSet{network.MustParsePort("8080"): {}},
 		ClientPort:             network.MustParsePort("8080"),
 		BrokerURI:              natsURI,
+		BrokerNetworkName:      "bridge", // prevents docker network not found errors
 		PublicHost:             "127.0.0.1",
 		DatabaseURI:            dbConnString,
 		PlayersPerRoom:         2,
@@ -578,6 +582,7 @@ func TestE2E_WorkerFailureAndRestart(t *testing.T) {
 		ExposePorts:            network.PortSet{network.MustParsePort("8080"): {}},
 		ClientPort:             network.MustParsePort("8080"),
 		BrokerURI:              natsURI,
+		BrokerNetworkName:      "bridge", // prevents docker network not found errors
 		PublicHost:             "127.0.0.1",
 		DatabaseURI:            dbConnString,
 		PlayersPerRoom:         2,
@@ -669,6 +674,7 @@ func TestE2E_NoMatchWithoutEnoughPlayers(t *testing.T) {
 		ExposePorts:            network.PortSet{network.MustParsePort("8080"): {}},
 		ClientPort:             network.MustParsePort("8080"),
 		BrokerURI:              natsURI,
+		BrokerNetworkName:      "bridge", // prevents docker network not found errors
 		PublicHost:             "127.0.0.1",
 		DatabaseURI:            dbConnString,
 		PlayersPerRoom:         2,
