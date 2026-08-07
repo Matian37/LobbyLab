@@ -4,6 +4,7 @@ import {
     validateCredentialsSchema,
     validateSession,
     isValidToken,
+    validateGameLaunchUrl,
 } from './validate.js';
 import { ERRORS } from './errors.js';
 import {
@@ -216,5 +217,28 @@ describe('validateSession', () => {
 
         expect(result).toEqual({ data: { token } });
         expect(cookies.get).toHaveBeenCalledWith('session');
+    });
+});
+
+describe('validateGameLaunchUrl', () => {
+    it.each([
+        [
+            'valid template',
+            'mygame://join?host={host}&port={port}&token={token}',
+            true,
+        ],
+        ['missing host', 'mygame://join?port={port}&token={token}', false],
+        ['missing port', 'mygame://join?host={host}&token={token}', false],
+        ['missing token', 'mygame://join?host={host}&port={port}', false],
+        ['non-string', 42, false],
+        ['undefined', undefined, false],
+        ['null', null, false],
+        [
+            'invalid url',
+            'not a url ?host={host}&port={port}&token={token}',
+            false,
+        ],
+    ])('returns %s', (_name, value, expected) => {
+        expect(validateGameLaunchUrl(value)).toBe(expected);
     });
 });

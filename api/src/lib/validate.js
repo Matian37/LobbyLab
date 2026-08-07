@@ -64,6 +64,20 @@ export function isValidToken(str) {
     return typeof str === 'string' && TOKEN_REGEX.test(str);
 }
 
+export function validateGameLaunchUrl(url) {
+    if (typeof url !== 'string') return false;
+
+    const required = ['{host}', '{port}', '{token}'];
+    if (!required.every((p) => url.includes(p))) return false;
+
+    const testUrl = url
+        .replace('{host}', 'localhost')
+        .replace('{port}', '8080')
+        .replace('{token}', 'token');
+
+    return URL.canParse(testUrl);
+}
+
 export function validateSession(cookies) {
     const cookie = cookies.get('session');
     if (cookie === undefined) {
