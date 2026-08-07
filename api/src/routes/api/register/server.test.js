@@ -4,7 +4,7 @@ import * as db from '$lib/db.js';
 import * as validate from '$lib/validate.js';
 import { PASSWORD_MIN_LENGTH, LOGIN_MIN_LENGTH } from '$lib/constants.js';
 import { ERRORS } from '$lib/errors.js';
-import { expectError } from '$lib/test-utils.js';
+import { expectError } from '$lib/test/utils.js';
 
 const EXAMPLE_LOGIN = 'a'.repeat(LOGIN_MIN_LENGTH);
 const EXAMPLE_PASSWORD = 'a'.repeat(PASSWORD_MIN_LENGTH);

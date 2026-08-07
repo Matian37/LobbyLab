@@ -22,8 +22,27 @@ cp .env.example .env
 | `POSTGRES_PASSWORD` | Database password |
 | `NATS_URI` | NATS connection URI |
 | `PUBLIC_HOST` | Publicly reachable address of the Docker host |
+| `PUBLIC_GAME_LAUNCH_URL` | Template URL used to launch the game client when a match is found |
 
 The defaults are suitable for local development. In production, set `PUBLIC_HOST` to your server's public IP or domain name so game clients can connect to game server containers.
+
+#### Game Launch URL
+
+`PUBLIC_GAME_LAUNCH_URL` is a template that the API fills in with the matched game server's details and then opens in the browser to hand off to the game client. It must contain three placeholders, which are replaced with values from the user's active match:
+
+| Placeholder | Replaced with                         |
+| ----------- | ------------------------------------- |
+| `{host}`    | Game server host (from `PUBLIC_HOST`) |
+| `{port}`    | Game server port, e.g. `8080/udp`     |
+| `{token}`   | The user's `match_auth_token`         |
+
+Example:
+
+```
+mygame://join?host={host}&port={port}&token={token}
+```
+
+It is expected that a `mygame://` protocol handler is registered on the user's device, otherwise the game client will not be able to launch.
 
 ### 2. Game Server
 

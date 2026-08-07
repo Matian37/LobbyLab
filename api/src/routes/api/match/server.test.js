@@ -7,11 +7,16 @@ import { expectError } from '$lib/test/utils.js';
 import { SESSION_TOKEN_LENGTH } from '$lib/constants.js';
 
 const EXAMPLE_SESSION_TOKEN = 'a'.repeat(SESSION_TOKEN_LENGTH);
+const EXAMPLE_MATCH = {
+    host: 'host',
+    port: 'port',
+    matchAuthToken: 'TOKEN',
+};
 
 vi.mock('$lib/db.js', () => {
     return {
         getLoginFromToken: vi.fn(),
-        getMatchResults: vi.fn(),
+        getUserMatch: vi.fn(),
     };
 });
 
@@ -27,10 +32,9 @@ describe('GET', () => {
         const response = await api.GET({ cookies });
 
         await expectError(response, ERRORS.noSessionToken);
-
         expect(validate.validateSession).toHaveBeenCalledWith(cookies);
         expect(db.getLoginFromToken).not.toHaveBeenCalled();
-        expect(db.getMatchResults).not.toHaveBeenCalled();
+        expect(db.getUserMatch).not.toHaveBeenCalled();
     });
 
     it('returns error when session does not exist', async () => {
@@ -41,49 +45,44 @@ describe('GET', () => {
         });
 
         await expectError(response, ERRORS.invalidSessionToken);
-
         expect(validate.validateSession).toHaveBeenCalled();
         expect(db.getLoginFromToken).toHaveBeenCalledWith(
             EXAMPLE_SESSION_TOKEN
         );
-        expect(db.getMatchResults).not.toHaveBeenCalled();
+        expect(db.getUserMatch).not.toHaveBeenCalled();
     });
 
-    it('returns 200 with matches when user is logged in', async () => {
+    it('returns 200 with the match when the user has one', async () => {
         db.getLoginFromToken.mockResolvedValue('user1');
-        db.getMatchResults.mockResolvedValue([
-            {
-                details: { players: ['user1', 'user2'], winner: 'user1' },
-                canceled: false,
-            },
-            {
-                details: { players: ['user1', 'user3'], winner: 'user1' },
-                canceled: true,
-            },
-        ]);
+        db.getUserMatch.mockResolvedValue(EXAMPLE_MATCH);
 
         const response = await api.GET({
             cookies: { get: () => EXAMPLE_SESSION_TOKEN },
         });
 
         expect(response.status).toBe(200);
-        expect(await response.json()).toEqual({
-            matches: [
-                {
-                    details: { players: ['user1', 'user2'], winner: 'user1' },
-                    canceled: false,
-                },
-                {
-                    details: { players: ['user1', 'user3'], winner: 'user1' },
-                    canceled: true,
-                },
-            ],
-        });
-
+        expect(await response.json()).toEqual({ match: EXAMPLE_MATCH });
         expect(validate.validateSession).toHaveBeenCalled();
         expect(db.getLoginFromToken).toHaveBeenCalledWith(
             EXAMPLE_SESSION_TOKEN
         );
-        expect(db.getMatchResults).toHaveBeenCalledWith('user1');
+        expect(db.getUserMatch).toHaveBeenCalledWith('user1');
+    });
+
+    it('returns 200 with match: null when the user has no match', async () => {
+        db.getLoginFromToken.mockResolvedValue('user1');
+        db.getUserMatch.mockResolvedValue(null);
+
+        const response = await api.GET({
+            cookies: { get: () => EXAMPLE_SESSION_TOKEN },
+        });
+
+        expect(response.status).toBe(200);
+        expect(await response.json()).toEqual({ match: null });
+        expect(validate.validateSession).toHaveBeenCalled();
+        expect(db.getLoginFromToken).toHaveBeenCalledWith(
+            EXAMPLE_SESSION_TOKEN
+        );
+        expect(db.getUserMatch).toHaveBeenCalledWith('user1');
     });
 });

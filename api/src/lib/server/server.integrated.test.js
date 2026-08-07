@@ -18,7 +18,7 @@ import {
     resetSchema,
     setupDatabase,
     teardownDatabase,
-} from '$lib/test-database.js';
+} from '$lib/test/database.js';
 
 const OPTIONS = Object.freeze({
     ...SERVER_DEFAULT_OPTIONS,

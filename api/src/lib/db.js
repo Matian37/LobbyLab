@@ -128,6 +128,21 @@ export async function getLoginFromToken(token) {
     return q[0]?.login ?? null;
 }
 
+export async function getUserMatch(login) {
+    const q = await sql`
+        SELECT u.match_auth_token, m.host, m.port
+        FROM users u
+        LEFT JOIN matches m ON m.id = u.match_id
+        WHERE u.login = ${login} AND u.match_id IS NOT NULL
+    `;
+    if (q.length === 0) return null;
+    return {
+        host: q[0].host,
+        port: q[0].port,
+        matchAuthToken: q[0].match_auth_token,
+    };
+}
+
 export async function addSession(login) {
     try {
         const q = await sql`
