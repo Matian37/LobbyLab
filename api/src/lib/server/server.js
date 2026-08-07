@@ -11,9 +11,11 @@ import { isValidToken } from './../validate.js';
 import { CONNECTION_ERRORS } from './../errors.js';
 import { SERVER_DEFAULT_OPTIONS, State } from './../constants.js';
 import { Connection } from './connection.js';
+import { websocketLogger } from '../logger.js';
 
 export class Connections {
     #connections = new Map();
+    #logger = websocketLogger.child({ class: 'connections' });
 
     set(connection) {
         const existingConnection = this.#connections.get(connection.login);
@@ -22,6 +24,14 @@ export class Connections {
             existingConnection !== undefined &&
             existingConnection.websocketId > connection.websocketId
         ) {
+            this.#logger.info(
+                {
+                    login: connection.login,
+                    existingWebsocketId: existingConnection.websocketId,
+                    incomingWebsocketId: connection.websocketId,
+                },
+                'rejecting connection, newer websocket already connected'
+            );
             connection.close(4001, 'Replaced by new connection');
             return;
         }
@@ -33,9 +43,24 @@ export class Connections {
         );
 
         if (existingConnection !== undefined) {
+            this.#logger.info(
+                {
+                    login: connection.login,
+                    existingWebsocketId: existingConnection.websocketId,
+                    incomingWebsocketId: connection.websocketId,
+                },
+                'existing connection replaced by a newer websocket'
+            );
             existingConnection.close(4001, 'Replaced by new connection');
         }
 
+        this.#logger.debug(
+            {
+                login: connection.login,
+                websocketId: connection.websocketId,
+            },
+            'connection registered'
+        );
         connection.open();
     }
 
@@ -47,8 +72,15 @@ export class Connections {
 
         this.#connections.delete(login);
         connection.close();
+        this.#logger.info(
+            { login, websocketId },
+            'connection closed and removed from tracking'
+        );
         removeQueueStatus(login, websocketId).catch((err) =>
-            console.debug('failed to remove queue status', err)
+            this.#logger.error(
+                { login, websocketId, err },
+                'failed to remove queue status'
+            )
         );
     }
 
@@ -59,10 +91,14 @@ export class Connections {
     }
 
     close() {
+        this.#logger.debug('closing connections');
+
         for (const connection of this.#connections.values()) {
             connection.close();
         }
         this.#connections.clear();
+
+        this.#logger.debug('all connections closed');
     }
 }
 
@@ -70,13 +106,21 @@ export async function createConnection(ws, login, options) {
     let websocketId;
     try {
         websocketId = await setQueueStatus(login, options.queueExtensionMs);
+        websocketLogger.debug(
+            { login, websocketId },
+            'queue status registered for connection'
+        );
     } catch (err) {
-        console.debug('failed to register websocket', err);
+        websocketLogger.error({ login, err }, 'failed to register websocket');
         ws.close(1011, 'Internal error');
         return null;
     }
 
     if (websocketId === null) {
+        websocketLogger.info(
+            { login },
+            'user is already in a match, rejecting connection'
+        );
         ws.close(4000, 'Already in match');
         return null;
     }
@@ -114,6 +158,7 @@ export class ConnectionServer {
     #wss;
     #options;
     #connections = new Connections();
+    #logger = websocketLogger.child({ class: 'server' });
     #state = State.INIT;
     #queueTimer = null;
     #pollTimer = null;
@@ -146,6 +191,8 @@ export class ConnectionServer {
     }
 
     open() {
+        this.#logger.debug('opening connection server');
+
         if (this.#state !== State.INIT) {
             throw CONNECTION_ERRORS.cannotOpenServer(this.#state);
         }
@@ -166,17 +213,45 @@ export class ConnectionServer {
         );
 
         this.#httpServer.on('upgrade', this.#upgradeHandler);
+
+        this.#logger.info(
+            { connectionPath: this.#options.connectionPath },
+            'connection server opened'
+        );
     }
 
     #upgradeHandler = (request, socket, head) => {
+        this.#logger.debug(
+            {
+                remoteAddress: socket.remoteAddress,
+                remotePort: socket.remotePort,
+                url: request.url,
+            },
+            'handling websocket upgrade'
+        );
+
         let pathname;
         try {
             ({ pathname } = new URL(request.url, 'http://localhost'));
         } catch {
+            this.#logger.info(
+                {
+                    remoteAddress: socket.remoteAddress,
+                    remotePort: socket.remotePort,
+                },
+                'rejecting websocket upgrade, invalid url'
+            );
             socket.destroy();
             return;
         }
         if (pathname !== this.#options.connectionPath) {
+            this.#logger.info(
+                {
+                    remoteAddress: socket.remoteAddress,
+                    remotePort: socket.remotePort,
+                },
+                'rejecting websocket upgrade, path does not match'
+            );
             safeSocketDestroy(request, socket);
             return;
         }
@@ -187,17 +262,43 @@ export class ConnectionServer {
     };
 
     async extendQueues() {
-        if (this.#state !== State.OPEN) return;
+        this.#logger.debug('extending queues');
+
+        if (this.#state !== State.OPEN) {
+            this.#logger.debug(
+                { state: this.#state },
+                'skipping queue extension, server not open'
+            );
+            return;
+        }
 
         const queued = this.#connections.getQueued();
 
         await extendQueueStatuses(queued, this.#options.queueExtensionMs).catch(
-            (err) => console.debug('failed to extend queue status', err)
+            (err) =>
+                this.#logger.error({ err }, 'failed to extend queue status')
+        );
+
+        this.#logger.debug(
+            {
+                websocketIds: queued.map(
+                    (connection) => connection.websocketId
+                ),
+            },
+            'queue extension finished'
         );
     }
 
     async onPull() {
-        if (this.#state !== State.OPEN) return;
+        this.#logger.debug('pulling connection statuses');
+
+        if (this.#state !== State.OPEN) {
+            this.#logger.debug(
+                { state: this.#state },
+                'skipping status pull, server not open'
+            );
+            return;
+        }
 
         const queued = this.#connections.getQueued();
 
@@ -205,24 +306,53 @@ export class ConnectionServer {
         try {
             statuses = await getConnectionStatuses(queued);
         } catch (err) {
-            console.debug('failed to pull connection statuses', err);
+            this.#logger.error({ err }, 'failed to pull connection statuses');
             return;
         }
 
         for (const connection of queued) {
             const status = statuses.get(connection.login);
             if (status === undefined) {
+                this.#logger.warn(
+                    { login: connection.login },
+                    'user no longer exists, closing connection'
+                );
                 connection.close(4004, 'User no longer exists');
                 continue;
             }
 
             if (status.websocketId !== connection.websocketId) {
+                this.#logger.info(
+                    {
+                        login: connection.login,
+                        oldWebsocketId: connection.websocketId,
+                        newWebsocketId: status.websocketId,
+                    },
+                    'connection replaced according to database state, closing it'
+                );
                 connection.close(4001, 'Replaced by new connection');
                 continue;
             }
 
-            if (status.matchId === null) continue;
+            if (status.matchId === null) {
+                this.#logger.debug(
+                    {
+                        login: connection.login,
+                        websocketId: connection.websocketId,
+                    },
+                    'no match assigned yet, keeping connection queued'
+                );
+                continue;
+            }
 
+            this.#logger.info(
+                {
+                    login: connection.login,
+                    websocketId: connection.websocketId,
+                    matchId: status.matchId,
+                },
+                'match assigned, sending match details'
+            );
             connection.sendMatchAndClose({
                 login: connection.login,
                 host: status.host,
@@ -230,16 +360,33 @@ export class ConnectionServer {
                 matchAuthToken: status.matchAuthToken,
             });
         }
+
+        this.#logger.debug('status pull finished');
     }
 
     async onConnection(ws, request) {
+        this.#logger.debug('handling new connection');
+
         if (this.#state !== State.OPEN) {
+            this.#logger.debug(
+                { state: this.#state },
+                'rejecting connection, server not open'
+            );
             ws.close(1001, 'Server is shutting down');
             return;
         }
 
         const result = parseSessionToken(request);
         if (result.error !== undefined) {
+            this.#logger.info(
+                {
+                    code: result.code,
+                    error: result.error,
+                    remoteAddress: request.socket?.remoteAddress,
+                    remotePort: request.socket?.remotePort,
+                },
+                'rejecting connection, session token invalid'
+            );
             ws.close(result.code, result.error);
             return;
         }
@@ -249,14 +396,31 @@ export class ConnectionServer {
         try {
             login = await getLoginFromToken(token);
         } catch (err) {
-            console.debug('failed to authenticate connection', err);
+            this.#logger.error({ err }, 'failed to authenticate connection');
             ws.close(1011, 'Internal error');
             return;
         }
         if (login === null) {
+            this.#logger.debug(
+                {
+                    code: result.code,
+                    error: result.error,
+                    remoteAddress: request.socket?.remoteAddress,
+                    remotePort: request.socket?.remotePort,
+                },
+                'connection rejected, invalid session token'
+            );
             ws.close(4401, 'Invalid session token');
             return;
         }
+        this.#logger.debug(
+            {
+                login,
+                remoteAddress: request.socket?.remoteAddress,
+                remotePort: request.socket?.remotePort,
+            },
+            'connection authenticated'
+        );
 
         const connection = await createConnection(ws, login, this.#options);
         if (connection === null) return;
@@ -264,29 +428,55 @@ export class ConnectionServer {
         // prevent adding websocket to connections
         // when close was already called during await
         if (this.#state !== State.OPEN) {
+            this.#logger.debug(
+                { state: this.#state },
+                'rejecting connection, server closed during creation'
+            );
             ws.close(1001, 'Server is shutting down');
             return;
         }
 
         this.#connections.set(connection);
+
+        if (connection.state == State.OPEN)
+            this.#logger.info(
+                {
+                    login,
+                    websocketId: connection.websocketId,
+                    remoteAddress: request.socket?.remoteAddress,
+                    remotePort: request.socket?.remotePort,
+                },
+                'connection accepted'
+            );
     }
 
     close() {
-        if (this.#state === State.CLOSED) return;
+        this.#logger.info('closing connection server');
+
+        if (this.#state === State.CLOSED) {
+            this.#logger.debug('ignoring close, server already closed');
+            return;
+        }
         this.#state = State.CLOSED;
 
         clearInterval(this.#queueTimer);
         this.#queueTimer = null;
+        this.#logger.debug('queue extension timer stopped');
 
         clearInterval(this.#pollTimer);
         this.#pollTimer = null;
+        this.#logger.debug('status poll timer stopped');
 
         this.#httpServer.off('upgrade', this.#upgradeHandler);
         this.#httpServer = null;
+        this.#logger.debug('upgrade handler detached');
 
         this.#connections.close();
 
         this.#wss.close?.();
+        this.#logger.debug('websocket server closed');
+
+        this.#logger.info('connection server closed');
     }
 }
 
