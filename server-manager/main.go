@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"os"
 	"os/signal"
@@ -12,18 +13,17 @@ import (
 )
 
 func main() {
+	config, err := config.ReadConfig()
+	if err != nil {
+		panic(fmt.Errorf("failed to read config: %w", err))
+	}
+
 	baseHandler := slog.NewJSONHandler(
 		os.Stdout,
-		&slog.HandlerOptions{Level: slog.LevelInfo},
+		&slog.HandlerOptions{Level: config.LogLevel},
 	)
 	handler := internal.NewContextErrorHandler(baseHandler)
 	logger := slog.New(handler)
-
-	config, err := config.ReadConfig()
-	if err != nil {
-		logger.Error("failed to read config", "error", err)
-		os.Exit(1)
-	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()

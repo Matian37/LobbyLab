@@ -4,6 +4,7 @@ package adapters
 
 import (
 	"context"
+	"log/slog"
 	"testing"
 	"time"
 
@@ -159,6 +160,7 @@ func TestIntegration_DockerConnection_containerCreateOptions(t *testing.T) {
 				ExposePorts: network.PortSet{
 					network.MustParsePort("1234"): {},
 				},
+				GameServerLogLevel: slog.LevelDebug,
 			},
 		}
 		portMap := network.PortMap{network.MustParsePort("1234"): {}}
@@ -168,6 +170,7 @@ func TestIntegration_DockerConnection_containerCreateOptions(t *testing.T) {
 		assert.Equal(t, opts.Image, dc.config.Image)
 		require.NotNil(t, opts.Config)
 		assert.Equal(t, dc.config.ExposePorts, opts.Config.ExposedPorts)
+		assert.Equal(t, []string{"LOG_LEVEL=DEBUG"}, opts.Config.Env)
 
 		require.NotNil(t, opts.HostConfig)
 		assert.Equal(t, opts.HostConfig.PortBindings, portMap)

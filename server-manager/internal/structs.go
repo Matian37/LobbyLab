@@ -2,6 +2,7 @@ package internal
 
 import (
 	"encoding/json"
+	"log/slog"
 
 	"github.com/moby/moby/api/types/network"
 )
@@ -15,6 +16,8 @@ type EnvConfig struct {
 	PublicHost     string
 	DatabaseURI    string
 	PlayersPerRoom int
+	LogLevel       slog.Level
+	GameServerLogLevel slog.Level
 
 	// must not be exposed for production use
 	TestMakeContainerDummy bool
