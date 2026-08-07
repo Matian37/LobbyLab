@@ -6,8 +6,8 @@
     import { env } from '$env/dynamic/public';
 
     let rows = $state([]);
-    let user = $derived($page.data);
-    let title = $derived(!user.login ? 'Log in' : user.login);
+    let user = $derived($page.data?.login);
+    let title = $derived(user ?? 'Log in');
     let matchmaking = $state(false);
     let matchmakingError = $state('');
     let matchmakingSeconds = $state(0);
@@ -15,6 +15,7 @@
     let matchmakingSocket = null;
     let matchmakingTimer = null;
     let matchFound = false;
+    let cancelled = false;
 
     onMount(async () => {
         invalidateAll();
@@ -56,9 +57,7 @@
         await fetch('/api/logout', {
             method: 'POST',
         });
-        user = null;
-
-        title = 'Log in';
+        await invalidateAll();
     }
 
     async function play() {
@@ -72,10 +71,14 @@
             return;
         }
 
-        if (matchmaking) return;
+        if (matchmaking) {
+            cancelMatchmaking();
+            return;
+        }
 
         matchmakingError = '';
         matchmaking = true;
+        cancelled = false;
         startTimer();
 
         const wsProtocol = location.protocol === 'https:' ? 'wss' : 'ws';
@@ -94,6 +97,7 @@
             matchmaking = false;
             stopTimer();
             if (matchFound) return;
+            if (cancelled) return;
             if (event.code === 4000) {
                 location.reload();
                 return;
@@ -104,8 +108,24 @@
             matchmaking = false;
             stopTimer();
             if (matchFound) return;
+            if (cancelled) return;
             matchmakingError = 'Connection issue, try again later';
         };
+    }
+
+    function cancelMatchmaking() {
+        cancelled = true;
+        if (matchmakingSocket) {
+            if (matchmakingSocket.readyState === WebSocket.OPEN) {
+                matchmakingSocket.close();
+            } else if (matchmakingSocket.readyState === WebSocket.CONNECTING) {
+                matchmakingSocket.onopen = () => matchmakingSocket.close();
+            }
+        }
+        matchmakingSocket = null;
+        matchmaking = false;
+        stopTimer();
+        matchmakingError = '';
     }
 
     function launchGame(match) {
@@ -144,12 +164,12 @@
 </button>
 <button onclick={() => goto(resolve('/register'))}> Register </button>
 <button onclick={() => logout()} data-testid="logout"> Log out </button>
-{#if user.login}
+{#if user}
     <button onclick={() => play()} data-testid="play">
         {currentMatch
             ? 'Join'
             : matchmaking
-              ? formatTime(matchmakingSeconds)
+              ? `Cancel ${formatTime(matchmakingSeconds)}`
               : 'Play'}
     </button>
 {/if}
