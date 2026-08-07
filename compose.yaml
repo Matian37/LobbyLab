@@ -65,6 +65,9 @@ services:
       GAME_SERVER_LOG_LEVEL: info
       PLAYERS_PER_ROOM: 2
       LOG_LEVEL: info
+    volumes:
+      # TODO: required but dangerous, docker socket proxy would be safer instead
+      - /var/run/docker.sock:/var/run/docker.sock
     networks:
       - db-net
       - nats-net
