@@ -4,7 +4,7 @@ import {
     resetSchema,
     setupDatabase,
     teardownDatabase,
-} from '$lib/test-database.js';
+} from '$lib/test/database.js';
 
 let db, helperSql, container;
 

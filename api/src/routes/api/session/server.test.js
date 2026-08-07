@@ -3,7 +3,7 @@ import * as api from './+server.js';
 import * as db from '$lib/db.js';
 import * as validate from '$lib/validate.js';
 import { ERRORS } from '$lib/errors.js';
-import { expectError } from '$lib/test-utils.js';
+import { expectError } from '$lib/test/utils.js';
 import { SESSION_TOKEN_LENGTH } from '$lib/constants.js';
 
 const EXAMPLE_SESSION_TOKEN = 'a'.repeat(SESSION_TOKEN_LENGTH);

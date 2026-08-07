@@ -18,7 +18,7 @@ export async function setupDatabase() {
     process.env.DATABASE_URL = databaseUrl;
     console.log('[db] container started; initializing schema...');
 
-    const initSqlPath = path.resolve(__dirname, '../../../init.sql');
+    const initSqlPath = path.resolve(__dirname, '../../../../init.sql');
     const initSql = fs.readFileSync(initSqlPath, 'utf8');
     process.env.DATABASE_INIT_SQL = initSql;
 

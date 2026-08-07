@@ -13,7 +13,7 @@ import {
     PASSWORD_MAX_LENGTH,
     SESSION_TOKEN_LENGTH,
 } from './constants.js';
-import { expectError } from './test-utils.js';
+import { expectError } from './test/utils.js';
 
 const VALID_LOGIN = 'a'.repeat(LOGIN_MIN_LENGTH);
 const VALID_PASSWORD = 'a'.repeat(PASSWORD_MIN_LENGTH);
