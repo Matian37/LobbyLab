@@ -15,6 +15,7 @@
     let matchmakingSocket = null;
     let matchmakingTimer = null;
     let matchFound = false;
+    let cancelled = false;
 
     onMount(async () => {
         invalidateAll();
@@ -72,10 +73,14 @@
             return;
         }
 
-        if (matchmaking) return;
+        if (matchmaking) {
+            cancelMatchmaking();
+            return;
+        }
 
         matchmakingError = '';
         matchmaking = true;
+        cancelled = false;
         startTimer();
 
         const wsProtocol = location.protocol === 'https:' ? 'wss' : 'ws';
@@ -94,6 +99,7 @@
             matchmaking = false;
             stopTimer();
             if (matchFound) return;
+            if (cancelled) return;
             if (event.code === 4000) {
                 location.reload();
                 return;
@@ -104,8 +110,24 @@
             matchmaking = false;
             stopTimer();
             if (matchFound) return;
+            if (cancelled) return;
             matchmakingError = 'Connection issue, try again later';
         };
+    }
+
+    function cancelMatchmaking() {
+        cancelled = true;
+        if (matchmakingSocket) {
+            if (matchmakingSocket.readyState === WebSocket.OPEN) {
+                matchmakingSocket.close();
+            } else if (matchmakingSocket.readyState === WebSocket.CONNECTING) {
+                matchmakingSocket.onopen = () => matchmakingSocket.close();
+            }
+        }
+        matchmakingSocket = null;
+        matchmaking = false;
+        stopTimer();
+        matchmakingError = '';
     }
 
     function launchGame(match) {
@@ -149,7 +171,7 @@
         {currentMatch
             ? 'Join'
             : matchmaking
-              ? formatTime(matchmakingSeconds)
+              ? `Cancel ${formatTime(matchmakingSeconds)}`
               : 'Play'}
     </button>
 {/if}
