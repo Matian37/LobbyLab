@@ -6,8 +6,8 @@
     import { env } from '$env/dynamic/public';
 
     let rows = $state([]);
-    let user = $derived($page.data);
-    let title = $derived(!user.login ? 'Log in' : user.login);
+    let user = $derived($page.data?.login);
+    let title = $derived(user ?? 'Log in');
     let matchmaking = $state(false);
     let matchmakingError = $state('');
     let matchmakingSeconds = $state(0);
@@ -57,9 +57,7 @@
         await fetch('/api/logout', {
             method: 'POST',
         });
-        user = null;
-
-        title = 'Log in';
+        await invalidateAll();
     }
 
     async function play() {
@@ -166,7 +164,7 @@
 </button>
 <button onclick={() => goto(resolve('/register'))}> Register </button>
 <button onclick={() => logout()} data-testid="logout"> Log out </button>
-{#if user.login}
+{#if user}
     <button onclick={() => play()} data-testid="play">
         {currentMatch
             ? 'Join'
