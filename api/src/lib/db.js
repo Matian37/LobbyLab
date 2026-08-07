@@ -110,17 +110,6 @@ export async function removeQueueStatus(login, websocketId) {
     `;
 }
 
-export async function isWaiting(login) {
-    const q = await sql`
-        SELECT 1 FROM users
-        WHERE
-            login = ${login} 
-            AND match_id IS NULL 
-            AND queued_until > NOW()
-    `;
-    return q.length > 0;
-}
-
 export async function getLoginFromToken(token) {
     const q = await sql`
         SELECT login FROM sessions WHERE token = ${token}
