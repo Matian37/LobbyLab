@@ -4,6 +4,7 @@ package adapters
 
 import (
 	"context"
+	"log/slog"
 	"testing"
 	"time"
 
@@ -35,6 +36,7 @@ func newTestConnWithPorts(t *testing.T, exposePorts []string, clientPort string)
 		Image:                  containerImage,
 		ExposePorts:            exposeSet,
 		ClientPort:             network.MustParsePort(clientPort),
+		BrokerNetworkName:      "bridge", // prevents docker network not found errors
 		TestMakeContainerDummy: true,
 	})
 	require.NoError(t, err)
@@ -51,6 +53,9 @@ func newTestConn(t *testing.T) *DockerConnection {
 // NOTE: CMD is required to make container hang forever
 func createContainer(t *testing.T, dc *DockerConnection) string {
 	t.Helper()
+
+	// prevents docker network not found errors
+	dc.config.BrokerNetworkName = "bridge"
 
 	portMap := network.PortMap{}
 	for port, _ := range dc.config.ExposePorts {
@@ -159,6 +164,8 @@ func TestIntegration_DockerConnection_containerCreateOptions(t *testing.T) {
 				ExposePorts: network.PortSet{
 					network.MustParsePort("1234"): {},
 				},
+				BrokerURI:          "nats://localhost:4222",
+				GameServerLogLevel: slog.LevelDebug,
 			},
 		}
 		portMap := network.PortMap{network.MustParsePort("1234"): {}}
@@ -168,12 +175,17 @@ func TestIntegration_DockerConnection_containerCreateOptions(t *testing.T) {
 		assert.Equal(t, opts.Image, dc.config.Image)
 		require.NotNil(t, opts.Config)
 		assert.Equal(t, dc.config.ExposePorts, opts.Config.ExposedPorts)
+		assert.Equal(t, []string{"LOG_LEVEL=DEBUG", "NATS_URI=" + dc.config.BrokerURI}, opts.Config.Env)
 
 		require.NotNil(t, opts.HostConfig)
 		assert.Equal(t, opts.HostConfig.PortBindings, portMap)
 
 		require.NotNil(t, opts.HostConfig.Init)
 		assert.True(t, *opts.HostConfig.Init)
+
+		require.NotNil(t, opts.NetworkingConfig)
+		require.Len(t, opts.NetworkingConfig.EndpointsConfig, 1)
+		require.Contains(t, opts.NetworkingConfig.EndpointsConfig, dc.config.BrokerNetworkName)
 	})
 
 	t.Run("TestContainerDummy env", func(t *testing.T) {

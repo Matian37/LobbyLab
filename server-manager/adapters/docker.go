@@ -215,6 +215,7 @@ func (dc *DockerConnection) getPorts(ctx context.Context, containerID string) (n
 }
 
 // NOTE: portMap must have unspecified host ports
+// NOTE: due to container spawning nature, logs cannot be attached to compose logs
 func (dc *DockerConnection) containerCreateOptions(portMap network.PortMap) client.ContainerCreateOptions {
 	options := client.ContainerCreateOptions{
 		Image: dc.config.Image,
@@ -222,6 +223,10 @@ func (dc *DockerConnection) containerCreateOptions(portMap network.PortMap) clie
 			ExposedPorts: dc.config.ExposePorts,
 			Labels: map[string]string{
 				"com.github.multiplayer-asset.worker": "true",
+			},
+			Env: []string{
+				"LOG_LEVEL=" + dc.config.GameServerLogLevel.String(),
+				"NATS_URI=" + dc.config.BrokerURI,
 			},
 		},
 		HostConfig: &container.HostConfig{
@@ -232,6 +237,11 @@ func (dc *DockerConnection) containerCreateOptions(portMap network.PortMap) clie
 			RestartPolicy: container.RestartPolicy{
 				Name:              container.RestartPolicyDisabled,
 				MaximumRetryCount: 0,
+			},
+		},
+		NetworkingConfig: &network.NetworkingConfig{
+			EndpointsConfig: map[string]*network.EndpointSettings{
+				dc.config.BrokerNetworkName: {},
 			},
 		},
 	}
