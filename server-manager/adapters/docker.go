@@ -239,6 +239,11 @@ func (dc *DockerConnection) containerCreateOptions(portMap network.PortMap) clie
 				MaximumRetryCount: 0,
 			},
 		},
+		NetworkingConfig: &network.NetworkingConfig{
+			EndpointsConfig: map[string]*network.EndpointSettings{
+				"multiplayer-asset_nats-net": {}, // Network name
+			},
+		},
 	}
 
 	if dc.config.TestMakeContainerDummy {

@@ -178,6 +178,9 @@ func TestIntegration_DockerConnection_containerCreateOptions(t *testing.T) {
 
 		require.NotNil(t, opts.HostConfig.Init)
 		assert.True(t, *opts.HostConfig.Init)
+
+		require.NotNil(t, opts.NetworkingConfig)
+		require.NotEmpty(t, opts.NetworkingConfig.EndpointsConfig)
 	})
 
 	t.Run("TestContainerDummy env", func(t *testing.T) {
