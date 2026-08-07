@@ -551,3 +551,31 @@ describe('getConnectionStatuses', () => {
         expect(statuses.size).toBe(0);
     });
 });
+
+describe('getUserMatch', () => {
+    it('returns match details for a matched user', async () => {
+        await helperSql`
+            INSERT INTO matches (id, host, port) VALUES (1, 'h', 'p')
+        `;
+        await helperSql`
+            INSERT INTO users (login, password, match_id, match_auth_token)
+            VALUES ('user', 'pass', 1, 'TOKEN')
+        `;
+
+        expect(await db.getUserMatch('user')).toEqual({
+            host: 'h',
+            port: 'p',
+            matchAuthToken: 'TOKEN',
+        });
+    });
+
+    it('returns null when the user has no match', async () => {
+        await db.addUser('user', 'pass');
+
+        expect(await db.getUserMatch('user')).toBeNull();
+    });
+
+    it('returns null when the user does not exist', async () => {
+        expect(await db.getUserMatch('missing')).toBeNull();
+    });
+});
