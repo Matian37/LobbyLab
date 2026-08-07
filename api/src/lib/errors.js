@@ -39,6 +39,7 @@ export const ERRORS = Object.freeze({
             { status: 422 }
         ),
     loginTaken: () => json({ msg: 'Login is already taken' }, { status: 409 }),
+    wsRequired: () => json({ msg: 'Websocket is required' }, { status: 426 }),
 });
 
 export class ConnectionStateError extends Error {

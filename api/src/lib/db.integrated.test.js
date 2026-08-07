@@ -21,6 +21,17 @@ afterAll(async () => {
     await teardownDatabase({ container, helperSql });
 });
 
+async function isWaiting(login) {
+    const q = await helperSql`
+        SELECT 1 FROM users
+        WHERE
+            login = ${login} 
+            AND match_id IS NULL 
+            AND queued_until > NOW()
+    `;
+    return q.length > 0;
+}
+
 describe('addUser', () => {
     it('inserts user into the database and returns true', async () => {
         expect(await db.addUser('user', 'pass')).toBeTruthy();
@@ -217,7 +228,7 @@ describe('removeQueueStatus', () => {
             [{ login: 'user', websocketId: ws1 }],
             5000
         );
-        expect(await db.isWaiting('user')).toBeTruthy();
+        expect(await isWaiting('user')).toBeTruthy();
 
         await db.removeQueueStatus('user', ws1);
 
@@ -226,7 +237,7 @@ describe('removeQueueStatus', () => {
         `;
         expect(rows[0].removed).toBe(true);
         expect(Number(rows[0].last_websocket_id)).toBe(ws1);
-        expect(await db.isWaiting('user')).toBeFalsy();
+        expect(await isWaiting('user')).toBeFalsy();
     });
 
     it('does not remove the queue status when the websocket id does not match', async () => {
@@ -238,7 +249,7 @@ describe('removeQueueStatus', () => {
         );
         await db.removeQueueStatus('user', ws1 + 100);
 
-        expect(await db.isWaiting('user')).toBeTruthy();
+        expect(await isWaiting('user')).toBeTruthy();
     });
 
     it('does not remove the queue status when the user is matched', async () => {
@@ -260,41 +271,6 @@ describe('removeQueueStatus', () => {
 
     it('does nothing when user does not exist', async () => {
         await expect(db.removeQueueStatus('user', 1)).resolves.toBeUndefined();
-    });
-});
-
-describe('isWaiting', () => {
-    it('returns true when user is queued and not matched', async () => {
-        expect(await db.addUser('user', 'pass')).toBeTruthy();
-        const ws1 = await db.setQueueStatus('user', 5000);
-        await db.extendQueueStatuses(
-            [{ login: 'user', websocketId: ws1 }],
-            5000
-        );
-        expect(await db.isWaiting('user')).toBeTruthy();
-    });
-
-    it('returns false when user has an active match_id', async () => {
-        await helperSql`
-            INSERT INTO matches (id, host, port) VALUES (1, '', '0');
-        `;
-        await helperSql`
-            INSERT INTO users (login, password, match_id, queued_until)
-            VALUES ('user', '', 1, NOW() + INTERVAL '5 hours');
-        `;
-        expect(await db.isWaiting('user')).toBeFalsy();
-    });
-
-    it('returns false when queued_until is in the past', async () => {
-        await helperSql`
-            INSERT INTO users (login, password, match_id, queued_until)
-            VALUES ('user', '', NULL, NOW() - INTERVAL '5 hours')
-        `;
-        expect(await db.isWaiting('user')).toBeFalsy();
-    });
-
-    it('returns false when user does not exist', async () => {
-        expect(await db.isWaiting('user')).toBeFalsy();
     });
 });
 
