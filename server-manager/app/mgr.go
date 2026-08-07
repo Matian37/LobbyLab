@@ -345,7 +345,9 @@ func (wm *WorkerManager) healthCheck(ctx context.Context) error {
 	defer wm.mu.Unlock()
 
 	for _, worker := range wm.workers {
-		_, pong := responders[worker.ID]
+		// worker hostnames are short versions of the full container ID
+		// so to match it exactly, we need to shorten the worker ID to 12 characters
+		_, pong := responders[shortenID(worker.ID)]
 		worker.HandlePong(pong)
 
 		if worker.IsHealthy() {
@@ -413,4 +415,11 @@ func (wm *WorkerManager) getFreeWorker() *Worker {
 		}
 	}
 	return nil
+}
+
+func shortenID(id string) string {
+	if len(id) > 12 {
+		return id[0:12]
+	}
+	return id
 }

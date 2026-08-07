@@ -73,6 +73,11 @@ func TestNewWorkerManager(t *testing.T) {
 	assert.NotNil(t, wm.dbConn)
 }
 
+func TestShortenID(t *testing.T) {
+	assert.Equal(t, "abcdef123456", shortenID("abcdef123456"))
+	assert.Equal(t, "abcdef123456", shortenID("abcdef1234567890"))
+}
+
 func TestWorkerManager_Start(t *testing.T) {
 	t.Run("already initialized", func(t *testing.T) {
 		wm := WorkerManager{initialized: true}
