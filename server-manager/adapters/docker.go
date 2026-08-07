@@ -224,7 +224,10 @@ func (dc *DockerConnection) containerCreateOptions(portMap network.PortMap) clie
 			Labels: map[string]string{
 				"com.github.multiplayer-asset.worker": "true",
 			},
-			Env: []string{"LOG_LEVEL=" + dc.config.GameServerLogLevel.String()},
+			Env: []string{
+				"LOG_LEVEL=" + dc.config.GameServerLogLevel.String(),
+				"NATS_URI=" + dc.config.BrokerURI,
+			},
 		},
 		HostConfig: &container.HostConfig{
 			// init is required for game-server to reap abandoned child processes

@@ -160,6 +160,7 @@ func TestIntegration_DockerConnection_containerCreateOptions(t *testing.T) {
 				ExposePorts: network.PortSet{
 					network.MustParsePort("1234"): {},
 				},
+				BrokerURI:          "nats://localhost:4222",
 				GameServerLogLevel: slog.LevelDebug,
 			},
 		}
@@ -170,7 +171,7 @@ func TestIntegration_DockerConnection_containerCreateOptions(t *testing.T) {
 		assert.Equal(t, opts.Image, dc.config.Image)
 		require.NotNil(t, opts.Config)
 		assert.Equal(t, dc.config.ExposePorts, opts.Config.ExposedPorts)
-		assert.Equal(t, []string{"LOG_LEVEL=DEBUG"}, opts.Config.Env)
+		assert.Equal(t, []string{"LOG_LEVEL=DEBUG", "NATS_URI=" + dc.config.BrokerURI}, opts.Config.Env)
 
 		require.NotNil(t, opts.HostConfig)
 		assert.Equal(t, opts.HostConfig.PortBindings, portMap)
