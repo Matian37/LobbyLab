@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
+	"server/internal"
 	"testing"
 	"time"
 
@@ -126,40 +127,9 @@ func TestNATSConnection_subscribeHealth(t *testing.T) {
 		require.NoError(t, err)
 		t.Cleanup(func() { pub.Close() })
 
-		pongSubject := healthSubject + "." + c.containerID
-		pong, err := pub.SubscribeSync(pongSubject)
+		msg, err := pub.Request(healthSubject, []byte{}, time.Second)
 		require.NoError(t, err)
-		pub.Flush()
-
-		err = pub.Publish(healthSubject, []byte{})
-		require.NoError(t, err)
-
-		msg, err := pong.NextMsg(150 * time.Millisecond)
-		require.NoError(t, err)
-		assert.Empty(t, msg.Data)
-	})
-}
-
-func TestNATSConnection_HealthPing(t *testing.T) {
-	t.Run("success", func(t *testing.T) {
-		addr := newNATSServer(t)
-
-		c := NewConnection(addr, "a")
-		err := c.Open(150 * time.Millisecond)
-		require.NoError(t, err)
-
-		nc, err := nats.Connect(addr)
-		require.NoError(t, err)
-		t.Cleanup(func() { nc.Close() })
-
-		pong, err := nc.SubscribeSync(healthSubject + "." + c.containerID)
-		require.NoError(t, err)
-		nc.Flush()
-
-		require.NoError(t, nc.Publish(healthSubject, []byte{}))
-		msg, err := pong.NextMsg(1 * time.Second)
-		require.NoError(t, err)
-		assert.Empty(t, msg.Data)
+		assert.Equal(t, []byte(c.containerID), msg.Data)
 	})
 }
 
@@ -305,7 +275,9 @@ func TestNATSConnection_GetMatchConfig(t *testing.T) {
 		require.NoError(t, err)
 		t.Cleanup(func() { nc.Close() })
 
-		expectedConfig := `{"config": 123}`
+		expectedConfig := internal.MatchConfig{MatchID: 1, Config: []byte(`{"gameconfig": 123}`)}
+		expectedConfigJSON, err := json.Marshal(expectedConfig)
+		require.NoError(t, err)
 
 		doneChan := make(chan struct{})
 		go func() {
@@ -313,7 +285,7 @@ func TestNATSConnection_GetMatchConfig(t *testing.T) {
 
 			msg, err := nc.Request(
 				assignSubject+"."+containerID,
-				[]byte(expectedConfig),
+				[]byte(expectedConfigJSON),
 				1*time.Second,
 			)
 			require.NoError(t, err)
@@ -322,7 +294,8 @@ func TestNATSConnection_GetMatchConfig(t *testing.T) {
 
 		config, err := c.GetMatchConfig(context.Background())
 		require.NoError(t, err)
-		assert.Equal(t, string(expectedConfig), config)
+		assert.Equal(t, expectedConfig.MatchID, config.MatchID)
+		assert.JSONEq(t, string(expectedConfig.Config), string(config.Config))
 
 		<-doneChan
 	})
@@ -331,13 +304,13 @@ func TestNATSConnection_GetMatchConfig(t *testing.T) {
 func TestNATSConnection_SendCancel(t *testing.T) {
 	t.Run("not open", func(t *testing.T) {
 		c := NATSConnection{}
-		err := c.SendCancel(context.Background())
+		err := c.SendCancel(context.Background(), 0)
 		assert.ErrorIs(t, err, ErrConnectionNotOpen)
 	})
 
 	t.Run("closed", func(t *testing.T) {
 		c := NATSConnection{opened: true, closed: true}
-		err := c.SendCancel(context.Background())
+		err := c.SendCancel(context.Background(), 0)
 		assert.ErrorIs(t, err, ErrConnectionClosed)
 	})
 
@@ -351,7 +324,7 @@ func TestNATSConnection_SendCancel(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		cancel()
 
-		err = c.SendCancel(ctx)
+		err = c.SendCancel(ctx, 0)
 		require.ErrorIs(t, err, context.Canceled)
 	})
 
@@ -373,7 +346,7 @@ func TestNATSConnection_SendCancel(t *testing.T) {
 		stream, err := js.Stream(ctx, ResultStreamName)
 		require.NoError(t, err)
 
-		require.NoError(t, c.SendCancel(context.Background()))
+		require.NoError(t, c.SendCancel(context.Background(), 1))
 
 		msg, err := stream.GetLastMsgForSubject(ctx, resultSubject)
 		require.NoError(t, err)
@@ -381,21 +354,23 @@ func TestNATSConnection_SendCancel(t *testing.T) {
 		var result Result
 		err = json.Unmarshal(msg.Data, &result)
 		require.NoError(t, err)
+
 		assert.False(t, result.Success)
 		assert.Equal(t, json.RawMessage("{}"), result.Details)
+		assert.Equal(t, 1, result.MatchID)
 	})
 }
 
 func TestNATSConnection_SendResult(t *testing.T) {
 	t.Run("not open", func(t *testing.T) {
 		c := NATSConnection{}
-		err := c.SendResult(context.Background(), []byte("data"))
+		err := c.SendResult(context.Background(), 0, []byte{})
 		assert.ErrorIs(t, err, ErrConnectionNotOpen)
 	})
 
 	t.Run("closed", func(t *testing.T) {
 		c := NATSConnection{opened: true, closed: true}
-		err := c.SendResult(context.Background(), []byte("data"))
+		err := c.SendResult(context.Background(), 0, []byte{})
 		assert.ErrorIs(t, err, ErrConnectionClosed)
 	})
 
@@ -409,7 +384,7 @@ func TestNATSConnection_SendResult(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		cancel()
 
-		err = c.SendResult(ctx, []byte("{}"))
+		err = c.SendResult(ctx, 0, []byte("{}"))
 		require.ErrorIs(t, err, context.Canceled)
 	})
 
@@ -431,14 +406,14 @@ func TestNATSConnection_SendResult(t *testing.T) {
 		stream, err := js.Stream(ctx, ResultStreamName)
 		require.NoError(t, err)
 
-		result := `{"data":123}`
-		expected := `{"success":true,"details":` + result + `}`
+		gameResult := `{"data":123}`
+		matchID := 1
+		expectedJSON := fmt.Sprintf(`{"success": true,"matchID": %v,"details": %v}`, matchID, gameResult)
 
-		require.NoError(t, c.SendResult(context.Background(), []byte(result)))
+		require.NoError(t, c.SendResult(context.Background(), matchID, []byte(gameResult)))
 
 		msg, err := stream.GetLastMsgForSubject(ctx, resultSubject)
 		require.NoError(t, err)
-
-		assert.Equal(t, []byte(expected), msg.Data)
+		assert.JSONEq(t, expectedJSON, string(msg.Data))
 	})
 }

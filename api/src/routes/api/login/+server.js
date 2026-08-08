@@ -1,41 +1,32 @@
-import { findUserByLogin, setSession, deleteSession, getLoginFromToken, tokenExists } from '$lib/db.js';
-import bcrypt from 'bcryptjs';
 import { json } from '@sveltejs/kit';
-import { handleError } from '$lib/error_handler.js';
-import { generateToken } from '$lib/helpers.js';
+import { verifyPassword, addSession } from '$lib/db.js';
+import { ERRORS } from '$lib/errors.js';
+import { validateCredentialsSchema } from '$lib/validate.js';
+import { httpLogger } from '$lib/logger.js';
 
-export async function POST({request})
-{
-    const {login, password} = await request.json();
-    const result = await findUserByLogin(login);
-    if(result.length == 0) {
-        return json({sukces: false, msg: "Podany login nie istnieje"});
+export async function POST({ request, cookies }) {
+    const result = await validateCredentialsSchema(request);
+    if (result.error !== undefined) return result.error;
+
+    if (!(await verifyPassword(result.data.login, result.data.password))) {
+        return ERRORS.invalidCredentials();
     }
-    
-    if(await bcrypt.compare(password, result[0].password)){
-        return json({
-            sukces: true,
-            msg: generateToken(login)
-        });
+
+    const token = await addSession(result.data.login);
+    if (token === null) {
+        // user gone, so credentials are no longer valid from user perspective
+        httpLogger.warn(
+            { login: result.data.login },
+            'login failed, user no longer exists'
+        );
+        return ERRORS.invalidCredentials();
     }
-    else{
-        return json({
-            sukces: false,
-            msg: "Podane hasło jest błędne"
-        });
-    }
-}
 
-export async function DELETE({request}){
-    const {token} = await request.json();
-
-    await deleteSession(token);
-    return json({sukces: true});
-}
-
-export async function GET({url}){
-    const token = url.searchParams.get('token');
-    
-    if((await tokenExists(token)).length == 0) return json({sukces: false});
-    return json({sukces: true});
+    cookies.set('session', token, {
+        path: '/',
+        httpOnly: true,
+        secure: true,
+        sameSite: 'strict',
+    });
+    return json({});
 }

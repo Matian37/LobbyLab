@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"os/exec"
 	"slices"
@@ -83,15 +84,21 @@ func (s *GameServer) Stop(ctx context.Context) error {
 
 	s.startWait()
 
-	s.cmd.Process.Signal(syscall.SIGTERM)
+	if err := s.cmd.Process.Signal(syscall.SIGTERM); err != nil {
+		slog.Warn("failed to send SIGTERM", "pid", s.cmd.Process.Pid, "err", err)
+	}
 
 	select {
 	case <-s.waitChannel:
 		// kill remaining children
-		syscall.Kill(-s.pgid, syscall.SIGKILL)
+		if err := syscall.Kill(-s.pgid, syscall.SIGKILL); err != nil {
+			slog.Warn("failed to kill remaining children", "pgid", s.pgid, "err", err)
+		}
 		return nil
 	case <-ctx.Done():
-		syscall.Kill(-s.pgid, syscall.SIGKILL)
+		if err := syscall.Kill(-s.pgid, syscall.SIGKILL); err != nil {
+			slog.Warn("failed to kill remaining children", "pgid", s.pgid, "err", err)
+		}
 		<-s.waitChannel
 		return ctx.Err()
 	}
@@ -107,7 +114,10 @@ func (s *GameServer) GetResult(ctx context.Context) ([]byte, error) {
 		return []byte{}, err
 	}
 
-	s.resultFile.Seek(0, 0)
+	_, err := s.resultFile.Seek(0, 0)
+	if err != nil {
+		return []byte{}, err
+	}
 	result, err := io.ReadAll(s.resultFile)
 	if err != nil {
 		return []byte{}, err
@@ -133,25 +143,32 @@ func (s *GameServer) wait(ctx context.Context) error {
 // start wait goroutine and create waitChannel
 //
 // Note: use this instead of s.cmd.Wait() and only when cmd has started
-func (s *GameServer) startWait() error {
+func (s *GameServer) startWait() {
 	if s.waitChannel == nil {
 		s.waitChannel = make(chan error, 1)
 		go func() {
 			s.waitChannel <- s.cmd.Wait()
 		}()
 	}
-	return nil
 }
 
 func (s *GameServer) cleanup() {
 	if s.configFile != nil {
-		s.configFile.Close()
-		os.Remove(s.configFile.Name())
+		if err := s.configFile.Close(); err != nil {
+			slog.Warn("failed to close config file", "err", err)
+		}
+		if err := os.Remove(s.configFile.Name()); err != nil {
+			slog.Warn("failed to remove config file", "err", err)
+		}
 		s.configFile = nil
 	}
 	if s.resultFile != nil {
-		s.resultFile.Close()
-		os.Remove(s.resultFile.Name())
+		if err := s.resultFile.Close(); err != nil {
+			slog.Warn("failed to close result file", "err", err)
+		}
+		if err := os.Remove(s.resultFile.Name()); err != nil {
+			slog.Warn("failed to remove result file", "err", err)
+		}
 		s.resultFile = nil
 	}
 	if s.waitChannel != nil {

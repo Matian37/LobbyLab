@@ -1,71 +1,212 @@
 <script>
-    import { goto } from "$app/navigation";
-    import { getData, resetData } from "$lib/user_data";
-    let title = $state('Zaloguj sie');
-    let buttonText = $state('Play');
-    let user = false;
+    import { goto, invalidateAll } from '$app/navigation';
+    import { resolve } from '$app/paths';
+    import { onMount, onDestroy } from 'svelte';
+    import { page } from '$app/stores';
+    import { env } from '$env/dynamic/public';
 
-    LoadUser();
-    async function LoadUser(){
-        let data = await getData();
-        if(!data || data == undefined) title = "Zaloguj sie";
-        else{
-            user = {login: data.login, token: data.token};
-            title = data.login;
-        } 
-    }
+    let rows = $state([]);
+    let user = $derived($page.data?.login);
+    let title = $derived(user ?? 'Log in');
+    let matchmaking = $state(false);
+    let matchmakingError = $state('');
+    let matchmakingSeconds = $state(0);
+    let currentMatch = $state(null);
+    let matchmakingSocket = null;
+    let matchmakingTimer = null;
+    let matchFound = false;
+    let cancelled = false;
 
-    export function changePage(path) {
-        console.log("KLIKKKK");
-        goto(path);
-    }
+    onMount(async () => {
+        invalidateAll();
+        LoadMatches();
 
-    async function logout(){
-        if(!user) return;
-        resetData();
-        const response = await fetch('/api/login', {
-            method: 'DELETE',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({token: user.token})
+        if (!user) return;
+        await loadCurrentMatch();
+    });
+
+    onDestroy(() => {
+        matchmakingSocket?.close();
+        stopTimer();
+    });
+
+    async function LoadMatches() {
+        if (!user) return;
+        const query = await fetch(`/api/results`, {
+            method: 'GET',
         });
-        user = null;
+        if (!query.ok) return;
 
-        title = "Zaloguj sie";
+        const response = await query.json();
+
+        rows = response.matches.filter((row) => row.details !== null);
     }
 
-    async function play(){
-        if(!user) 
-        {
-            console.debug('zaloguj sie~!!');
+    async function loadCurrentMatch() {
+        const response = await fetch('/api/match', {
+            method: 'GET',
+        });
+        if (!response.ok) return;
+
+        const { match } = await response.json();
+        currentMatch = match;
+    }
+
+    async function logout() {
+        if (!user) return;
+        await fetch('/api/logout', {
+            method: 'POST',
+        });
+        await invalidateAll();
+    }
+
+    async function play() {
+        if (!user) {
+            console.debug('log in first');
             return;
         }
-        if(await isInWaitingList(user.token)){
-            console.debug('jestes juz w kolejce');
+
+        if (currentMatch) {
+            launchGame(currentMatch);
             return;
+        }
+
+        if (matchmaking) {
+            cancelMatchmaking();
+            return;
+        }
+
+        matchmakingError = '';
+        matchmaking = true;
+        cancelled = false;
+        startTimer();
+
+        const wsProtocol = location.protocol === 'https:' ? 'wss' : 'ws';
+        matchmakingSocket = new WebSocket(
+            `${wsProtocol}://${location.host}/api/connection`
+        );
+        matchmakingSocket.onmessage = (event) => {
+            const payload = JSON.parse(event.data);
+            if (payload.host !== undefined && payload.port !== undefined) {
+                matchFound = true;
+                currentMatch = payload;
+                launchGame(payload);
+            }
+        };
+        matchmakingSocket.onclose = (event) => {
+            matchmaking = false;
+            stopTimer();
+            if (matchFound) return;
+            if (cancelled) return;
+            if (event.code === 4000) {
+                location.reload();
+                return;
+            }
+            matchmakingError = 'Connection issue, try again later';
+        };
+        matchmakingSocket.onerror = () => {
+            matchmaking = false;
+            stopTimer();
+            if (matchFound) return;
+            if (cancelled) return;
+            matchmakingError = 'Connection issue, try again later';
+        };
+    }
+
+    function cancelMatchmaking() {
+        cancelled = true;
+        if (matchmakingSocket) {
+            if (matchmakingSocket.readyState === WebSocket.OPEN) {
+                matchmakingSocket.close();
+            } else if (matchmakingSocket.readyState === WebSocket.CONNECTING) {
+                matchmakingSocket.onopen = () => matchmakingSocket.close();
+            }
+        }
+        matchmakingSocket = null;
+        matchmaking = false;
+        stopTimer();
+        matchmakingError = '';
+    }
+
+    function launchGame(match) {
+        const url = env.PUBLIC_GAME_LAUNCH_URL.replaceAll(
+            '{host}',
+            encodeURIComponent(match.host)
+        )
+            .replaceAll('{port}', encodeURIComponent(match.port))
+            .replaceAll('{token}', encodeURIComponent(match.matchAuthToken));
+        location.href = url;
+    }
+
+    function startTimer() {
+        matchmakingSeconds = 0;
+        matchmakingTimer = setInterval(() => {
+            matchmakingSeconds++;
+        }, 1000);
+    }
+
+    function stopTimer() {
+        if (matchmakingTimer !== null) {
+            clearInterval(matchmakingTimer);
+            matchmakingTimer = null;
         }
     }
 
-    async function isInWaitingList(token)
-    {
-        let response = await fetch(`/api/waiting?token=${token}`);
-        let wynik = await response.json();
-        return wynik.sukces;
+    function formatTime(totalSeconds) {
+        const minutes = String(Math.floor(totalSeconds / 60)).padStart(2, '0');
+        const seconds = String(totalSeconds % 60).padStart(2, '0');
+        return `${minutes}:${seconds}`;
     }
 </script>
 
-<button onclick={() => changePage("/login")} data-testid="login-page">
+<button onclick={() => goto(resolve('/login'))} data-testid="login-page">
     Login
 </button>
-<button onclick={() => changePage("/register")}>
-    Register
-</button>
-<button onclick={() => logout()} data-testid='logout'>
-    Log out
-</button>
-<button onclick={()=> play()}>
-    {buttonText}
-</button>
+<button onclick={() => goto(resolve('/register'))}> Register </button>
+<button onclick={() => logout()} data-testid="logout"> Log out </button>
+{#if user}
+    <button onclick={() => play()} data-testid="play">
+        {currentMatch
+            ? 'Join'
+            : matchmaking
+              ? `Cancel ${formatTime(matchmakingSeconds)}`
+              : 'Play'}
+    </button>
+{/if}
 
-<h1 data-testid='title'>{title}</h1>
+<h1 data-testid="title">{title}</h1>
+
+{#if matchmakingError}
+    <p class="error" data-testid="error">{matchmakingError}</p>
+{/if}
+
+<table>
+    <thead>
+        <tr>
+            {#if rows.length > 0}
+                {#each Array(rows[0].details.players.length) as _, i (i)}
+                    <th>Player {i + 1}</th>
+                {/each}
+                <th>Winner</th>
+            {/if}
+        </tr>
+    </thead>
+    <tbody>
+        {#if rows.length > 0}
+            {#each rows as row, i (i)}
+                <tr>
+                    {#each row.details.players as player (player)}
+                        <td>{player}</td>
+                    {/each}
+                    <td>{row.details.winner}</td>
+                </tr>
+            {/each}
+        {/if}
+    </tbody>
+</table>
+
+<style>
+    .error {
+        color: red;
+    }
+</style>

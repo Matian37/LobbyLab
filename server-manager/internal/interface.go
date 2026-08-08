@@ -1,35 +1,52 @@
+//go:generate go run go.uber.org/mock/mockgen -source=./interface.go -destination=./mocks/interface.go -package=mocks
+
 package internal
 
 import (
 	"context"
 	"time"
-
-	"github.com/moby/moby/api/types/network"
 )
 
-type DockerClient interface {
-	Init(config *EnvConfig) error
-	CreateWorkerContainer(ctx context.Context) (string, error)
-	IsContainerOK(ctx context.Context, id string) (bool, error)
+type DockerConnection interface {
+	Open(config *EnvConfig) error
+	Close() error
+	SpawnContainer(ctx context.Context) (string, error)
 	RestartContainer(ctx context.Context, id string) error
 	KillContainer(ctx context.Context, id string) error
-	GetPorts(ctx context.Context, containerID string) (network.PortMap, error)
-	Close() error
+	GetGamePort(ctx context.Context, containerID string) (string, error)
+	RemoveZombieWorkers(ctx context.Context) error
 }
 
 type BrokerConnection interface {
-	Open(timeout time.Duration, config *EnvConfig) error
-	SendPing(ctx context.Context) error
-	GetPong(ctx context.Context) (string, time.Time, error)
-	AssignJob(ctx context.Context, workerID string, config string) error
+	Open(ctx context.Context, config *EnvConfig) error
 	Close() error
+	AssignJob(ctx context.Context, workerID string, config MatchConfig) error
+	// GetWorkersPong broadcasts a ping to all active workers
+	// and returns those that respond before the timeout.
+	GetWorkersPong(ctx context.Context, pongTimeout time.Duration) (Responders, error)
+	GetResult(ctx context.Context) (Message, error)
 }
 
 type WorkerManager interface {
-	Init(ctx context.Context, config *EnvConfig, workerCount int) error
+	Start(ctx context.Context) error
+	Shutdown()
 	WaitForFreeWorker(ctx context.Context)
-	AssignMatch(ctx context.Context, config string) (network.Port, error)
-	Monitor(ctx context.Context)
-	SaveResults(ctx context.Context)
-	Close(ctx context.Context)
+	AssignMatch(ctx context.Context, config MatchConfig) (ServerInfo, error)
+}
+
+type DatabaseConnection interface {
+	Open(ctx context.Context) error
+	Close() error
+	SaveMatchResults(ctx context.Context, results Result) error
+	GatherMatchPlayers(ctx context.Context) ([]User, error)
+	AddMatch(ctx context.Context, users []User, serverInfo ServerInfo, matchId int) error
+	GetNextMatchId(ctx context.Context) (int, error)
+	GenerateAuthTokens(ctx context.Context, users []User) ([]User, error)
+	RemoveMatchStatus(ctx context.Context, matchID int) error
+	SetupMatchmaking(ctx context.Context) error
+}
+
+type Message interface {
+	Data() []byte
+	Ack() error
 }

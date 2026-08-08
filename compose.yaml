@@ -1,3 +1,5 @@
+name: multiplayer-asset
+
 services:
   db:
     image: postgres:18.4-alpine
@@ -32,14 +34,14 @@ services:
       start_period: 5s
 
   api:
-    build: 
+    build:
       context: ./api
       dockerfile: Dockerfile
     environment:
-      POSTGRES_DB: ${POSTGRES_DB}
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      PORT: 3000
+      LOG_LEVEL: info
+      PUBLIC_GAME_LAUNCH_URL: ${PUBLIC_GAME_LAUNCH_URL}
     ports:
       - "3000:3000"
     networks:
@@ -49,12 +51,24 @@ services:
         condition: service_healthy
 
   server-manager:
-    image: golang:1.26-alpine
+    build:
+      context: ./server-manager
+      dockerfile: Dockerfile
     environment:
-      POSTGRES_DB: ${POSTGRES_DB}
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      DATABASE_URI: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
       NATS_URI: ${NATS_URI}
+      NATS_NETWORK_NAME: "multiplayer-asset_nats-net"
+      PUBLIC_HOST: ${PUBLIC_HOST}
+      GAME_SERVER_IMAGE: "game-server:latest"
+      GAME_SERVER_COUNT: 2
+      GAME_SERVER_EXPOSE_PORTS: "7777/udp,8080"
+      GAME_SERVER_CLIENT_PORT: "7777/udp"
+      GAME_SERVER_LOG_LEVEL: info
+      PLAYERS_PER_ROOM: 2
+      LOG_LEVEL: info
+    volumes:
+      # TODO: required but dangerous, docker socket proxy would be safer instead
+      - /var/run/docker.sock:/var/run/docker.sock
     networks:
       - db-net
       - nats-net
@@ -67,8 +81,7 @@ services:
 networks:
   db-net:
     driver: bridge
-    #internal: true
+    internal: true
   nats-net:
     driver: bridge
     internal: true
-
