@@ -1,40 +1,34 @@
 <script>
+    import { enhance } from '$app/forms';
     import { goto } from '$app/navigation';
     import { resolve } from '$app/paths';
     import { UNEXPECTED_ERROR_MSG } from '$lib/errors.js';
 
-    let login = $state(''),
-        password = $state(''),
-        errorMessage = $state('');
+    let errorMessage = $state('');
 
-    async function submit() {
-        const response = await fetch('/api/login', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ login: login, password: password }),
-        });
-        console.log('response received');
-
-        if (response.ok) {
-            console.log('logged in successfully');
+    const enhanceLogin = enhance(() => {
+        return async ({ result }) => {
+            if (result.type === 'failure') {
+                errorMessage = result.data?.msg ?? UNEXPECTED_ERROR_MSG;
+                return;
+            }
+            if (result.type === 'error') {
+                errorMessage = UNEXPECTED_ERROR_MSG;
+                return;
+            }
             errorMessage = '';
             await goto(resolve('/'));
-        } else {
-            const err = await response
-                .json()
-                .catch(() => ({ msg: UNEXPECTED_ERROR_MSG }));
-            errorMessage = err.msg;
-        }
-    }
+        };
+    });
 </script>
 
 <button onclick={() => goto(resolve('/'))}>Back</button>
-Login <input bind:value={login} data-testid="login-input" />
-Password
-<input bind:value={password} type="password" data-testid="password-input" />
-<button onclick={() => submit()} data-testid="login-apply">Submit</button>
+<form method="POST" use:enhance={enhanceLogin}>
+    Login <input name="login" data-testid="login-input" />
+    Password
+    <input name="password" type="password" data-testid="password-input" />
+    <button type="submit" data-testid="login-apply">Submit</button>
+</form>
 
 <p data-testid="error-text">{errorMessage}</p>
 
