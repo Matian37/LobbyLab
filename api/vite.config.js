@@ -1,6 +1,6 @@
 import { sveltekit } from '@sveltejs/kit/vite';
 import { defineConfig } from 'vite';
-import { fileURLToPath } from 'node:url';
+import path from 'node:path';
 import { websocketLogger } from './src/lib/logger.js';
 
 // Track servers we've already attached to, so restarts don't double-bind
@@ -46,22 +46,21 @@ function websocketServer() {
     };
 }
 
-const alias = {
-    $lib: fileURLToPath(new URL('./src/lib', import.meta.url)),
-    $routes: fileURLToPath(new URL('./src/routes', import.meta.url)),
-};
-
 export default defineConfig({
     plugins: [sveltekit(), websocketServer()],
     test: {
         environment: 'jsdom',
-        alias,
         env: {
             LOG_LEVEL: 'silent',
         },
         chaiConfig: { truncateThreshold: 0 },
     },
     resolve: {
-        alias,
+        conditions: process.env.VITEST ? ['browser'] : undefined,
+        alias: {
+            $lib: path.resolve(import.meta.dirname, './src/lib'),
+            $routes: path.resolve(import.meta.dirname, './src/routes'),
+            ...(process.env.VITEST && { ws: import.meta.resolve('ws') }),
+        },
     },
 });
