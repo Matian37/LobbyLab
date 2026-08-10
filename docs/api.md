@@ -105,8 +105,8 @@ referenced session still exists.
 
 ## GET `/api/session`
 
-Reports whether the session identified by the `session` cookie is currently
-active.
+Reports the login of the session identified by the `session` cookie. When the
+cookie is well-formed but the session no longer exists, the cookie is deleted.
 
 **Request body**
 
@@ -116,7 +116,8 @@ None.
 
 | Code | Response                       | Description                              |
 | ------ | -------------------------- | ---------------------------------------- |
-| 200    | `{ "exists": bool }`       | `true` when the session token is valid and active; `false` when it is well-formed but no longer exists. |
+| 200    | `{ "login": string }`     | The login the session belongs to. |
+| 200    | `{ "login": null }`       | The session no longer exists; the stale cookie is deleted. |
 | 401    | `{ "msg": "No session token provided" }` | No `session` cookie present. |
 | 401    | `{ "msg": "Invalid session token" }`     | Cookie value is not a valid token. |
 
