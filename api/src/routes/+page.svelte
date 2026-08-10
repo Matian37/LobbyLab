@@ -5,12 +5,8 @@
     import { onMount, onDestroy } from 'svelte';
     import { page } from '$app/stores';
     import { env } from '$env/dynamic/public';
-
-    const Status = Object.freeze({
-        NOT_ACTIVE: 'not active',
-        PENDING: 'pending',
-        FOUND: 'found',
-    });
+    import { formatButton, matchStatusString } from '$lib/format.js';
+    import { WaitingStatus } from '$lib/constants.js';
 
     class Timer {
         #timer = null;
@@ -33,16 +29,16 @@
     class Matchmaking {
         timer = new Timer();
         errorMessage = $state('');
-        status = $state(Status.NOT_ACTIVE);
+        status = $state(WaitingStatus.NOT_ACTIVE);
         socket = null;
 
         constructor(currentMatch) {
             this.currentMatch = currentMatch;
 
             if (this.currentMatch) {
-                this.status = Status.FOUND;
+                this.status = WaitingStatus.FOUND;
             } else {
-                this.status = Status.NOT_ACTIVE;
+                this.status = WaitingStatus.NOT_ACTIVE;
             }
 
             this.buttonText = $derived(
@@ -52,20 +48,20 @@
 
         pressButton() {
             switch (this.status) {
-                case Status.NOT_ACTIVE:
+                case WaitingStatus.NOT_ACTIVE:
                     this.#start();
                     break;
-                case Status.PENDING:
+                case WaitingStatus.PENDING:
                     this.#cancel();
                     break;
-                case Status.FOUND:
+                case WaitingStatus.FOUND:
                     this.#join();
                     break;
             }
         }
 
         #start() {
-            this.status = Status.PENDING;
+            this.status = WaitingStatus.PENDING;
             this.errorMessage = '';
             this.timer.start();
 
@@ -75,19 +71,19 @@
             );
 
             this.socket.onmessage = (event) => {
-                if (this.status !== Status.PENDING) return;
+                if (this.status !== WaitingStatus.PENDING) return;
 
                 const payload = JSON.parse(event.data);
-                this.status = Status.FOUND;
+                this.status = WaitingStatus.FOUND;
                 this.currentMatch = payload;
 
                 this.#join();
             };
 
             this.socket.onclose = (event) => {
-                if (this.status !== Status.PENDING) return;
+                if (this.status !== WaitingStatus.PENDING) return;
 
-                this.status = Status.NOT_ACTIVE;
+                this.status = WaitingStatus.NOT_ACTIVE;
 
                 // if is 'already in match' error code
                 if (event.code === 4000) {
@@ -100,16 +96,16 @@
             };
 
             this.socket.onerror = () => {
-                if (this.status !== Status.PENDING) return;
+                if (this.status !== WaitingStatus.PENDING) return;
 
-                this.status = Status.NOT_ACTIVE;
+                this.status = WaitingStatus.NOT_ACTIVE;
                 this.errorMessage = 'Connection issue, try again later';
                 this.close();
             };
         }
 
         #cancel() {
-            this.status = Status.NOT_ACTIVE;
+            this.status = WaitingStatus.NOT_ACTIVE;
             this.close();
         }
 
@@ -138,43 +134,12 @@
         }
     }
 
-    function formatTime(totalSeconds) {
-        const hours = String(Math.floor(totalSeconds / 3600)).padStart(2, '0');
-        const minutes = String(Math.floor((totalSeconds % 3600) / 60)).padStart(
-            2,
-            '0'
-        );
-        const seconds = String(totalSeconds % 60).padStart(2, '0');
-
-        if (hours > 0) {
-            return `${hours}:${minutes}:${seconds}`;
-        }
-        return `${minutes}:${seconds}`;
-    }
-
-    function formatButton(status, totalSeconds) {
-        switch (status) {
-            case Status.NOT_ACTIVE:
-                return 'Play';
-            case Status.PENDING:
-                return 'Cancel ' + formatTime(totalSeconds);
-            case Status.FOUND:
-                return 'Join';
-        }
-    }
-
     let user = $derived($page.data?.login);
     let title = $derived(user ?? 'Log in');
     let matches = $derived($page.data?.matches ?? []);
     let currentMatch = $page.data?.currentMatch ?? null;
 
     let matchmaking = new Matchmaking(currentMatch);
-
-    function matchStatusString(match) {
-        if (match.active) return 'ACTIVE';
-        if (match.canceled) return 'CANCELED';
-        return 'FINISHED';
-    }
 
     const enhanceLogout = () => {
         return async ({ result }) => {
