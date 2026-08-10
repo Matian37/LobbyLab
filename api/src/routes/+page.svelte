@@ -1,64 +1,43 @@
 <script>
+    import { enhance } from '$app/forms';
     import { goto, invalidateAll } from '$app/navigation';
     import { resolve } from '$app/paths';
     import { onMount, onDestroy } from 'svelte';
     import { page } from '$app/stores';
     import { env } from '$env/dynamic/public';
 
-    let rows = $state([]);
     let user = $derived($page.data?.login);
     let title = $derived(user ?? 'Log in');
+    // TODO: don't filter matches without details; make the table render them
+    // better so this filter is not needed
+    let matches = $derived(
+        ($page.data?.matches ?? []).filter((row) => row.details !== null)
+    );
+    let currentMatch = $state($page.data?.currentMatch ?? null);
     let matchmaking = $state(false);
     let matchmakingError = $state('');
     let matchmakingSeconds = $state(0);
-    let currentMatch = $state(null);
     let matchmakingSocket = null;
     let matchmakingTimer = null;
     let matchFound = false;
     let cancelled = false;
 
-    onMount(async () => {
-        invalidateAll();
-        LoadMatches();
+    const enhanceLogout = () => {
+        return async ({ result }) => {
+            if (result.type === 'success') {
+                await invalidateAll();
+            }
+        };
+    };
 
-        if (!user) return;
-        await loadCurrentMatch();
+    onMount(() => {
+        invalidateAll();
     });
 
     onDestroy(() => {
         matchmakingSocket?.close();
         stopTimer();
     });
-
-    async function LoadMatches() {
-        if (!user) return;
-        const query = await fetch(`/api/results`, {
-            method: 'GET',
-        });
-        if (!query.ok) return;
-
-        const response = await query.json();
-
-        rows = response.matches.filter((row) => row.details !== null);
-    }
-
-    async function loadCurrentMatch() {
-        const response = await fetch('/api/match', {
-            method: 'GET',
-        });
-        if (!response.ok) return;
-
-        const { match } = await response.json();
-        currentMatch = match;
-    }
-
-    async function logout() {
-        if (!user) return;
-        await fetch('/api/logout', {
-            method: 'POST',
-        });
-        await invalidateAll();
-    }
 
     async function play() {
         if (!user) {
@@ -119,7 +98,8 @@
             if (matchmakingSocket.readyState === WebSocket.OPEN) {
                 matchmakingSocket.close();
             } else if (matchmakingSocket.readyState === WebSocket.CONNECTING) {
-                matchmakingSocket.onopen = () => matchmakingSocket.close();
+                const socket = matchmakingSocket;
+                socket.onopen = () => socket.close();
             }
         }
         matchmakingSocket = null;
@@ -163,7 +143,14 @@
     Login
 </button>
 <button onclick={() => goto(resolve('/register'))}> Register </button>
-<button onclick={() => logout()} data-testid="logout"> Log out </button>
+<form
+    method="POST"
+    action="?/logout"
+    use:enhance={enhanceLogout}
+    data-testid="logout-form"
+>
+    <button type="submit" data-testid="logout"> Log out </button>
+</form>
 {#if user}
     <button onclick={() => play()} data-testid="play">
         {currentMatch
@@ -183,8 +170,8 @@
 <table>
     <thead>
         <tr>
-            {#if rows.length > 0}
-                {#each Array(rows[0].details.players.length) as _, i (i)}
+            {#if matches.length > 0}
+                {#each Array(matches[0].details.players.length) as _, i (i)}
                     <th>Player {i + 1}</th>
                 {/each}
                 <th>Winner</th>
@@ -192,13 +179,13 @@
         </tr>
     </thead>
     <tbody>
-        {#if rows.length > 0}
-            {#each rows as row, i (i)}
+        {#if matches.length > 0}
+            {#each matches as match, i (i)}
                 <tr>
-                    {#each row.details.players as player (player)}
+                    {#each match.details.players as player (player)}
                         <td>{player}</td>
                     {/each}
-                    <td>{row.details.winner}</td>
+                    <td>{match.details.winner}</td>
                 </tr>
             {/each}
         {/if}

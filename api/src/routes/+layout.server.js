@@ -1,13 +1,10 @@
-import { getLoginFromToken } from '$lib/db';
+import { GET } from '$routes/api/session/+server.js';
 
 export async function load({ cookies }) {
-    const token = cookies.get('session');
-    if (token === undefined) return null;
+    const response = await GET({ cookies });
+    if (!response.ok) return null;
 
-    const login = await getLoginFromToken(token);
-    if (login === null) {
-        cookies.delete('session', { path: '/' });
-        return null;
-    }
-    return { login: login };
+    const { login } = await response.json();
+    if (login === null) return null;
+    return { login };
 }
