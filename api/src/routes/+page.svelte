@@ -6,17 +6,175 @@
     import { page } from '$app/stores';
     import { env } from '$env/dynamic/public';
 
+    const Status = Object.freeze({
+        NOT_ACTIVE: 'not active',
+        PENDING: 'pending',
+        FOUND: 'found',
+    });
+
+    class Timer {
+        #timer = null;
+        seconds = $state(0);
+
+        start() {
+            this.seconds = 0;
+            this.#timer = setInterval(() => {
+                this.seconds++;
+            }, 1000);
+        }
+
+        stop() {
+            if (this.#timer === null) return;
+            clearInterval(this.#timer);
+            this.#timer = null;
+        }
+    }
+
+    class Matchmaking {
+        timer = new Timer();
+        errorMessage = $state('');
+        status = $state(Status.NOT_ACTIVE);
+        socket = null;
+
+        constructor(currentMatch) {
+            this.currentMatch = currentMatch;
+
+            if (this.currentMatch) {
+                this.status = Status.FOUND;
+            } else {
+                this.status = Status.NOT_ACTIVE;
+            }
+
+            this.buttonText = $derived(
+                formatButton(matchmaking.status, matchmaking.timer.seconds)
+            );
+        }
+
+        pressButton() {
+            switch (this.status) {
+                case Status.NOT_ACTIVE:
+                    this.#start();
+                    break;
+                case Status.PENDING:
+                    this.#cancel();
+                    break;
+                case Status.FOUND:
+                    this.#join();
+                    break;
+            }
+        }
+
+        #start() {
+            this.status = Status.PENDING;
+            this.errorMessage = '';
+            this.timer.start();
+
+            const wsProtocol = location.protocol === 'https:' ? 'wss' : 'ws';
+            this.socket = new WebSocket(
+                `${wsProtocol}://${location.host}/api/connection`
+            );
+
+            this.socket.onmessage = (event) => {
+                if (this.status !== Status.PENDING) return;
+
+                const payload = JSON.parse(event.data);
+                this.status = Status.FOUND;
+                this.currentMatch = payload;
+
+                this.#join();
+            };
+
+            this.socket.onclose = (event) => {
+                if (this.status !== Status.PENDING) return;
+
+                this.status = Status.NOT_ACTIVE;
+
+                // if is 'already in match' error code
+                if (event.code === 4000) {
+                    this.close();
+                    location.reload();
+                } else {
+                    this.errorMessage = 'Connection issue, try again later';
+                    this.close();
+                }
+            };
+
+            this.socket.onerror = () => {
+                if (this.status !== Status.PENDING) return;
+
+                this.status = Status.NOT_ACTIVE;
+                this.errorMessage = 'Connection issue, try again later';
+                this.close();
+            };
+        }
+
+        #cancel() {
+            this.status = Status.NOT_ACTIVE;
+            this.close();
+        }
+
+        #join() {
+            const { host, port, matchAuthToken } = this.currentMatch;
+            let url = env.PUBLIC_GAME_LAUNCH_URL;
+            location.href = url
+                .replaceAll('{host}', encodeURIComponent(host))
+                .replaceAll('{port}', encodeURIComponent(port))
+                .replaceAll('{token}', encodeURIComponent(matchAuthToken));
+        }
+
+        close() {
+            this.timer.stop();
+
+            if (!this.socket) return;
+
+            if (this.socket.readyState === WebSocket.CONNECTING) {
+                const socket = this.socket;
+                socket.onopen = () => socket.close();
+            } else {
+                this.socket.close();
+            }
+
+            this.socket = null;
+        }
+    }
+
+    function formatTime(totalSeconds) {
+        const hours = String(Math.floor(totalSeconds / 3600)).padStart(2, '0');
+        const minutes = String(Math.floor((totalSeconds % 3600) / 60)).padStart(
+            2,
+            '0'
+        );
+        const seconds = String(totalSeconds % 60).padStart(2, '0');
+
+        if (hours > 0) {
+            return `${hours}:${minutes}:${seconds}`;
+        }
+        return `${minutes}:${seconds}`;
+    }
+
+    function formatButton(status, totalSeconds) {
+        switch (status) {
+            case Status.NOT_ACTIVE:
+                return 'Play';
+            case Status.PENDING:
+                return 'Cancel ' + formatTime(totalSeconds);
+            case Status.FOUND:
+                return 'Join';
+        }
+    }
+
     let user = $derived($page.data?.login);
     let title = $derived(user ?? 'Log in');
     let matches = $derived($page.data?.matches ?? []);
-    let currentMatch = $state($page.data?.currentMatch ?? null);
-    let matchmaking = $state(false);
-    let matchmakingError = $state('');
-    let matchmakingSeconds = $state(0);
-    let matchmakingSocket = null;
-    let matchmakingTimer = null;
-    let matchFound = false;
-    let cancelled = false;
+    let currentMatch = $page.data?.currentMatch ?? null;
+
+    let matchmaking = new Matchmaking(currentMatch);
+
+    function matchStatusString(match) {
+        if (match.active) return 'ACTIVE';
+        if (match.canceled) return 'CANCELED';
+        return 'FINISHED';
+    }
 
     const enhanceLogout = () => {
         return async ({ result }) => {
@@ -31,114 +189,8 @@
     });
 
     onDestroy(() => {
-        matchmakingSocket?.close();
-        stopTimer();
+        matchmaking.close();
     });
-
-    async function play() {
-        if (!user) {
-            console.debug('log in first');
-            return;
-        }
-
-        if (currentMatch) {
-            launchGame(currentMatch);
-            return;
-        }
-
-        if (matchmaking) {
-            cancelMatchmaking();
-            return;
-        }
-
-        matchmakingError = '';
-        matchmaking = true;
-        cancelled = false;
-        startTimer();
-
-        const wsProtocol = location.protocol === 'https:' ? 'wss' : 'ws';
-        matchmakingSocket = new WebSocket(
-            `${wsProtocol}://${location.host}/api/connection`
-        );
-        matchmakingSocket.onmessage = (event) => {
-            const payload = JSON.parse(event.data);
-            if (payload.host !== undefined && payload.port !== undefined) {
-                matchFound = true;
-                currentMatch = payload;
-                launchGame(payload);
-            }
-        };
-        matchmakingSocket.onclose = (event) => {
-            matchmaking = false;
-            stopTimer();
-            if (matchFound) return;
-            if (cancelled) return;
-            if (event.code === 4000) {
-                location.reload();
-                return;
-            }
-            matchmakingError = 'Connection issue, try again later';
-        };
-        matchmakingSocket.onerror = () => {
-            matchmaking = false;
-            stopTimer();
-            if (matchFound) return;
-            if (cancelled) return;
-            matchmakingError = 'Connection issue, try again later';
-        };
-    }
-
-    function cancelMatchmaking() {
-        cancelled = true;
-        if (matchmakingSocket) {
-            if (matchmakingSocket.readyState === WebSocket.OPEN) {
-                matchmakingSocket.close();
-            } else if (matchmakingSocket.readyState === WebSocket.CONNECTING) {
-                const socket = matchmakingSocket;
-                socket.onopen = () => socket.close();
-            }
-        }
-        matchmakingSocket = null;
-        matchmaking = false;
-        stopTimer();
-        matchmakingError = '';
-    }
-
-    function launchGame(match) {
-        const url = env.PUBLIC_GAME_LAUNCH_URL.replaceAll(
-            '{host}',
-            encodeURIComponent(match.host)
-        )
-            .replaceAll('{port}', encodeURIComponent(match.port))
-            .replaceAll('{token}', encodeURIComponent(match.matchAuthToken));
-        location.href = url;
-    }
-
-    function matchStatus(match) {
-        if (match.active) return 'ACTIVE';
-        if (match.canceled) return 'CANCELED';
-        return 'FINISHED';
-    }
-
-    function startTimer() {
-        matchmakingSeconds = 0;
-        matchmakingTimer = setInterval(() => {
-            matchmakingSeconds++;
-        }, 1000);
-    }
-
-    function stopTimer() {
-        if (matchmakingTimer !== null) {
-            clearInterval(matchmakingTimer);
-            matchmakingTimer = null;
-        }
-    }
-
-    function formatTime(totalSeconds) {
-        const minutes = String(Math.floor(totalSeconds / 60)).padStart(2, '0');
-        const seconds = String(totalSeconds % 60).padStart(2, '0');
-        return `${minutes}:${seconds}`;
-    }
 </script>
 
 <button onclick={() => goto(resolve('/login'))} data-testid="login-page">
@@ -154,19 +206,15 @@
     <button type="submit" data-testid="logout"> Log out </button>
 </form>
 {#if user}
-    <button onclick={() => play()} data-testid="play">
-        {currentMatch
-            ? 'Join'
-            : matchmaking
-              ? `Cancel ${formatTime(matchmakingSeconds)}`
-              : 'Play'}
+    <button onclick={() => matchmaking.pressButton()} data-testid="play">
+        {matchmaking.buttonText}
     </button>
 {/if}
 
 <h1 data-testid="title">{title}</h1>
 
-{#if matchmakingError}
-    <p class="error" data-testid="error">{matchmakingError}</p>
+{#if matchmaking.errorMessage}
+    <p class="error" data-testid="error">{matchmaking.errorMessage}</p>
 {/if}
 
 <table>
@@ -183,7 +231,7 @@
             {#each matches as match (match.id)}
                 <tr>
                     <td>{match.id}</td>
-                    <td>{matchStatus(match)}</td>
+                    <td>{matchStatusString(match)}</td>
                     <td>{match.details?.players?.join(', ') ?? ''}</td>
                     <td>{match.details?.winner ?? ''}</td>
                 </tr>
