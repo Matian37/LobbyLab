@@ -61,8 +61,10 @@ describe('load', () => {
     it('loads the matches and the current match for a valid session', async () => {
         const matches = [
             {
+                id: 1,
                 details: { players: ['login', 'user2'], winner: 'login' },
                 canceled: false,
+                active: false,
             },
         ];
         db.getLoginFromToken.mockResolvedValue('login');

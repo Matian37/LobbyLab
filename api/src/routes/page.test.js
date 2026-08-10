@@ -195,54 +195,75 @@ describe('home page', () => {
                 loggedIn: true,
                 matches: [
                     {
+                        id: 1,
                         details: {
                             players: ['login', 'user2'],
                             winner: 'login',
                         },
                         canceled: false,
+                        active: false,
                     },
                     {
+                        id: 2,
                         details: {
                             players: ['user3', 'user4'],
                             winner: 'user4',
                         },
                         canceled: false,
+                        active: false,
                     },
                 ],
             });
 
             expect(getTableMatrix(screen.getByRole('table'))).toEqual([
-                ['Player 1', 'Player 2', 'Winner'],
-                ['login', 'user2', 'login'],
-                ['user3', 'user4', 'user4'],
+                ['ID', 'STATUS', 'PLAYERS', 'WINNER'],
+                ['1', 'FINISHED', 'login, user2', 'login'],
+                ['2', 'FINISHED', 'user3, user4', 'user4'],
             ]);
         });
 
-        it('filters out matches without details', async () => {
+        it('shows matches without details with their status', async () => {
             await renderHome({
                 loggedIn: true,
                 matches: [
-                    { details: null, canceled: true },
                     {
+                        id: 3,
+                        details: null,
+                        canceled: true,
+                        active: false,
+                    },
+                    {
+                        id: 4,
+                        details: null,
+                        canceled: false,
+                        active: true,
+                    },
+                    {
+                        id: 1,
                         details: {
                             players: ['login', 'user2'],
                             winner: 'login',
                         },
                         canceled: false,
+                        active: false,
                     },
                 ],
             });
 
             expect(getTableMatrix(screen.getByRole('table'))).toEqual([
-                ['Player 1', 'Player 2', 'Winner'],
-                ['login', 'user2', 'login'],
+                ['ID', 'STATUS', 'PLAYERS', 'WINNER'],
+                ['3', 'CANCELED', '', ''],
+                ['4', 'ACTIVE', '', ''],
+                ['1', 'FINISHED', 'login, user2', 'login'],
             ]);
         });
 
         it('renders an empty table when there are no matches', async () => {
             await renderHome({ loggedIn: true, matches: [] });
 
-            expect(getTableMatrix(screen.getByRole('table'))).toEqual([[]]);
+            expect(getTableMatrix(screen.getByRole('table'))).toEqual([
+                ['ID', 'STATUS', 'PLAYERS', 'WINNER'],
+            ]);
         });
     });
 

@@ -165,16 +165,19 @@ export async function sessionExist(token) {
 export async function getMatchResults(login) {
     return (
         await sql`
-            SELECT m.results, m.canceled
+            SELECT m.id, m.results, m.canceled, m.active
             FROM matches m
             WHERE m.id IN (
                 SELECT match_id
                 FROM user_matches
                 WHERE user_id = ${login} 
             )
+            ORDER BY m.id DESC
         `
     ).map((row) => ({
+        id: Number(row.id),
         details: row.results,
         canceled: row.canceled,
+        active: row.active,
     }));
 }

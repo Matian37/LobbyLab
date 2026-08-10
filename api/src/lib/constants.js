@@ -12,6 +12,12 @@ export const State = Object.freeze({
     CLOSED: 'CLOSED',
 });
 
+export const WaitingStatus = Object.freeze({
+    NOT_ACTIVE: 'not active',
+    PENDING: 'pending',
+    FOUND: 'found',
+});
+
 export const CONNECTION_DEFAULT_OPTIONS = Object.freeze({
     pingIntervalMs: 5_000,
     pongTimeoutMs: 3_000,

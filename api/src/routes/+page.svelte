@@ -5,22 +5,141 @@
     import { onMount, onDestroy } from 'svelte';
     import { page } from '$app/stores';
     import { env } from '$env/dynamic/public';
+    import { formatButton, matchStatusString } from '$lib/format.js';
+    import { WaitingStatus } from '$lib/constants.js';
+
+    class Timer {
+        #timer = null;
+        seconds = $state(0);
+
+        start() {
+            this.seconds = 0;
+            this.#timer = setInterval(() => {
+                this.seconds++;
+            }, 1000);
+        }
+
+        stop() {
+            if (this.#timer === null) return;
+            clearInterval(this.#timer);
+            this.#timer = null;
+        }
+    }
+
+    class Matchmaking {
+        timer = new Timer();
+        errorMessage = $state('');
+        status = $state(WaitingStatus.NOT_ACTIVE);
+        socket = null;
+
+        constructor(currentMatch) {
+            this.currentMatch = currentMatch;
+
+            if (this.currentMatch) {
+                this.status = WaitingStatus.FOUND;
+            } else {
+                this.status = WaitingStatus.NOT_ACTIVE;
+            }
+
+            this.buttonText = $derived(
+                formatButton(matchmaking.status, matchmaking.timer.seconds)
+            );
+        }
+
+        pressButton() {
+            switch (this.status) {
+                case WaitingStatus.NOT_ACTIVE:
+                    this.#start();
+                    break;
+                case WaitingStatus.PENDING:
+                    this.#cancel();
+                    break;
+                case WaitingStatus.FOUND:
+                    this.#join();
+                    break;
+            }
+        }
+
+        #start() {
+            this.status = WaitingStatus.PENDING;
+            this.errorMessage = '';
+            this.timer.start();
+
+            const wsProtocol = location.protocol === 'https:' ? 'wss' : 'ws';
+            this.socket = new WebSocket(
+                `${wsProtocol}://${location.host}/api/connection`
+            );
+
+            this.socket.onmessage = (event) => {
+                if (this.status !== WaitingStatus.PENDING) return;
+
+                const payload = JSON.parse(event.data);
+                this.status = WaitingStatus.FOUND;
+                this.currentMatch = payload;
+
+                this.#join();
+            };
+
+            this.socket.onclose = (event) => {
+                if (this.status !== WaitingStatus.PENDING) return;
+
+                this.status = WaitingStatus.NOT_ACTIVE;
+
+                // if is 'already in match' error code
+                if (event.code === 4000) {
+                    this.close();
+                    location.reload();
+                } else {
+                    this.errorMessage = 'Connection issue, try again later';
+                    this.close();
+                }
+            };
+
+            this.socket.onerror = () => {
+                if (this.status !== WaitingStatus.PENDING) return;
+
+                this.status = WaitingStatus.NOT_ACTIVE;
+                this.errorMessage = 'Connection issue, try again later';
+                this.close();
+            };
+        }
+
+        #cancel() {
+            this.status = WaitingStatus.NOT_ACTIVE;
+            this.close();
+        }
+
+        #join() {
+            const { host, port, matchAuthToken } = this.currentMatch;
+            let url = env.PUBLIC_GAME_LAUNCH_URL;
+            location.href = url
+                .replaceAll('{host}', encodeURIComponent(host))
+                .replaceAll('{port}', encodeURIComponent(port))
+                .replaceAll('{token}', encodeURIComponent(matchAuthToken));
+        }
+
+        close() {
+            this.timer.stop();
+
+            if (!this.socket) return;
+
+            if (this.socket.readyState === WebSocket.CONNECTING) {
+                const socket = this.socket;
+                socket.onopen = () => socket.close();
+            } else {
+                this.socket.close();
+            }
+
+            this.socket = null;
+        }
+    }
 
     let user = $derived($page.data?.login);
     let title = $derived(user ?? 'Log in');
-    // TODO: don't filter matches without details; make the table render them
-    // better so this filter is not needed
-    let matches = $derived(
-        ($page.data?.matches ?? []).filter((row) => row.details !== null)
-    );
-    let currentMatch = $state($page.data?.currentMatch ?? null);
-    let matchmaking = $state(false);
-    let matchmakingError = $state('');
-    let matchmakingSeconds = $state(0);
-    let matchmakingSocket = null;
-    let matchmakingTimer = null;
-    let matchFound = false;
-    let cancelled = false;
+    let matches = $derived($page.data?.matches ?? []);
+    let currentMatch = $page.data?.currentMatch ?? null;
+
+    let matchmaking = new Matchmaking(currentMatch);
 
     const enhanceLogout = () => {
         return async ({ result }) => {
@@ -35,108 +154,8 @@
     });
 
     onDestroy(() => {
-        matchmakingSocket?.close();
-        stopTimer();
+        matchmaking.close();
     });
-
-    async function play() {
-        if (!user) {
-            console.debug('log in first');
-            return;
-        }
-
-        if (currentMatch) {
-            launchGame(currentMatch);
-            return;
-        }
-
-        if (matchmaking) {
-            cancelMatchmaking();
-            return;
-        }
-
-        matchmakingError = '';
-        matchmaking = true;
-        cancelled = false;
-        startTimer();
-
-        const wsProtocol = location.protocol === 'https:' ? 'wss' : 'ws';
-        matchmakingSocket = new WebSocket(
-            `${wsProtocol}://${location.host}/api/connection`
-        );
-        matchmakingSocket.onmessage = (event) => {
-            const payload = JSON.parse(event.data);
-            if (payload.host !== undefined && payload.port !== undefined) {
-                matchFound = true;
-                currentMatch = payload;
-                launchGame(payload);
-            }
-        };
-        matchmakingSocket.onclose = (event) => {
-            matchmaking = false;
-            stopTimer();
-            if (matchFound) return;
-            if (cancelled) return;
-            if (event.code === 4000) {
-                location.reload();
-                return;
-            }
-            matchmakingError = 'Connection issue, try again later';
-        };
-        matchmakingSocket.onerror = () => {
-            matchmaking = false;
-            stopTimer();
-            if (matchFound) return;
-            if (cancelled) return;
-            matchmakingError = 'Connection issue, try again later';
-        };
-    }
-
-    function cancelMatchmaking() {
-        cancelled = true;
-        if (matchmakingSocket) {
-            if (matchmakingSocket.readyState === WebSocket.OPEN) {
-                matchmakingSocket.close();
-            } else if (matchmakingSocket.readyState === WebSocket.CONNECTING) {
-                const socket = matchmakingSocket;
-                socket.onopen = () => socket.close();
-            }
-        }
-        matchmakingSocket = null;
-        matchmaking = false;
-        stopTimer();
-        matchmakingError = '';
-    }
-
-    function launchGame(match) {
-        const url = env.PUBLIC_GAME_LAUNCH_URL.replaceAll(
-            '{host}',
-            encodeURIComponent(match.host)
-        )
-            .replaceAll('{port}', encodeURIComponent(match.port))
-            .replaceAll('{token}', encodeURIComponent(match.matchAuthToken));
-        location.href = url;
-    }
-
-    function startTimer() {
-        matchmakingSeconds = 0;
-        matchmakingTimer = setInterval(() => {
-            matchmakingSeconds++;
-        }, 1000);
-    }
-
-    function stopTimer() {
-        if (matchmakingTimer !== null) {
-            clearInterval(matchmakingTimer);
-            matchmakingTimer = null;
-        }
-    }
-
-    function formatTime(totalSeconds) {
-        const minutes = String(Math.floor(totalSeconds / 60)).padStart(2, '0');
-        const seconds = String(totalSeconds % 60).padStart(2, '0');
-        return `${minutes}:${seconds}`;
-    }
 </script>
 
 <button onclick={() => goto(resolve('/login'))} data-testid="login-page">
@@ -152,40 +171,34 @@
     <button type="submit" data-testid="logout"> Log out </button>
 </form>
 {#if user}
-    <button onclick={() => play()} data-testid="play">
-        {currentMatch
-            ? 'Join'
-            : matchmaking
-              ? `Cancel ${formatTime(matchmakingSeconds)}`
-              : 'Play'}
+    <button onclick={() => matchmaking.pressButton()} data-testid="play">
+        {matchmaking.buttonText}
     </button>
 {/if}
 
 <h1 data-testid="title">{title}</h1>
 
-{#if matchmakingError}
-    <p class="error" data-testid="error">{matchmakingError}</p>
+{#if matchmaking.errorMessage}
+    <p class="error" data-testid="error">{matchmaking.errorMessage}</p>
 {/if}
 
 <table>
     <thead>
         <tr>
-            {#if matches.length > 0}
-                {#each Array(matches[0].details.players.length) as _, i (i)}
-                    <th>Player {i + 1}</th>
-                {/each}
-                <th>Winner</th>
-            {/if}
+            <th>ID</th>
+            <th>STATUS</th>
+            <th>PLAYERS</th>
+            <th>WINNER</th>
         </tr>
     </thead>
     <tbody>
         {#if matches.length > 0}
-            {#each matches as match, i (i)}
+            {#each matches as match (match.id)}
                 <tr>
-                    {#each match.details.players as player (player)}
-                        <td>{player}</td>
-                    {/each}
-                    <td>{match.details.winner}</td>
+                    <td>{match.id}</td>
+                    <td>{matchStatusString(match)}</td>
+                    <td>{match.details?.players?.join(', ') ?? ''}</td>
+                    <td>{match.details?.winner ?? ''}</td>
                 </tr>
             {/each}
         {/if}
