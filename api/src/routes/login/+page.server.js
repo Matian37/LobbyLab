@@ -1,10 +1,10 @@
 import { fail } from '@sveltejs/kit';
-import { POST } from '$routes/api/login/+server.js';
+import { POST as loginPOST } from '$routes/api/login/+server.js';
 
 export const actions = {
     default: async ({ request, cookies }) => {
         const formData = await request.formData();
-        const response = await POST({
+        const response = await loginPOST({
             request: {
                 json: async () => ({
                     login: formData.get('login'),

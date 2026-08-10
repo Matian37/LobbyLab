@@ -6,7 +6,7 @@
 
     let errorMessage = $state('');
 
-    const enhanceLogin = enhance(() => {
+    const enhanceLogin = () => {
         return async ({ result }) => {
             if (result.type === 'failure') {
                 errorMessage = result.data?.msg ?? UNEXPECTED_ERROR_MSG;
@@ -19,11 +19,11 @@
             errorMessage = '';
             await goto(resolve('/'));
         };
-    });
+    };
 </script>
 
 <button onclick={() => goto(resolve('/'))}>Back</button>
-<form method="POST" use:enhance={enhanceLogin}>
+<form method="POST" use:enhance={enhanceLogin} data-testid="login-form">
     Login <input name="login" data-testid="login-input" />
     Password
     <input name="password" type="password" data-testid="password-input" />

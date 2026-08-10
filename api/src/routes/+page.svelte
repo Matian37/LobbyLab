@@ -22,13 +22,13 @@
     let matchFound = false;
     let cancelled = false;
 
-    const enhanceLogout = enhance(() => {
+    const enhanceLogout = () => {
         return async ({ result }) => {
             if (result.type === 'success') {
                 await invalidateAll();
             }
         };
-    });
+    };
 
     onMount(() => {
         invalidateAll();
@@ -143,7 +143,12 @@
     Login
 </button>
 <button onclick={() => goto(resolve('/register'))}> Register </button>
-<form method="POST" action="?/logout" use:enhance={enhanceLogout}>
+<form
+    method="POST"
+    action="?/logout"
+    use:enhance={enhanceLogout}
+    data-testid="logout-form"
+>
     <button type="submit" data-testid="logout"> Log out </button>
 </form>
 {#if user}
