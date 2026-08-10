@@ -8,11 +8,7 @@
 
     let user = $derived($page.data?.login);
     let title = $derived(user ?? 'Log in');
-    // TODO: don't filter matches without details; make the table render them
-    // better so this filter is not needed
-    let matches = $derived(
-        ($page.data?.matches ?? []).filter((row) => row.details !== null)
-    );
+    let matches = $derived($page.data?.matches ?? []);
     let currentMatch = $state($page.data?.currentMatch ?? null);
     let matchmaking = $state(false);
     let matchmakingError = $state('');
@@ -118,6 +114,12 @@
         location.href = url;
     }
 
+    function matchStatus(match) {
+        if (match.active) return 'ACTIVE';
+        if (match.canceled) return 'CANCELED';
+        return 'FINISHED';
+    }
+
     function startTimer() {
         matchmakingSeconds = 0;
         matchmakingTimer = setInterval(() => {
@@ -170,22 +172,20 @@
 <table>
     <thead>
         <tr>
-            {#if matches.length > 0}
-                {#each Array(matches[0].details.players.length) as _, i (i)}
-                    <th>Player {i + 1}</th>
-                {/each}
-                <th>Winner</th>
-            {/if}
+            <th>ID</th>
+            <th>STATUS</th>
+            <th>PLAYERS</th>
+            <th>WINNER</th>
         </tr>
     </thead>
     <tbody>
         {#if matches.length > 0}
-            {#each matches as match, i (i)}
+            {#each matches as match (match.id)}
                 <tr>
-                    {#each match.details.players as player (player)}
-                        <td>{player}</td>
-                    {/each}
-                    <td>{match.details.winner}</td>
+                    <td>{match.id}</td>
+                    <td>{matchStatus(match)}</td>
+                    <td>{match.details?.players?.join(', ') ?? ''}</td>
+                    <td>{match.details?.winner ?? ''}</td>
                 </tr>
             {/each}
         {/if}
