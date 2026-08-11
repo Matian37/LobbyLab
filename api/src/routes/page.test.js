@@ -133,37 +133,47 @@ describe('home page', () => {
         return { ...result, location, cookies };
     }
 
-    describe('auth', () => {
-        it('shows "Log in" and no play button when logged out', async () => {
+    describe('appearence', () => {
+        it('shows specific buttons for logged out state', async () => {
             await renderHome({ loggedIn: false });
 
-            expect(screen.getByTestId('title')).toHaveTextContent('Log in');
+            expect(screen.queryByTestId('login-page')).toBeInTheDocument();
+            expect(screen.queryByTestId('register-page')).toBeInTheDocument();
+            expect(screen.queryByTestId('logout-form')).not.toBeInTheDocument();
             expect(screen.queryByTestId('play')).not.toBeInTheDocument();
-        });
-
-        it('shows the login name and a Play button when logged in', async () => {
-            await renderHome({ loggedIn: true });
-
-            expect(screen.getByTestId('title')).toHaveTextContent(
-                EXAMPLE_LOGIN
-            );
-            expect(screen.getByTestId('play')).toHaveTextContent('Play');
-        });
-
-        it('hides the client download link when logged out', async () => {
-            await renderHome({ loggedIn: false });
-
             expect(
                 screen.queryByTestId('download-client')
             ).not.toBeInTheDocument();
+            expect(screen.queryByTestId('title')).toHaveTextContent('Log in');
+            expect(screen.queryByTestId('error')).not.toBeInTheDocument();
+            expect(
+                screen.queryByTestId('matches-title')
+            ).not.toBeInTheDocument();
+            expect(screen.queryByRole('table')).not.toBeInTheDocument();
         });
 
-        it('shows the client download button when logged in', async () => {
-            await renderHome({ loggedIn: true });
+        it('shows specific buttons for logged in state', async () => {
+            await renderHome({ loggedIn: true, matches: [] });
 
-            expect(screen.getByTestId('download-client')).toBeInTheDocument();
+            expect(screen.queryByTestId('login-page')).not.toBeInTheDocument();
+            expect(
+                screen.queryByTestId('register-page')
+            ).not.toBeInTheDocument();
+            expect(screen.queryByTestId('logout-form')).toBeInTheDocument();
+            expect(screen.queryByTestId('play')).toBeInTheDocument();
+            expect(screen.queryByTestId('download-client')).toBeInTheDocument();
+            expect(screen.queryByTestId('title')).toHaveTextContent(
+                EXAMPLE_LOGIN
+            );
+            expect(screen.queryByTestId('error')).not.toBeInTheDocument();
+            expect(screen.queryByTestId('matches-title')).toBeInTheDocument();
+            expect(getTableMatrix(screen.getByRole('table'))).toEqual([
+                ['ID', 'STATUS', 'PLAYERS', 'WINNER'],
+            ]);
         });
+    });
 
+    describe('auth', () => {
         it('downloads the client when the download button is clicked', async () => {
             const { location } = await renderHome({ loggedIn: true });
             const user = userEvent.setup();
@@ -278,14 +288,6 @@ describe('home page', () => {
                 ['3', 'CANCELED', '', ''],
                 ['4', 'ACTIVE', '', ''],
                 ['1', 'FINISHED', 'login, user2', 'login'],
-            ]);
-        });
-
-        it('renders an empty table when there are no matches', async () => {
-            await renderHome({ loggedIn: true, matches: [] });
-
-            expect(getTableMatrix(screen.getByRole('table'))).toEqual([
-                ['ID', 'STATUS', 'PLAYERS', 'WINNER'],
             ]);
         });
     });

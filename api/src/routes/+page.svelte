@@ -158,19 +158,25 @@
     });
 </script>
 
-<button onclick={() => goto(resolve('/login'))} data-testid="login-page">
-    Login
-</button>
-<button onclick={() => goto(resolve('/register'))}> Register </button>
-<form
-    method="POST"
-    action="?/logout"
-    use:enhance={enhanceLogout}
-    data-testid="logout-form"
->
-    <button type="submit" data-testid="logout"> Log out </button>
-</form>
-{#if user}
+{#if !user}
+    <button onclick={() => goto(resolve('/login'))} data-testid="login-page">
+        Login
+    </button>
+    <button
+        onclick={() => goto(resolve('/register'))}
+        data-testid="register-page"
+    >
+        Register
+    </button>
+{:else}
+    <form
+        method="POST"
+        action="?/logout"
+        use:enhance={enhanceLogout}
+        data-testid="logout-form"
+    >
+        <button type="submit" data-testid="logout"> Log out </button>
+    </form>
     <button onclick={() => matchmaking.pressButton()} data-testid="play">
         {matchmaking.buttonText}
     </button>
@@ -182,37 +188,34 @@
     </button>
 {/if}
 
-<h1 data-testid="title">{title}</h1>
-
 {#if matchmaking.errorMessage}
     <p class="error" data-testid="error">{matchmaking.errorMessage}</p>
 {/if}
 
-<table>
-    <thead>
-        <tr>
-            <th>ID</th>
-            <th>STATUS</th>
-            <th>PLAYERS</th>
-            <th>WINNER</th>
-        </tr>
-    </thead>
-    <tbody>
-        {#if matches.length > 0}
-            {#each matches as match (match.id)}
-                <tr>
-                    <td>{match.id}</td>
-                    <td>{matchStatusString(match)}</td>
-                    <td>{match.details?.players?.join(', ') ?? ''}</td>
-                    <td>{match.details?.winner ?? ''}</td>
-                </tr>
-            {/each}
-        {/if}
-    </tbody>
-</table>
+<h1 data-testid="title">{title}</h1>
 
-<style>
-    .error {
-        color: red;
-    }
-</style>
+{#if user}
+    <h1 data-testid="matches-title">Matches</h1>
+    <table>
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>STATUS</th>
+                <th>PLAYERS</th>
+                <th>WINNER</th>
+            </tr>
+        </thead>
+        <tbody>
+            {#if matches.length > 0}
+                {#each matches as match (match.id)}
+                    <tr>
+                        <td>{match.id}</td>
+                        <td>{matchStatusString(match)}</td>
+                        <td>{match.details?.players?.join(', ') ?? ''}</td>
+                        <td>{match.details?.winner ?? ''}</td>
+                    </tr>
+                {/each}
+            {/if}
+        </tbody>
+    </table>
+{/if}
