@@ -233,8 +233,8 @@ func TestWorkerManager_Shutdown(t *testing.T) {
 		docker, broker, db, wm := newMockWorkerManagerWithInit(t, []*Worker{{ID: "worker-1"}, {ID: "worker-2"}})
 
 		gomock.InOrder(
-			docker.EXPECT().KillContainer(context.Background(), "worker-1").Return(nil),
-			docker.EXPECT().KillContainer(context.Background(), "worker-2").Return(nil),
+			docker.EXPECT().RemoveContainer(context.Background(), "worker-1").Return(nil),
+			docker.EXPECT().RemoveContainer(context.Background(), "worker-2").Return(nil),
 			docker.EXPECT().Close().Return(nil),
 			broker.EXPECT().Close().Return(nil),
 			db.EXPECT().Close().Return(nil),

@@ -71,18 +71,18 @@ func (mr *MockDockerConnectionMockRecorder) GetGamePort(ctx, containerID any) *g
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetGamePort", reflect.TypeOf((*MockDockerConnection)(nil).GetGamePort), ctx, containerID)
 }
 
-// KillContainer mocks base method.
-func (m *MockDockerConnection) KillContainer(ctx context.Context, id string) error {
+// RemoveContainer mocks base method.
+func (m *MockDockerConnection) RemoveContainer(ctx context.Context, id string) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "KillContainer", ctx, id)
+	ret := m.ctrl.Call(m, "RemoveContainer", ctx, id)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
-// KillContainer indicates an expected call of KillContainer.
-func (mr *MockDockerConnectionMockRecorder) KillContainer(ctx, id any) *gomock.Call {
+// RemoveContainer indicates an expected call of RemoveContainer.
+func (mr *MockDockerConnectionMockRecorder) RemoveContainer(ctx, id any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "KillContainer", reflect.TypeOf((*MockDockerConnection)(nil).KillContainer), ctx, id)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RemoveContainer", reflect.TypeOf((*MockDockerConnection)(nil).RemoveContainer), ctx, id)
 }
 
 // Open mocks base method.
