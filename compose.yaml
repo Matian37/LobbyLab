@@ -42,10 +42,12 @@ services:
       PORT: 3000
       LOG_LEVEL: info
       PUBLIC_GAME_LAUNCH_URL: ${PUBLIC_GAME_LAUNCH_URL}
+      ORIGIN: http://localhost:3000
     ports:
       - "3000:3000"
     networks:
       - db-net
+      - public-net
     depends_on:
       db:
         condition: service_healthy
@@ -85,3 +87,6 @@ networks:
   nats-net:
     driver: bridge
     internal: true
+  public-net:
+    driver: bridge
+    internal: false
