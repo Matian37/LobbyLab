@@ -150,6 +150,29 @@ describe('home page', () => {
             expect(screen.getByTestId('play')).toHaveTextContent('Play');
         });
 
+        it('hides the client download link when logged out', async () => {
+            await renderHome({ loggedIn: false });
+
+            expect(
+                screen.queryByTestId('download-client')
+            ).not.toBeInTheDocument();
+        });
+
+        it('shows the client download button when logged in', async () => {
+            await renderHome({ loggedIn: true });
+
+            expect(screen.getByTestId('download-client')).toBeInTheDocument();
+        });
+
+        it('downloads the client when the download button is clicked', async () => {
+            const { location } = await renderHome({ loggedIn: true });
+            const user = userEvent.setup();
+
+            await user.click(screen.getByTestId('download-client'));
+
+            expect(location.hrefSetter).toHaveBeenCalledWith('/api/download');
+        });
+
         it('logs out and invalidates the page data', async () => {
             await renderHome({ loggedIn: true });
             mocks.nextResult = { type: 'success', data: {} };

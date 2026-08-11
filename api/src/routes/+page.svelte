@@ -174,6 +174,12 @@
     <button onclick={() => matchmaking.pressButton()} data-testid="play">
         {matchmaking.buttonText}
     </button>
+    <button
+        onclick={() => (location.href = resolve('/api/download'))}
+        data-testid="download-client"
+    >
+        Download client
+    </button>
 {/if}
 
 <h1 data-testid="title">{title}</h1>

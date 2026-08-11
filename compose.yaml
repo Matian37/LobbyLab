@@ -42,6 +42,10 @@ services:
       PORT: 3000
       LOG_LEVEL: info
       PUBLIC_GAME_LAUNCH_URL: ${PUBLIC_GAME_LAUNCH_URL}
+      GAME_CLIENT_FILE: game-client.zip
+      DOWNLOADS_DIR: /api/downloads
+    volumes:
+      - ./data/downloads:/api/downloads
     ports:
       - "3000:3000"
     networks:
