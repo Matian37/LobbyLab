@@ -336,11 +336,9 @@ func TestE2E_RemoveZombieWorkers(t *testing.T) {
 	require.NoError(t, err)
 	defer cli.Close()
 
-	info, err := cli.ContainerInspect(ctx, zombieID, client.ContainerInspectOptions{})
-	require.NoError(t, err)
-	require.NotNil(t, info.Container.State)
-	assert.Equal(t, container.StateExited, info.Container.State.Status,
-		"zombie container should be killed by RemoveZombieWorkers")
+	_, err = cli.ContainerInspect(context.Background(), zombieID, client.ContainerInspectOptions{})
+	require.Error(t, err, "zombie container be removed")
+	require.ErrorContains(t, err, "No such container", "zombie container not removed")
 
 	cancel()
 	select {
