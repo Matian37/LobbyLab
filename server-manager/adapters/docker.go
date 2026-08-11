@@ -116,7 +116,7 @@ func (dc *DockerConnection) RestartContainer(ctx context.Context, id string) err
 	return nil
 }
 
-func (dc *DockerConnection) KillContainer(ctx context.Context, id string) error {
+func (dc *DockerConnection) RemoveContainer(ctx context.Context, id string) error {
 	if !dc.initialized {
 		return ErrDockerConnNotInit
 	}
@@ -127,7 +127,11 @@ func (dc *DockerConnection) KillContainer(ctx context.Context, id string) error 
 	timeoutCtx, cancel := context.WithTimeout(ctx, dc.killTimeout)
 	defer cancel()
 
-	_, err := dc.client.ContainerKill(timeoutCtx, id, client.ContainerKillOptions{})
+	_, err := dc.client.ContainerRemove(
+		timeoutCtx,
+		id,
+		client.ContainerRemoveOptions{Force: true, RemoveVolumes: true},
+	)
 	if err != nil {
 		return err
 	}
@@ -154,7 +158,15 @@ func (dc *DockerConnection) RemoveZombieWorkers(ctx context.Context) error {
 	}
 
 	for _, c := range containers.Items {
-		if _, err := dc.client.ContainerKill(timeoutCtx, c.ID, client.ContainerKillOptions{}); err != nil {
+		_, err := dc.client.ContainerRemove(
+			timeoutCtx,
+			c.ID,
+			client.ContainerRemoveOptions{
+				Force:         true,
+				RemoveVolumes: true,
+			},
+		)
+		if err != nil {
 			slog.Error("failed to kill zombie container", "id", c.ID, "error", err)
 		}
 	}

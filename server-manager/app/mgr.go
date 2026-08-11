@@ -134,7 +134,7 @@ func (wm *WorkerManager) Shutdown() {
 
 	for _, worker := range wm.workers {
 		wm.logger.Debug("killing worker", "worker", worker.ID)
-		err := wm.dockerConn.KillContainer(context.Background(), worker.ID)
+		err := wm.dockerConn.RemoveContainer(context.Background(), worker.ID)
 		if err != nil {
 			wm.logger.Error("failed to kill worker", "worker", worker.ID, "error", err)
 		}
