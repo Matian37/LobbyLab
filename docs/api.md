@@ -123,6 +123,30 @@ None.
 
 ---
 
+## GET `/api/download`
+
+Returns the game client archive for the authenticated user as a file download.
+The response is served as `application/octet-stream` with a `Content-Disposition: attachment` header.
+
+**Request body**
+
+None.
+
+**Responses**
+
+| Code | Response                                 | Description                                              |
+|------|------------------------------------------|----------------------------------------------------------|
+| 200  | Game client                              | The client file, streamed as an attachment.              |
+| 401  | `{ "msg": "No session token provided" }` | No `session` cookie present.                             |
+| 401  | `{ "msg": "Invalid session token" }`     | Cookie value is invalid or the session no longer exists. |
+| 404  | `{ "msg": "Not found" }`                 | The client file is not configured on the server.         |
+
+The name of the file served is configured on the server via the
+`GAME_CLIENT_FILE` environment variable. See `docs/setup.md` for how to make
+the file available; without it, clients receive a `404`.
+
+---
+
 ## GET `/api/match`
 
 Returns the active match assigned to the authenticated user, if any.

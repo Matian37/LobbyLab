@@ -44,6 +44,32 @@ mygame://join?host={host}&port={port}&token={token}
 
 It is expected that a `mygame://` protocol handler is registered on the user's device, otherwise the game client will not be able to launch.
 
+#### Game Client Download
+
+The web frontend shows a "Download client" button to logged-in users that
+downloads the game client archive from `GET /api/download`. For the download
+to work you must make the client file available to the `api` container:
+
+1. **Place the client archive in the mounted downloads directory.**
+   The `api` service mounts `./data/downloads` into the container at
+   `/api/downloads`. Drop your built game client archive there, e.g.:
+
+   ```
+   data/downloads/game-client.zip
+   ```
+
+2. **Set the file name.**
+   `compose.yaml` sets `GAME_CLIENT_FILE: game-client.zip` on the `api`
+   service, which must match the file name from step 1. Change it if you name
+   the archive differently.
+
+Both `DOWNLOADS_DIR` and `GAME_CLIENT_FILE` must be set on the `api` service.
+If either is missing, `GET /api/download` always responds with `404`.
+
+If the file is missing, `GET /api/download` responds with `404`, and users see
+a failed download. There is no default file bundled with the stack, so this
+setup step is required before the download link works.
+
 ### 2. Game Server
 
 #### 2.1 Dockerfile
