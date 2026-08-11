@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"math"
 	"server-manager/internal"
 	"sync"
 	"time"
@@ -164,7 +165,16 @@ func (nc *NATSConnection) GetResult(ctx context.Context) (internal.Message, erro
 		return nil, ErrNATSConnClosed
 	}
 
-	msg, err := nc.resultConsumer.Next(jetstream.FetchContext(ctx))
+	// HACK: set deadline for timeout to approx 290 years
+	// library enforces expiry time even when context without deadline is provided
+	// the only way for Next to "disable" it, is to set deadline to max duration
+	// possible way to remove this hack is too refactor the codebase to use Consume function instead
+	ctx, cancel := context.WithTimeout(ctx, math.MaxInt64)
+	defer cancel()
+
+	msg, err := nc.resultConsumer.Next(
+		jetstream.FetchContext(ctx),
+	)
 	if err != nil {
 		return nil, err
 	}
