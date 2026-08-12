@@ -149,7 +149,7 @@ func (dc *DatabaseConnection) AddMatch(
 
 	_, err = tx.Exec(
 		ctx,
-		"UPDATE users SET match_id = $1, queued_until = NOW() - INTERVAL '5 seconds' WHERE login = ANY($2)",
+		"UPDATE users SET match_id = $1, queued_until = NULL WHERE login = ANY($2)",
 		matchID,
 		logins,
 	)
