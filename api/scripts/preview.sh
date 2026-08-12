@@ -1,6 +1,9 @@
 #!/bin/bash
 set -e
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+INIT_SQL="$(cd "$SCRIPT_DIR/../.." && pwd)/init.sql"
+
 cleanup() {
   docker rm -f postgres-test 2>/dev/null || true
   rm -rf /tmp/multiplayer-asset-e2e
@@ -14,8 +17,8 @@ docker run --name postgres-test \
   -e POSTGRES_USER=postgres \
   -e POSTGRES_DB=postgres \
   -p 5432:5432 \
-  -v ../init.sql:/docker-entrypoint-initdb.d/init.sql \
-  -d postgres
+  -v "$INIT_SQL:/docker-entrypoint-initdb.d/init.sql" \
+  -d postgres:18.4-alpine
 
 until docker exec postgres-test pg_isready -U postgres; do
   sleep 0.5
