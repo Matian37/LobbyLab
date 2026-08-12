@@ -6,16 +6,18 @@
   "scripts": {
     "dev": "bash scripts/dev.sh",
     "build": "vite build",
-    "preview": "vite preview",
+    "preview": "bash scripts/preview.sh",
     "prepare": "svelte-kit sync || echo ''",
     "test": "vitest run",
     "test:unit": "vitest run --exclude '**/*.integrated.test.js'",
     "test:integration": "vitest run .integrated.test.js",
+    "test:e2e": "vite build && playwright test",
     "lint": "eslint .",
     "format": "prettier --write ."
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.62.1",
     "@sveltejs/adapter-auto": "^7.0.1",
     "@sveltejs/adapter-node": "^5.5.4",
     "@sveltejs/kit": "^2.57.0",
