@@ -6,28 +6,28 @@ import { websocketLogger } from './src/lib/logger.js';
 // Track servers we've already attached to, so restarts don't double-bind
 const attachedServers = new WeakSet();
 
-function attachWebSocketServer(server) {
+async function attachWebSocketServer(server, loadCreateWssFunc) {
     const httpServer = server.httpServer;
 
     if (!httpServer) return;
     if (attachedServers.has(httpServer)) return;
     attachedServers.add(httpServer);
 
-    return server
-        .ssrLoadModule('$lib/server/server.js')
-        .then(async ({ createWebSocketServer }) => {
-            const wss = await createWebSocketServer(httpServer);
-            websocketLogger.info('websocket server attached');
-            httpServer.once('close', () => {
-                websocketLogger.info('websocket server closing');
-                wss.close();
-                attachedServers.delete(httpServer);
-            });
-        })
-        .catch((err) => {
+    try {
+        let createWebSocketServer = await loadCreateWssFunc();
+
+        const wss = await createWebSocketServer(httpServer);
+        websocketLogger.info('websocket server attached');
+
+        httpServer.once('close', () => {
+            websocketLogger.info('websocket server closing');
+            wss.close();
             attachedServers.delete(httpServer);
-            websocketLogger.error({ err }, 'websocket server failed to attach');
         });
+    } catch (err) {
+        attachedServers.delete(httpServer);
+        websocketLogger.error({ err }, 'websocket server failed to attach');
+    }
 }
 
 function websocketServer() {
@@ -35,12 +35,24 @@ function websocketServer() {
         name: 'websocket-server',
         configureServer(server) {
             return async () => {
-                await attachWebSocketServer(server);
+                await attachWebSocketServer(server, async () => {
+                    const module = await server.ssrLoadModule(
+                        '$lib/server/server.js'
+                    );
+                    return module.createWebSocketServer;
+                });
             };
         },
         configurePreviewServer(server) {
             return async () => {
-                await attachWebSocketServer(server);
+                await attachWebSocketServer(server, async () => {
+                    const modulePath = path.resolve(
+                        import.meta.dirname,
+                        './src/lib/server/server.js'
+                    );
+                    const module = await import(modulePath);
+                    return module.createWebSocketServer;
+                });
             };
         },
     };
