@@ -40,7 +40,7 @@ services:
     environment:
       DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
       PORT: 3000
-      LOG_LEVEL: info
+      LOG_LEVEL: debug
       PUBLIC_GAME_LAUNCH_URL: ${PUBLIC_GAME_LAUNCH_URL}
       ORIGIN: http://localhost:3000
     ports:
@@ -67,7 +67,7 @@ services:
       GAME_SERVER_CLIENT_PORT: "7777/udp"
       GAME_SERVER_LOG_LEVEL: info
       PLAYERS_PER_ROOM: 2
-      LOG_LEVEL: info
+      LOG_LEVEL: debug
     volumes:
       # TODO: required but dangerous, docker socket proxy would be safer instead
       - /var/run/docker.sock:/var/run/docker.sock
