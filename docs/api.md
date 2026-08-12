@@ -182,7 +182,7 @@ None.
 
 | Code | Response                                                                                                                                                   | Description                                                   |
 | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------- |
-| 200    | `{ "matches": [ { "details": <object>, "canceled": boolean } ] }`                                                                                      | List of past matches for the user.       |
+| 200    | `{ "matches": [ { "id": number, "details": <object>, "canceled": boolean, "active": boolean } ] }`                                                   | List of past matches for the user.       |
 | 401    | `{ "msg": "No session token provided" }`                                                                                                               | No `session` cookie present.                                  |
 | 401    | `{ "msg": "Invalid session token" }`                                                                                                                   | Cookie value is invalid or the session no longer exists.      |
 
