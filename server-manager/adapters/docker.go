@@ -64,7 +64,7 @@ func (dc *DockerConnection) Open(config *internal.EnvConfig) error {
 	return nil
 }
 
-func (dc *DockerConnection) SpawnContainer(ctx context.Context) (string, error) {
+func (dc *DockerConnection) SpawnContainer(ctx context.Context, workerID string) (string, error) {
 	if !dc.initialized {
 		return "", ErrDockerConnNotInit
 	}
@@ -77,7 +77,7 @@ func (dc *DockerConnection) SpawnContainer(ctx context.Context) (string, error) 
 	timeoutCtx, cancel := context.WithTimeout(ctx, dc.createTimeout)
 	defer cancel()
 
-	res, err := dc.client.ContainerCreate(timeoutCtx, dc.containerCreateOptions(portMap))
+	res, err := dc.client.ContainerCreate(timeoutCtx, dc.containerCreateOptions(portMap, workerID))
 	if err != nil {
 		return "", err
 	}
@@ -228,7 +228,10 @@ func (dc *DockerConnection) getPorts(ctx context.Context, containerID string) (n
 
 // NOTE: portMap must have unspecified host ports
 // NOTE: due to container spawning nature, logs cannot be attached to compose logs
-func (dc *DockerConnection) containerCreateOptions(portMap network.PortMap) client.ContainerCreateOptions {
+func (dc *DockerConnection) containerCreateOptions(
+	portMap network.PortMap,
+	workerID string,
+) client.ContainerCreateOptions {
 	options := client.ContainerCreateOptions{
 		Image: dc.config.Image,
 		Config: &container.Config{
@@ -239,6 +242,7 @@ func (dc *DockerConnection) containerCreateOptions(portMap network.PortMap) clie
 			Env: []string{
 				"LOG_LEVEL=" + dc.config.GameServerLogLevel.String(),
 				"NATS_URI=" + dc.config.BrokerURI,
+				"WORKER_ID=" + workerID,
 			},
 		},
 		HostConfig: &container.HostConfig{

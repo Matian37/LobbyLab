@@ -13,7 +13,8 @@ const (
 )
 
 type Worker struct {
-	ID string
+	ID          string
+	ContainerID string
 
 	State           WorkerState
 	stateID         int
@@ -25,9 +26,10 @@ type Worker struct {
 	restartTimeout time.Duration
 }
 
-func NewWorker(id string, maxPingRetries int, restartTimeout time.Duration) *Worker {
+func NewWorker(workerID string, containerID string, maxPingRetries int, restartTimeout time.Duration) *Worker {
 	return &Worker{
-		ID:             id,
+		ID:             workerID,
+		ContainerID:    containerID,
 		State:          WorkerFree,
 		maxPingRetries: maxPingRetries,
 		restartTimeout: restartTimeout,

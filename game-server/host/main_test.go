@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"log/slog"
-	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -64,6 +63,8 @@ func TestParseArgs_InputNotModified(t *testing.T) {
 }
 
 func TestSetupLogger(t *testing.T) {
+	t.Setenv("WORKER_ID", "worker-id")
+
 	originalLogger := slog.Default()
 	defer slog.SetDefault(originalLogger)
 
@@ -76,11 +77,7 @@ func TestSetupLogger(t *testing.T) {
 	err := json.Unmarshal(buf.Bytes(), &parsed)
 	require.NoError(t, err)
 
-	expectedHostname, err := os.Hostname()
-	if err != nil {
-		expectedHostname = "unknown"
-	}
-	assert.Equal(t, expectedHostname, parsed["hostname"])
+	assert.Equal(t, "worker-id", parsed["workerID"])
 	assert.Equal(t, "test message", parsed["msg"])
 	assert.Equal(t, "extra_val", parsed["extra_key"])
 }
