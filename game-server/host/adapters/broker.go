@@ -21,8 +21,8 @@ const (
 
 var (
 	ErrConnectionNotOpen       = errors.New("conection not initialized")
-	ErrConnectionNotReopenable = errors.New("connection cannot be reopened")
-	ErrConnectionClosed        = errors.New("connection already closed")
+	ErrConnectionAlreadyOpen   = errors.New("connection already opened")
+	ErrConnectionAlreadyClosed = errors.New("connection already closed")
 )
 
 type NATSConnection struct {
@@ -32,7 +32,6 @@ type NATSConnection struct {
 	conn *nats.Conn
 	js   jetstream.JetStream
 
-	healthSub  *nats.Subscription
 	requestSub *nats.Subscription
 
 	opened bool
@@ -47,11 +46,13 @@ func NewConnection(brokerURI string, containerID string) *NATSConnection {
 }
 
 func (c *NATSConnection) Open(timeout time.Duration) error {
+	if c.closed {
+		return ErrConnectionAlreadyClosed
+	}
 	if c.opened {
-		return ErrConnectionNotReopenable
+		return ErrConnectionAlreadyOpen
 	}
 
-	// check whether the result stream exists
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
@@ -63,22 +64,19 @@ func (c *NATSConnection) Open(timeout time.Duration) error {
 
 	js, err := jetstream.New(conn)
 	if err != nil {
-		_ = c.Close()
 		return err
 	}
 	c.js = js
 
+	// checks if the result subject stream exists
 	if _, err := c.js.StreamNameBySubject(ctx, resultSubject); err != nil {
-		_ = c.Close()
 		return err
 	}
 
 	if err := c.subscribeAssign(); err != nil {
-		_ = c.Close()
 		return err
 	}
 	if err := c.subscribeHealth(); err != nil {
-		_ = c.Close()
 		return err
 	}
 	c.opened = true
@@ -92,7 +90,7 @@ func (c *NATSConnection) Close() error {
 		return ErrConnectionNotOpen
 	}
 	if c.closed {
-		return ErrConnectionClosed
+		return ErrConnectionAlreadyClosed
 	}
 	c.closed = true
 	return c.conn.Drain()
@@ -103,7 +101,7 @@ func (c *NATSConnection) GetMatchConfig(ctx context.Context) (internal.MatchConf
 		return internal.MatchConfig{}, ErrConnectionNotOpen
 	}
 	if c.closed {
-		return internal.MatchConfig{}, ErrConnectionClosed
+		return internal.MatchConfig{}, ErrConnectionAlreadyClosed
 	}
 
 	msg, err := c.requestSub.NextMsgWithContext(ctx)
@@ -116,7 +114,7 @@ func (c *NATSConnection) GetMatchConfig(ctx context.Context) (internal.MatchConf
 		return internal.MatchConfig{}, err
 	}
 
-	// acknowledge request
+	// send request acknowledge
 	if err := c.conn.Publish(msg.Reply, []byte{}); err != nil {
 		return internal.MatchConfig{}, err
 	}
@@ -128,7 +126,7 @@ func (c *NATSConnection) SendCancel(ctx context.Context, matchID int) error {
 		return ErrConnectionNotOpen
 	}
 	if c.closed {
-		return ErrConnectionClosed
+		return ErrConnectionAlreadyClosed
 	}
 
 	payload, err := json.Marshal(internal.Result{
@@ -149,7 +147,7 @@ func (c *NATSConnection) SendResult(ctx context.Context, matchID int, result []b
 		return ErrConnectionNotOpen
 	}
 	if c.closed {
-		return ErrConnectionClosed
+		return ErrConnectionAlreadyClosed
 	}
 
 	payload, err := json.Marshal(internal.Result{
@@ -168,15 +166,9 @@ func (c *NATSConnection) SendResult(ctx context.Context, matchID int, result []b
 func (c *NATSConnection) subscribeAssign() error {
 	sub, err := c.conn.SubscribeSync(assignSubject + "." + c.containerID)
 	if err != nil {
-		if err := c.Close(); err != nil {
-			slog.Warn("failed to close connection", "err", err)
-		}
 		return err
 	}
 	if err := sub.SetPendingLimits(1, -1); err != nil {
-		if err := c.Close(); err != nil {
-			slog.Warn("failed to close connection", "err", err)
-		}
 		return err
 	}
 	c.requestSub = sub
@@ -188,8 +180,8 @@ func (c *NATSConnection) subscribeHealth() error {
 	sub, err := c.conn.Subscribe(healthSubject, func(msg *nats.Msg) {
 		slog.Debug("received ping, sending pong...")
 
-		if pongErr := c.conn.Publish(msg.Reply, []byte(c.containerID)); pongErr != nil {
-			slog.Error("failed to publish health response", "error", pongErr)
+		if err := c.conn.Publish(msg.Reply, []byte(c.containerID)); err != nil {
+			slog.Error("failed to publish health response", "error", err)
 		} else {
 			slog.Debug("pong sent successfuly")
 		}
@@ -197,11 +189,5 @@ func (c *NATSConnection) subscribeHealth() error {
 	if err != nil {
 		return err
 	}
-
-	if err := sub.SetPendingLimits(1, -1); err != nil {
-		return err
-	}
-	c.healthSub = sub
-
-	return nil
+	return sub.SetPendingLimits(1, -1)
 }

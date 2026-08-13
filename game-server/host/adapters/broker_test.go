@@ -18,13 +18,13 @@ import (
 
 const ResultStreamName = "RESULTS"
 
-func createNATSServer(t *testing.T, enableJetstream bool, createResultStream bool) string {
+func createNATSServer(t *testing.T) string {
 	t.Helper()
 
 	opts := &server.Options{
 		Port:      -1,
 		Host:      "127.0.0.1",
-		JetStream: enableJetstream,
+		JetStream: true,
 		StoreDir:  t.TempDir(),
 	}
 	s, err := server.NewServer(opts)
@@ -35,34 +35,40 @@ func createNATSServer(t *testing.T, enableJetstream bool, createResultStream boo
 
 	t.Cleanup(s.Shutdown)
 
-	addr := fmt.Sprintf("nats://127.0.0.1:%d", s.Addr().(*net.TCPAddr).Port)
+	return fmt.Sprintf("nats://127.0.0.1:%d", s.Addr().(*net.TCPAddr).Port)
+}
 
-	if createResultStream {
-		nc, err := nats.Connect(addr)
-		require.NoError(t, err)
-		t.Cleanup(func() { nc.Close() })
+func newNATSServer(t *testing.T) string {
+	addr := createNATSServer(t)
 
-		js, err := jetstream.New(nc)
-		require.NoError(t, err)
-		_, err = js.CreateStream(
-			context.Background(),
-			jetstream.StreamConfig{
-				Name:     ResultStreamName,
-				Subjects: []string{resultSubject},
-			},
-		)
-		require.NoError(t, err)
-	}
+	nc, err := nats.Connect(addr)
+	require.NoError(t, err)
+	t.Cleanup(func() { nc.Close() })
+
+	js, err := jetstream.New(nc)
+	require.NoError(t, err)
+
+	_, err = js.CreateStream(
+		context.Background(),
+		jetstream.StreamConfig{
+			Name:     ResultStreamName,
+			Subjects: []string{resultSubject},
+		},
+	)
+	require.NoError(t, err)
 
 	return addr
 }
 
-func newNATSServer(t *testing.T) string {
-	return createNATSServer(t, true, true)
+func newNATSServerWithoutResultStream(t *testing.T) string {
+	return createNATSServer(t)
 }
 
-func newNATSServerWithoutResultStream(t *testing.T) string {
-	return createNATSServer(t, true, false)
+func getHelperConn(t *testing.T, addr string) *nats.Conn {
+	nc, err := nats.Connect(addr)
+	require.NoError(t, err)
+	t.Cleanup(func() { nc.Close() })
+	return nc
 }
 
 func TestNewConnection(t *testing.T) {
@@ -71,13 +77,12 @@ func TestNewConnection(t *testing.T) {
 
 	c := NewConnection(brokerURI, containerID)
 
-	assert.NotNil(t, c)
+	require.NotNil(t, c)
 
 	assert.Equal(t, brokerURI, c.brokerURI)
 	assert.Equal(t, containerID, c.containerID)
 
 	assert.Nil(t, c.conn)
-	assert.Nil(t, c.healthSub)
 	assert.Nil(t, c.requestSub)
 
 	assert.False(t, c.opened)
@@ -89,21 +94,14 @@ func TestNATSConnection_subscribeAssign(t *testing.T) {
 		addr := newNATSServer(t)
 
 		c := NewConnection(addr, "a")
+		c.conn = getHelperConn(t, addr)
 
-		nc, err := nats.Connect(addr)
-		require.NoError(t, err)
-		c.conn = nc
-		t.Cleanup(func() { nc.Close() })
-
-		err = c.subscribeAssign()
-		require.NoError(t, err)
-
+		require.NoError(t, c.subscribeAssign())
 		assert.NotNil(t, c.requestSub)
 		assert.True(t, c.requestSub.IsValid())
 
 		msgLimit, bytesLimit, err := c.requestSub.PendingLimits()
 		require.NoError(t, err)
-
 		assert.Equal(t, 1, msgLimit)
 		assert.Equal(t, -1, bytesLimit)
 	})
@@ -114,19 +112,11 @@ func TestNATSConnection_subscribeHealth(t *testing.T) {
 		addr := newNATSServer(t)
 
 		c := NewConnection(addr, "a")
-
-		nc, err := nats.Connect(addr)
-		require.NoError(t, err)
-		c.conn = nc
-		t.Cleanup(func() { nc.Close() })
+		c.conn = getHelperConn(t, addr)
 
 		require.NoError(t, c.subscribeHealth())
-		assert.NotNil(t, c.healthSub)
 
-		pub, err := nats.Connect(addr)
-		require.NoError(t, err)
-		t.Cleanup(func() { pub.Close() })
-
+		pub := getHelperConn(t, addr)
 		msg, err := pub.Request(healthSubject, []byte{}, time.Second)
 		require.NoError(t, err)
 		assert.Equal(t, []byte(c.containerID), msg.Data)
@@ -136,13 +126,17 @@ func TestNATSConnection_subscribeHealth(t *testing.T) {
 func TestNATSConnection_Open(t *testing.T) {
 	t.Run("already open", func(t *testing.T) {
 		c := NATSConnection{opened: true}
-		err := c.Open(150 * time.Millisecond)
-		assert.ErrorIs(t, err, ErrConnectionNotReopenable)
+		assert.ErrorIs(t, c.Open(0), ErrConnectionAlreadyOpen)
+	})
+
+	t.Run("already closed", func(t *testing.T) {
+		c := NATSConnection{opened: true, closed: true}
+		assert.ErrorIs(t, c.Open(0), ErrConnectionAlreadyClosed)
 	})
 
 	t.Run("failure", func(t *testing.T) {
 		c := NewConnection("nats://10.255.255.1:4222", "b")
-		err := c.Open(150 * time.Millisecond)
+		err := c.Open(0)
 		assert.ErrorContains(t, err, "i/o timeout")
 
 		assert.False(t, c.opened)
@@ -154,19 +148,17 @@ func TestNATSConnection_Open(t *testing.T) {
 		addr := newNATSServerWithoutResultStream(t)
 
 		c := NewConnection(addr, "a")
-		err := c.Open(150 * time.Millisecond)
-		require.ErrorIs(t, err, jetstream.ErrStreamNotFound)
+		require.ErrorIs(t, c.Open(150*time.Millisecond), jetstream.ErrStreamNotFound)
 
 		assert.False(t, c.opened)
-		assert.True(t, c.closed)
+		assert.False(t, c.closed)
 	})
 
 	t.Run("success", func(t *testing.T) {
 		addr := newNATSServer(t)
 
 		c := NewConnection(addr, "a")
-		err := c.Open(150 * time.Millisecond)
-		require.NoError(t, err)
+		require.NoError(t, c.Open(150*time.Millisecond))
 
 		assert.True(t, c.opened)
 		assert.False(t, c.closed)
@@ -176,9 +168,6 @@ func TestNATSConnection_Open(t *testing.T) {
 
 		require.NotNil(t, c.js)
 
-		require.NotNil(t, c.healthSub)
-		assert.True(t, c.healthSub.IsValid())
-
 		require.NotNil(t, c.requestSub)
 		assert.True(t, c.requestSub.IsValid())
 	})
@@ -186,35 +175,31 @@ func TestNATSConnection_Open(t *testing.T) {
 	t.Run("partial opening", func(t *testing.T) {
 		addr := newNATSServer(t)
 
-		// space in containerID trigger error in subscribeAssign
+		// space in containerID triggers error in subscribeAssign
 		c := NewConnection(addr, "a b")
-		err := c.Open(150 * time.Millisecond)
-		assert.ErrorIs(t, err, nats.ErrBadSubject)
+		assert.ErrorIs(t, c.Open(150*time.Millisecond), nats.ErrBadSubject)
 
 		assert.False(t, c.opened)
-		assert.True(t, c.closed)
+		assert.False(t, c.closed)
 	})
 }
 
 func TestNATSConnection_Close(t *testing.T) {
 	t.Run("not open", func(t *testing.T) {
 		c := NATSConnection{}
-		err := c.Close()
-		assert.ErrorIs(t, err, ErrConnectionNotOpen)
+		assert.ErrorIs(t, c.Close(), ErrConnectionNotOpen)
 	})
 
 	t.Run("already closed", func(t *testing.T) {
 		c := NATSConnection{opened: true, closed: true}
-		err := c.Close()
-		assert.ErrorIs(t, err, ErrConnectionClosed)
+		assert.ErrorIs(t, c.Close(), ErrConnectionAlreadyClosed)
 	})
 
 	t.Run("success", func(t *testing.T) {
 		addr := newNATSServer(t)
 
 		c := NewConnection(addr, "a")
-		err := c.Open(150 * time.Millisecond)
-		require.NoError(t, err)
+		require.NoError(t, c.Open(150*time.Millisecond))
 		require.True(t, c.conn.IsConnected())
 
 		assert.NoError(t, c.Close())
@@ -226,8 +211,7 @@ func TestNATSConnection_Close(t *testing.T) {
 		addr := newNATSServer(t)
 
 		c := NewConnection(addr, "a")
-		err := c.Open(150 * time.Millisecond)
-		require.NoError(t, err)
+		require.NoError(t, c.Open(150*time.Millisecond))
 		require.True(t, c.conn.IsConnected())
 
 		assert.NoError(t, c.Close())
@@ -246,20 +230,19 @@ func TestNATSConnection_GetMatchConfig(t *testing.T) {
 	t.Run("closed", func(t *testing.T) {
 		c := NATSConnection{opened: true, closed: true}
 		_, err := c.GetMatchConfig(context.Background())
-		assert.ErrorIs(t, err, ErrConnectionClosed)
+		assert.ErrorIs(t, err, ErrConnectionAlreadyClosed)
 	})
 
 	t.Run("context canceled", func(t *testing.T) {
 		addr := newNATSServer(t)
 
 		c := NewConnection(addr, "a")
-		err := c.Open(150 * time.Millisecond)
-		require.NoError(t, err)
+		require.NoError(t, c.Open(150*time.Millisecond))
 
 		ctx, cancel := context.WithCancel(context.Background())
 		cancel()
 
-		_, err = c.GetMatchConfig(ctx)
+		_, err := c.GetMatchConfig(ctx)
 		assert.ErrorIs(t, err, context.Canceled)
 	})
 
@@ -268,28 +251,27 @@ func TestNATSConnection_GetMatchConfig(t *testing.T) {
 
 		containerID := "a"
 		c := NewConnection(addr, containerID)
-		err := c.Open(150 * time.Millisecond)
-		require.NoError(t, err)
+		require.NoError(t, c.Open(150*time.Millisecond))
 
-		nc, err := nats.Connect(addr)
-		require.NoError(t, err)
-		t.Cleanup(func() { nc.Close() })
+		nc := getHelperConn(t, addr)
 
 		expectedConfig := internal.MatchConfig{MatchID: 1, Config: []byte(`{"gameconfig": 123}`)}
 		expectedConfigJSON, err := json.Marshal(expectedConfig)
 		require.NoError(t, err)
 
-		doneChan := make(chan struct{})
+		msgChan := make(chan *nats.Msg)
+		errChan := make(chan error)
 		go func() {
-			defer close(doneChan)
-
 			msg, err := nc.Request(
 				assignSubject+"."+containerID,
 				[]byte(expectedConfigJSON),
 				1*time.Second,
 			)
-			require.NoError(t, err)
-			assert.Empty(t, msg.Data)
+			if err != nil {
+				errChan <- err
+			} else {
+				msgChan <- msg
+			}
 		}()
 
 		config, err := c.GetMatchConfig(context.Background())
@@ -297,7 +279,14 @@ func TestNATSConnection_GetMatchConfig(t *testing.T) {
 		assert.Equal(t, expectedConfig.MatchID, config.MatchID)
 		assert.JSONEq(t, string(expectedConfig.Config), string(config.Config))
 
-		<-doneChan
+		select {
+		case msg := <-msgChan:
+			assert.Empty(t, msg.Data)
+		case <-errChan:
+			t.Fatal("error waiting for msgChan", err)
+		case <-time.After(1 * time.Second):
+			t.Fatal("timeout waiting for assign ack")
+		}
 	})
 }
 
@@ -311,36 +300,29 @@ func TestNATSConnection_SendCancel(t *testing.T) {
 	t.Run("closed", func(t *testing.T) {
 		c := NATSConnection{opened: true, closed: true}
 		err := c.SendCancel(context.Background(), 0)
-		assert.ErrorIs(t, err, ErrConnectionClosed)
+		assert.ErrorIs(t, err, ErrConnectionAlreadyClosed)
 	})
 
 	t.Run("context canceled", func(t *testing.T) {
 		addr := newNATSServer(t)
 
 		c := NewConnection(addr, "a")
-		err := c.Open(150 * time.Millisecond)
-		require.NoError(t, err)
+		require.NoError(t, c.Open(150*time.Millisecond))
 
 		ctx, cancel := context.WithCancel(context.Background())
 		cancel()
 
-		err = c.SendCancel(ctx, 0)
-		require.ErrorIs(t, err, context.Canceled)
+		require.ErrorIs(t, c.SendCancel(ctx, 0), context.Canceled)
 	})
 
 	t.Run("success", func(t *testing.T) {
+		ctx := context.Background()
 		addr := newNATSServer(t)
 
 		c := NewConnection(addr, "a")
-		err := c.Open(150 * time.Millisecond)
-		require.NoError(t, err)
+		require.NoError(t, c.Open(150*time.Millisecond))
 
-		nc, err := nats.Connect(addr)
-		require.NoError(t, err)
-		t.Cleanup(func() { nc.Close() })
-
-		ctx := context.Background()
-
+		nc := getHelperConn(t, addr)
 		js, err := jetstream.New(nc)
 		require.NoError(t, err)
 		stream, err := js.Stream(ctx, ResultStreamName)
@@ -352,9 +334,7 @@ func TestNATSConnection_SendCancel(t *testing.T) {
 		require.NoError(t, err)
 
 		var result internal.Result
-		err = json.Unmarshal(msg.Data, &result)
-		require.NoError(t, err)
-
+		require.NoError(t, json.Unmarshal(msg.Data, &result))
 		assert.False(t, result.Success)
 		assert.Equal(t, json.RawMessage("{}"), result.Details)
 		assert.Equal(t, 1, result.MatchID)
@@ -371,49 +351,45 @@ func TestNATSConnection_SendResult(t *testing.T) {
 	t.Run("closed", func(t *testing.T) {
 		c := NATSConnection{opened: true, closed: true}
 		err := c.SendResult(context.Background(), 0, []byte{})
-		assert.ErrorIs(t, err, ErrConnectionClosed)
+		assert.ErrorIs(t, err, ErrConnectionAlreadyClosed)
 	})
 
 	t.Run("context canceled", func(t *testing.T) {
 		addr := newNATSServer(t)
 
 		c := NewConnection(addr, "a")
-		err := c.Open(150 * time.Millisecond)
-		require.NoError(t, err)
+		require.NoError(t, c.Open(150*time.Millisecond))
 
 		ctx, cancel := context.WithCancel(context.Background())
 		cancel()
 
-		err = c.SendResult(ctx, 0, []byte("{}"))
+		err := c.SendResult(ctx, 0, []byte("{}"))
 		require.ErrorIs(t, err, context.Canceled)
 	})
 
 	t.Run("success", func(t *testing.T) {
+		ctx := context.Background()
 		addr := newNATSServer(t)
 
 		c := NewConnection(addr, "a")
-		err := c.Open(150 * time.Millisecond)
-		require.NoError(t, err)
+		require.NoError(t, c.Open(150*time.Millisecond))
 
-		nc, err := nats.Connect(addr)
-		require.NoError(t, err)
-		t.Cleanup(func() { nc.Close() })
-
-		ctx := context.Background()
+		nc := getHelperConn(t, addr)
 
 		js, err := jetstream.New(nc)
 		require.NoError(t, err)
+
 		stream, err := js.Stream(ctx, ResultStreamName)
 		require.NoError(t, err)
 
-		gameResult := `{"data":123}`
-		matchID := 1
-		expectedJSON := fmt.Sprintf(`{"success": true,"matchID": %v,"details": %v}`, matchID, gameResult)
+		expectedResult := internal.Result{Success: true, MatchID: 1, Details: []byte(`{"data":123}`)}
+		expectedJSON, err := json.Marshal(expectedResult)
+		require.NoError(t, err)
 
-		require.NoError(t, c.SendResult(context.Background(), matchID, []byte(gameResult)))
+		require.NoError(t, c.SendResult(context.Background(), expectedResult.MatchID, expectedResult.Details))
 
 		msg, err := stream.GetLastMsgForSubject(ctx, resultSubject)
 		require.NoError(t, err)
-		assert.JSONEq(t, expectedJSON, string(msg.Data))
+		assert.JSONEq(t, string(expectedJSON), string(msg.Data))
 	})
 }
