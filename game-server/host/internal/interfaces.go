@@ -15,7 +15,7 @@ type BrokerConnection interface {
 	SendResult(ctx context.Context, matchID int, result []byte) error
 }
 
-type Server interface {
+type Executor interface {
 	Start(config string, command []string) error
 
 	// After Stop returns, the server must be ready to start again.

@@ -12,11 +12,11 @@ import (
 	"go.uber.org/mock/gomock"
 )
 
-func newMockApp(t *testing.T) (*mocks.MockBrokerConnection, *mocks.MockServer, *App) {
+func newMockApp(t *testing.T) (*mocks.MockBrokerConnection, *mocks.MockExecutor, *App) {
 	t.Helper()
 	ctrl := gomock.NewController(t)
 	mockConn := mocks.NewMockBrokerConnection(ctrl)
-	mockSrv := mocks.NewMockServer(ctrl)
+	mockSrv := mocks.NewMockExecutor(ctrl)
 	app := &App{
 		conn:              mockConn,
 		server:            mockSrv,
@@ -29,7 +29,7 @@ func newMockApp(t *testing.T) (*mocks.MockBrokerConnection, *mocks.MockServer, *
 	return mockConn, mockSrv, app
 }
 
-func newMockAppWithInit(t *testing.T) (*mocks.MockBrokerConnection, *mocks.MockServer, *App) {
+func newMockAppWithInit(t *testing.T) (*mocks.MockBrokerConnection, *mocks.MockExecutor, *App) {
 	mockConn, mockSrv, app := newMockApp(t)
 	app.initialized = true
 	return mockConn, mockSrv, app

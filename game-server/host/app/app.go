@@ -17,7 +17,7 @@ var (
 
 type App struct {
 	conn        internal.BrokerConnection
-	server      internal.Server
+	server      internal.Executor
 	cmdArgs     []string
 	initialized bool
 
