@@ -351,7 +351,7 @@ func TestNATSConnection_SendCancel(t *testing.T) {
 		msg, err := stream.GetLastMsgForSubject(ctx, resultSubject)
 		require.NoError(t, err)
 
-		var result Result
+		var result internal.Result
 		err = json.Unmarshal(msg.Data, &result)
 		require.NoError(t, err)
 

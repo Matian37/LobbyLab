@@ -123,12 +123,6 @@ func (c *NATSConnection) GetMatchConfig(ctx context.Context) (internal.MatchConf
 	return matchConfig, nil
 }
 
-type Result struct {
-	Success bool            `json:"success"`
-	MatchID int             `json:"matchID"`
-	Details json.RawMessage `json:"details"`
-}
-
 func (c *NATSConnection) SendCancel(ctx context.Context, matchID int) error {
 	if !c.opened {
 		return ErrConnectionNotOpen
@@ -137,7 +131,7 @@ func (c *NATSConnection) SendCancel(ctx context.Context, matchID int) error {
 		return ErrConnectionClosed
 	}
 
-	payload, err := json.Marshal(Result{
+	payload, err := json.Marshal(internal.Result{
 		Success: false,
 		MatchID: matchID,
 		Details: []byte(`{}`),
@@ -158,7 +152,7 @@ func (c *NATSConnection) SendResult(ctx context.Context, matchID int, result []b
 		return ErrConnectionClosed
 	}
 
-	payload, err := json.Marshal(Result{
+	payload, err := json.Marshal(internal.Result{
 		Success: true,
 		MatchID: matchID,
 		Details: result,
