@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"net"
 	"os"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -66,7 +67,7 @@ func TestMain(m *testing.M) {
 	os.Exit(code)
 }
 
-func setupNATS(t *testing.T, started *atomic.Bool) string {
+func setupNATS(t *testing.T, workerCount int, started *atomic.Bool) (string, chan error) {
 	t.Helper()
 
 	opts := &server.Options{
@@ -89,12 +90,10 @@ func setupNATS(t *testing.T, started *atomic.Bool) string {
 
 	addr := fmt.Sprintf("nats://127.0.0.1:%d", s.Addr().(*net.TCPAddr).Port)
 
-	setupNATSMock(t, addr, started)
-
-	return addr
+	return addr, setupNATSMock(t, addr, workerCount, started)
 }
 
-func setupNATSMock(t *testing.T, natsURI string, started *atomic.Bool) {
+func setupNATSMock(t *testing.T, natsURI string, workerCount int, started *atomic.Bool) chan error {
 	t.Helper()
 
 	nc, err := nats.Connect(natsURI)
@@ -105,26 +104,39 @@ func setupNATSMock(t *testing.T, natsURI string, started *atomic.Bool) {
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = cli.Close() })
 
+	errChan := make(chan error)
+
 	_, err = nc.Subscribe("workers.health", func(msg *nats.Msg) {
 		started.Store(true)
 
-		containers, err := cli.ContainerList(context.Background(), client.ContainerListOptions{})
-		if err != nil {
-			return
-		}
-		for _, c := range containers.Items {
-			if isContainerMine(t, &c) {
-				_ = nc.Publish(msg.Reply, []byte(c.ID))
-			}
-		}
+		forEachHealthyWorker(t, cli, errChan, func(containerID string, workerID string) {
+			_ = nc.Publish(msg.Reply, []byte(workerID))
+		})
 	})
 	require.NoError(t, err)
 
 	_, err = nc.Subscribe("workers.assign.*", func(msg *nats.Msg) {
 		started.Store(true)
-		_ = msg.Respond([]byte{})
+
+		// extract worker id from subject
+		parts := strings.SplitN(msg.Subject, ".", 3)
+		require.Equal(t, 3, len(parts))
+		subjectWorkerID := parts[2]
+
+		responded := false
+		forEachHealthyWorker(t, cli, errChan, func(containerID string, workerID string) {
+			if subjectWorkerID == workerID {
+				_ = msg.Respond([]byte{})
+				responded = true
+			}
+		})
+		if !responded {
+			errChan <- fmt.Errorf("unknown worker id: %s", subjectWorkerID)
+		}
 	})
 	require.NoError(t, err)
+
+	return errChan
 }
 
 func restartDB(t *testing.T, ctx context.Context) {
@@ -165,20 +177,30 @@ func cleanupContainers(t *testing.T) {
 	}
 }
 
-func setupTestEnvironment(t *testing.T) (natsURI string, started *atomic.Bool) {
+func setupTestEnvironment(t *testing.T, workerCount int) (
+	natsURI string,
+	started *atomic.Bool,
+	errChan chan error,
+) {
 	t.Helper()
 
 	restartDB(t, context.Background())
 	t.Cleanup(func() { cleanupContainers(t) })
 
 	started = &atomic.Bool{}
+	natsURI, errChan = setupNATS(t, workerCount, started)
 
-	return setupNATS(t, started), started
+	return
 }
 
-func isContainerMine(t *testing.T, c *container.Summary) bool {
-	t.Helper()
-	return c.Labels["com.github.multiplayer-asset.worker"] == "true"
+func checkErrChan(t *testing.T, errChan chan error) {
+	select {
+	case err := <-errChan:
+		close(errChan)
+		require.NoError(t, err)
+	default:
+		close(errChan)
+	}
 }
 
 func waitForAppStart(t *testing.T, started *atomic.Bool, appResChan chan error) {
@@ -215,7 +237,13 @@ func runApp(t *testing.T, ctx context.Context, cfg *internal.EnvConfig) chan err
 
 	resChan := make(chan error, 1)
 	go func() {
-		err := app.Run(ctx, cfg, slog.New(slog.NewTextHandler(os.Stdout, nil)))
+		logger := slog.New(
+			slog.NewTextHandler(
+				os.Stdout,
+				&slog.HandlerOptions{Level: slog.LevelDebug},
+			),
+		)
+		err := app.Run(ctx, cfg, logger)
 		resChan <- err
 	}()
 	return resChan
@@ -241,11 +269,12 @@ func TestE2E_GracefulShutdown(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	natsURI, started := setupTestEnvironment(t)
+	workerCount := 2
+	natsURI, started, errChan := setupTestEnvironment(t, workerCount)
 
 	cfg := &internal.EnvConfig{
 		Image:                  "busybox:latest",
-		Workercount:            2,
+		Workercount:            workerCount,
 		ExposePorts:            network.PortSet{network.MustParsePort("8080"): {}},
 		ClientPort:             network.MustParsePort("8080"),
 		BrokerURI:              natsURI,
@@ -267,6 +296,8 @@ func TestE2E_GracefulShutdown(t *testing.T) {
 	case <-time.After(5 * time.Second):
 		t.Fatal("timeout")
 	}
+
+	checkErrChan(t, errChan)
 }
 
 func runZombieContainer(t *testing.T, ctx context.Context) string {
@@ -312,11 +343,12 @@ func TestE2E_RemoveZombieWorkers(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	natsURI, started := setupTestEnvironment(t)
+	workerCount := 1
+	natsURI, started, errChan := setupTestEnvironment(t, workerCount)
 
 	cfg := &internal.EnvConfig{
 		Image:                  "busybox:latest",
-		Workercount:            1,
+		Workercount:            workerCount,
 		ExposePorts:            network.PortSet{network.MustParsePort("8080"): {}},
 		ClientPort:             network.MustParsePort("8080"),
 		BrokerURI:              natsURI,
@@ -347,6 +379,8 @@ func TestE2E_RemoveZombieWorkers(t *testing.T) {
 	case <-time.After(5 * time.Second):
 		t.Fatal("timeout")
 	}
+
+	checkErrChan(t, errChan)
 }
 
 func TestE2E_AppLifecycle(t *testing.T) {
@@ -357,11 +391,12 @@ func TestE2E_AppLifecycle(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	natsURI, started := setupTestEnvironment(t)
+	workerCount := 1
+	natsURI, started, errChan := setupTestEnvironment(t, workerCount)
 
 	cfg := &internal.EnvConfig{
 		Image:                  "busybox:latest",
-		Workercount:            1,
+		Workercount:            workerCount,
 		ExposePorts:            network.PortSet{network.MustParsePort("8080"): {}},
 		ClientPort:             network.MustParsePort("8080"),
 		BrokerURI:              natsURI,
@@ -439,6 +474,8 @@ func TestE2E_AppLifecycle(t *testing.T) {
 	case <-time.After(5 * time.Second):
 		t.Fatal("timeout")
 	}
+
+	checkErrChan(t, errChan)
 }
 
 // killWorkerContainer kills the first running container that belongs to us.
@@ -469,11 +506,12 @@ func TestE2E_WorkersOverloadWithMatches(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	natsURI, started := setupTestEnvironment(t)
+	workerCount := 2
+	natsURI, started, errChan := setupTestEnvironment(t, workerCount)
 
 	cfg := &internal.EnvConfig{
 		Image:                  "busybox:latest",
-		Workercount:            2,
+		Workercount:            workerCount,
 		ExposePorts:            network.PortSet{network.MustParsePort("8080"): {}},
 		ClientPort:             network.MustParsePort("8080"),
 		BrokerURI:              natsURI,
@@ -562,6 +600,8 @@ func TestE2E_WorkersOverloadWithMatches(t *testing.T) {
 	case <-time.After(5 * time.Second):
 		t.Fatal("timeout")
 	}
+
+	checkErrChan(t, errChan)
 }
 
 func TestE2E_WorkerFailureAndRestart(t *testing.T) {
@@ -572,11 +612,12 @@ func TestE2E_WorkerFailureAndRestart(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	natsURI, started := setupTestEnvironment(t)
+	workerCount := 1
+	natsURI, started, errChan := setupTestEnvironment(t, workerCount)
 
 	cfg := &internal.EnvConfig{
 		Image:                  "busybox:latest",
-		Workercount:            1,
+		Workercount:            workerCount,
 		ExposePorts:            network.PortSet{network.MustParsePort("8080"): {}},
 		ClientPort:             network.MustParsePort("8080"),
 		BrokerURI:              natsURI,
@@ -654,6 +695,8 @@ func TestE2E_WorkerFailureAndRestart(t *testing.T) {
 	case <-time.After(5 * time.Second):
 		t.Fatal("timeout")
 	}
+
+	checkErrChan(t, errChan)
 }
 
 func TestE2E_NoMatchWithoutEnoughPlayers(t *testing.T) {
@@ -664,11 +707,12 @@ func TestE2E_NoMatchWithoutEnoughPlayers(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	natsURI, started := setupTestEnvironment(t)
+	workerCount := 1
+	natsURI, started, errChan := setupTestEnvironment(t, workerCount)
 
 	cfg := &internal.EnvConfig{
 		Image:                  "busybox:latest",
-		Workercount:            1,
+		Workercount:            workerCount,
 		ExposePorts:            network.PortSet{network.MustParsePort("8080"): {}},
 		ClientPort:             network.MustParsePort("8080"),
 		BrokerURI:              natsURI,
@@ -704,4 +748,6 @@ func TestE2E_NoMatchWithoutEnoughPlayers(t *testing.T) {
 	case <-time.After(5 * time.Second):
 		t.Fatal("timeout")
 	}
+
+	checkErrChan(t, errChan)
 }
