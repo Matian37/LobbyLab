@@ -30,7 +30,7 @@ type App struct {
 func NewApp(brokerURI string, containerID string, cmdArgs []string) *App {
 	return &App{
 		conn:              adapters.NewConnection(brokerURI, containerID),
-		server:            &adapters.GameServer{},
+		server:            &adapters.Executor{},
 		cmdArgs:           cmdArgs,
 		initTimeout:       5 * time.Second,
 		serverStopTimeout: 5 * time.Second,

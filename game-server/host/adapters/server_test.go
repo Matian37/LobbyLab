@@ -41,12 +41,12 @@ func TestCreateTempFile(t *testing.T) {
 
 func TestGameServer_Cleanup(t *testing.T) {
 	t.Run("nil files", func(t *testing.T) {
-		server := GameServer{}
+		server := Executor{}
 		server.cleanup()
 	})
 
 	t.Run("success", func(t *testing.T) {
-		server := GameServer{
+		server := Executor{
 			started:     true,
 			cmd:         exec.Command("echo"),
 			pgid:        1,
@@ -63,7 +63,7 @@ func TestGameServer_Cleanup(t *testing.T) {
 		resultPath := server.resultFile.Name()
 
 		server.cleanup()
-		require.Equal(t, GameServer{}, server)
+		require.Equal(t, Executor{}, server)
 
 		_, err = os.Stat(configPath)
 		assert.ErrorIs(t, err, os.ErrNotExist)
@@ -74,7 +74,7 @@ func TestGameServer_Cleanup(t *testing.T) {
 
 func TestGameServer_StartWait(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
-		server := GameServer{}
+		server := Executor{}
 		require.NoError(t, server.Start("", []string{"echo"}))
 
 		server.startWait()
@@ -86,23 +86,23 @@ func TestGameServer_StartWait(t *testing.T) {
 
 func TestGameServer_Start(t *testing.T) {
 	t.Run("no command", func(t *testing.T) {
-		server := GameServer{}
+		server := Executor{}
 		err := server.Start("", []string{})
 		assert.ErrorIs(t, err, ErrCommandEmpty)
 		assert.False(t, server.started)
 	})
 
 	t.Run("invalid command", func(t *testing.T) {
-		server := GameServer{}
+		server := Executor{}
 		err := server.Start("", []string{""})
 		assert.ErrorIs(t, err, ErrGameServerStartFailed)
 		assert.False(t, server.started)
 
-		require.Equal(t, GameServer{}, server)
+		require.Equal(t, Executor{}, server)
 	})
 
 	t.Run("success", func(t *testing.T) {
-		server := GameServer{}
+		server := Executor{}
 
 		err := server.Start("", []string{"echo"})
 		require.NoError(t, err)
@@ -126,7 +126,7 @@ func TestGameServer_Start(t *testing.T) {
 	})
 
 	t.Run("already started", func(t *testing.T) {
-		server := GameServer{}
+		server := Executor{}
 		err := server.Start("", []string{"echo"})
 		require.NoError(t, err)
 
@@ -137,7 +137,7 @@ func TestGameServer_Start(t *testing.T) {
 
 func TestGameServer_Wait(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
-		server := GameServer{}
+		server := Executor{}
 		require.NoError(t, server.Start("", []string{"sh", "-c", "exit 1"}))
 
 		err := server.wait(context.Background())
@@ -147,7 +147,7 @@ func TestGameServer_Wait(t *testing.T) {
 	})
 
 	t.Run("context cancel", func(t *testing.T) {
-		server := GameServer{}
+		server := Executor{}
 		require.NoError(t, server.Start("", []string{"sleep", "inf"}))
 
 		ctx, cancel := context.WithCancel(context.Background())
@@ -166,13 +166,13 @@ func TestGameServer_Stop(t *testing.T) {
 	}
 
 	t.Run("not started", func(t *testing.T) {
-		server := GameServer{}
+		server := Executor{}
 		err := server.Stop(context.Background())
 		assert.ErrorIs(t, err, ErrGameServerNotStarted)
 	})
 
 	t.Run("success", func(t *testing.T) {
-		server := GameServer{}
+		server := Executor{}
 		err := server.Start("", []string{"sleep", "inf"})
 		require.NoError(t, err)
 
@@ -183,12 +183,12 @@ func TestGameServer_Stop(t *testing.T) {
 		require.NoError(t, err)
 		assert.Nil(t, ctx.Err())
 
-		assert.Equal(t, server, GameServer{})
+		assert.Equal(t, server, Executor{})
 		assertProcessGroupEnded(pgid)
 	})
 
 	t.Run("context cancel", func(t *testing.T) {
-		server := GameServer{}
+		server := Executor{}
 		err := server.Start("", []string{"echo"})
 		require.NoError(t, err)
 
@@ -203,7 +203,7 @@ func TestGameServer_Stop(t *testing.T) {
 	})
 
 	t.Run("process ignores SIGTERM", func(t *testing.T) {
-		server := GameServer{}
+		server := Executor{}
 
 		cmd := []string{"sh", "-c", "trap '' TERM; kill -USR1 $PPID; sleep inf"}
 		err := server.Start("", cmd)
@@ -225,7 +225,7 @@ func TestGameServer_Stop(t *testing.T) {
 	})
 
 	t.Run("process died but its child is alive", func(t *testing.T) {
-		server := GameServer{}
+		server := Executor{}
 
 		cmd := []string{"sh", "-c", "sleep inf & exit"}
 		require.NoError(t, server.Start("", cmd))
@@ -248,7 +248,7 @@ func TestGameServer_Stop(t *testing.T) {
 
 func TestGameServer_GetResult(t *testing.T) {
 	t.Run("not started", func(t *testing.T) {
-		server := GameServer{}
+		server := Executor{}
 		_, err := server.GetResult(context.Background())
 		assert.ErrorIs(t, err, ErrGameServerNotStarted)
 	})
@@ -268,7 +268,7 @@ func TestGameServer_GetResult(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			server := GameServer{}
+			server := Executor{}
 			require.NoError(t, server.Start("", []string{"echo"}))
 			defer func() { require.NoError(t, server.Stop(context.Background())) }()
 
@@ -284,7 +284,7 @@ func TestGameServer_GetResult(t *testing.T) {
 	}
 
 	t.Run("context canceled", func(t *testing.T) {
-		server := GameServer{}
+		server := Executor{}
 		require.NoError(t, server.Start("config", []string{"sleep", "inf"}))
 		defer func() { require.NoError(t, server.Stop(context.Background())) }()
 
@@ -324,7 +324,7 @@ func TestGameServer_LifeCycle(t *testing.T) {
 		},
 	}
 
-	server := GameServer{}
+	server := Executor{}
 
 	for idx, iteration := range iterations {
 		t.Logf("iteration %v", idx)
@@ -352,6 +352,6 @@ func TestGameServer_LifeCycle(t *testing.T) {
 
 		err = server.Stop(context.Background())
 		require.NoError(t, err)
-		require.Equal(t, GameServer{}, server)
+		require.Equal(t, Executor{}, server)
 	}
 }

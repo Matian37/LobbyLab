@@ -21,16 +21,19 @@ var (
 	ErrGameServerAlreadyStarted = errors.New("game server already started")
 )
 
-type GameServer struct {
-	started     bool
-	configFile  *os.File
-	resultFile  *os.File
-	cmd         *exec.Cmd
-	pgid        int
+type Executor struct {
+	started bool
+
+	configFile *os.File
+	resultFile *os.File
+
+	cmd  *exec.Cmd
+	pgid int
+
 	waitChannel chan error
 }
 
-func (s *GameServer) Start(config string, command []string) error {
+func (s *Executor) Start(config string, command []string) error {
 	if len(command) == 0 {
 		return ErrCommandEmpty
 	}
@@ -75,7 +78,7 @@ func (s *GameServer) Start(config string, command []string) error {
 	return nil
 }
 
-func (s *GameServer) Stop(ctx context.Context) error {
+func (s *Executor) Stop(ctx context.Context) error {
 	// s.pgid == 0 means that process is already gone
 	if !s.started {
 		return ErrGameServerNotStarted
@@ -105,7 +108,7 @@ func (s *GameServer) Stop(ctx context.Context) error {
 }
 
 // Note: function does not stop cmd, always run Stop function manually
-func (s *GameServer) GetResult(ctx context.Context) ([]byte, error) {
+func (s *Executor) GetResult(ctx context.Context) ([]byte, error) {
 	if !s.started {
 		return []byte{}, ErrGameServerNotStarted
 	}
@@ -125,7 +128,7 @@ func (s *GameServer) GetResult(ctx context.Context) ([]byte, error) {
 	return result, nil
 }
 
-func (s *GameServer) wait(ctx context.Context) error {
+func (s *Executor) wait(ctx context.Context) error {
 	if !s.started {
 		return ErrGameServerNotStarted
 	}
@@ -143,7 +146,7 @@ func (s *GameServer) wait(ctx context.Context) error {
 // start wait goroutine and create waitChannel
 //
 // Note: use this instead of s.cmd.Wait() and only when cmd has started
-func (s *GameServer) startWait() {
+func (s *Executor) startWait() {
 	if s.waitChannel == nil {
 		s.waitChannel = make(chan error, 1)
 		go func() {
@@ -152,7 +155,7 @@ func (s *GameServer) startWait() {
 	}
 }
 
-func (s *GameServer) cleanup() {
+func (s *Executor) cleanup() {
 	if s.configFile != nil {
 		if err := s.configFile.Close(); err != nil {
 			slog.Warn("failed to close config file", "err", err)
