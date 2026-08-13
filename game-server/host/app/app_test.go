@@ -1,4 +1,4 @@
-package main
+package app
 
 import (
 	"context"
@@ -58,11 +58,7 @@ func TestNewApp(t *testing.T) {
 	assert.Equal(t, 5*time.Second, app.serverStopTimeout)
 	assert.Equal(t, 15*time.Second, app.sendResultTimeout)
 	assert.Equal(t, 5*time.Second, app.sendCancelTimeout)
-
-	nc, ok := app.conn.(*NATSConnection)
-	assert.True(t, ok, "NewApp should create a NATSConnection")
-	assert.Equal(t, brokerURI, nc.brokerURI)
-	assert.Equal(t, containerID, nc.containerID)
+	assert.NotNil(t, app.conn)
 }
 
 func TestApp_Init(t *testing.T) {

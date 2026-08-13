@@ -1,10 +1,11 @@
-package main
+package app
 
 import (
 	"context"
 	"errors"
 	"fmt"
 	"log/slog"
+	"server/adapters"
 	"server/internal"
 	"time"
 )
@@ -28,8 +29,8 @@ type App struct {
 
 func NewApp(brokerURI string, containerID string, cmdArgs []string) *App {
 	return &App{
-		conn:              NewConnection(brokerURI, containerID),
-		server:            &GameServer{},
+		conn:              adapters.NewConnection(brokerURI, containerID),
+		server:            &adapters.GameServer{},
 		cmdArgs:           cmdArgs,
 		initTimeout:       5 * time.Second,
 		serverStopTimeout: 5 * time.Second,

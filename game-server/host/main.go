@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
+	"server/app"
 	"syscall"
 
 	"github.com/google/shlex"
@@ -78,7 +79,7 @@ func run() error {
 		return errors.New("failed to find NATS_URI env")
 	}
 
-	app := NewApp(natsURI, containerID, cmdArgs)
+	app := app.NewApp(natsURI, containerID, cmdArgs)
 
 	if err := app.Init(); err != nil {
 		return fmt.Errorf("failed to init app: %w", err)
