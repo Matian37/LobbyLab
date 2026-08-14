@@ -16,7 +16,7 @@ type BrokerConnection interface {
 }
 
 type Executor interface {
-	Start(config string, command []string) error
+	Start(config string) error
 
 	// After Stop returns, the server must be ready to start again.
 	// This is a required invariant.

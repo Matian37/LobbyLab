@@ -30,7 +30,7 @@ type App struct {
 func NewApp(brokerURI string, containerID string, cmdArgs []string) *App {
 	return &App{
 		conn:              adapters.NewConnection(brokerURI, containerID),
-		server:            &adapters.Executor{},
+		server:            adapters.NewExecutor(cmdArgs),
 		cmdArgs:           cmdArgs,
 		initTimeout:       5 * time.Second,
 		serverStopTimeout: 5 * time.Second,
@@ -100,7 +100,7 @@ func (app *App) runMatch(ctx context.Context) error {
 
 func (app *App) runServer(ctx context.Context, config string) ([]byte, error) {
 	slog.Info("starting server...")
-	if err := app.server.Start(config, app.cmdArgs); err != nil {
+	if err := app.server.Start(config); err != nil {
 		return nil, fmt.Errorf("failed to start server: %w", err)
 	}
 	defer app.stopServer(ctx)

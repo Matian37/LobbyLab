@@ -199,7 +199,7 @@ func TestApp_runServer(t *testing.T) {
 		ctx := newUniqueCtx(t)
 		result := []byte(`{"result":345}`)
 
-		mockSrv.EXPECT().Start(config, app.cmdArgs).Return(nil)
+		mockSrv.EXPECT().Start(config).Return(nil)
 		mockSrv.EXPECT().GetResult(ctx).Return(result, nil)
 		mockSrv.EXPECT().Stop(gomock.Any()).Return(nil)
 
@@ -210,7 +210,7 @@ func TestApp_runServer(t *testing.T) {
 
 	t.Run("start error", func(t *testing.T) {
 		_, mockSrv, app := newMockApp(t)
-		mockSrv.EXPECT().Start(config, app.cmdArgs).Return(errors.New(""))
+		mockSrv.EXPECT().Start(config).Return(errors.New(""))
 
 		res, err := app.runServer(context.Background(), config)
 		assert.Error(t, err)
@@ -221,7 +221,7 @@ func TestApp_runServer(t *testing.T) {
 		_, mockSrv, app := newMockApp(t)
 		ctx := newUniqueCtx(t)
 
-		mockSrv.EXPECT().Start(config, app.cmdArgs).Return(nil)
+		mockSrv.EXPECT().Start(config).Return(nil)
 		mockSrv.EXPECT().GetResult(ctx).Return(nil, errors.New(""))
 		mockSrv.EXPECT().Stop(gomock.Any()).Return(nil)
 
@@ -239,7 +239,7 @@ func TestApp_runMatch(t *testing.T) {
 		result := []byte(`{"result":345}`)
 
 		mockConn.EXPECT().GetMatchConfig(ctx).Return(config, nil)
-		mockSrv.EXPECT().Start(string(config.Config), app.cmdArgs).Return(nil)
+		mockSrv.EXPECT().Start(string(config.Config)).Return(nil)
 		mockSrv.EXPECT().GetResult(ctx).Return(result, nil)
 		mockSrv.EXPECT().Stop(gomock.Any()).Return(nil)
 		mockConn.EXPECT().SendResult(gomock.Any(), config.MatchID, result).Return(nil)
@@ -262,7 +262,7 @@ func TestApp_runMatch(t *testing.T) {
 		ctx := newUniqueCtx(t)
 
 		mockConn.EXPECT().GetMatchConfig(ctx).Return(internal.MatchConfig{}, nil)
-		mockSrv.EXPECT().Start(gomock.Any(), app.cmdArgs).Return(errors.New(""))
+		mockSrv.EXPECT().Start(gomock.Any()).Return(errors.New(""))
 		mockConn.EXPECT().SendCancel(gomock.Any(), gomock.Any()).Return(nil)
 
 		err := app.runMatch(ctx)
@@ -273,7 +273,7 @@ func TestApp_runMatch(t *testing.T) {
 		mockConn, mockSrv, app := newMockApp(t)
 
 		mockConn.EXPECT().GetMatchConfig(gomock.Any()).Return(internal.MatchConfig{}, nil)
-		mockSrv.EXPECT().Start(gomock.Any(), app.cmdArgs).Return(nil)
+		mockSrv.EXPECT().Start(gomock.Any()).Return(nil)
 		mockSrv.EXPECT().GetResult(gomock.Any()).Return([]byte{}, nil)
 		mockSrv.EXPECT().Stop(gomock.Any()).Return(nil)
 		mockConn.EXPECT().SendResult(gomock.Any(), gomock.Any(), gomock.Any()).Return(errors.New(""))
@@ -308,7 +308,7 @@ func TestApp_Run(t *testing.T) {
 		defer cancel()
 
 		mockConn.EXPECT().GetMatchConfig(ctx).Return(internal.MatchConfig{}, nil)
-		mockSrv.EXPECT().Start(gomock.Any(), app.cmdArgs).Return(nil)
+		mockSrv.EXPECT().Start(gomock.Any()).Return(nil)
 		mockSrv.EXPECT().GetResult(ctx).Return([]byte{}, nil)
 		mockSrv.EXPECT().Stop(gomock.Any()).Return(nil)
 		mockConn.EXPECT().SendResult(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)

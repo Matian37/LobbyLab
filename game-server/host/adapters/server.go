@@ -13,7 +13,6 @@ import (
 )
 
 var (
-	ErrCommandEmpty            = errors.New("args not provided")
 	ErrFailedToCreateTempFile  = errors.New("failed to create temp file")
 	ErrFailedToWriteConfig     = errors.New("failed to write config")
 	ErrGameServerFailedToStart = errors.New("failed to start game server")
@@ -22,6 +21,8 @@ var (
 )
 
 type Executor struct {
+	command []string
+
 	active bool
 
 	configFile *os.File
@@ -33,13 +34,17 @@ type Executor struct {
 	waitChannel chan error
 }
 
-func (s *Executor) Start(config string, command []string) error {
-	if len(command) == 0 {
-		return ErrCommandEmpty
-	}
+func NewExecutor(command []string) *Executor {
+	return &Executor{command: slices.Clone(command)}
+}
+
+// starts the executor with given command
+// NOTE: requires command to be non-empty
+func (s *Executor) Start(config string) error {
 	if s.active {
 		return ErrExecutorAlreadyActive
 	}
+	s.active = true
 
 	configFile, err := createTempFile("config")
 	if err != nil {
@@ -57,8 +62,7 @@ func (s *Executor) Start(config string, command []string) error {
 	}
 	s.resultFile = resultFile
 
-	command = attachParams(slices.Clone(command), s.configFile.Name(), s.resultFile.Name())
-
+	command := attachParams(slices.Clone(s.command), s.configFile.Name(), s.resultFile.Name())
 	s.cmd = exec.Command(command[0], command[1:]...)
 	s.cmd.SysProcAttr = &syscall.SysProcAttr{
 		Setpgid:   true,
@@ -69,7 +73,6 @@ func (s *Executor) Start(config string, command []string) error {
 		return fmt.Errorf("%w: %w", ErrGameServerFailedToStart, err)
 	}
 	s.pgid = s.cmd.Process.Pid
-	s.active = true
 
 	return nil
 }
@@ -78,7 +81,39 @@ func (s *Executor) Stop(ctx context.Context) error {
 	if !s.active {
 		return ErrExecutorNotActive
 	}
-	defer s.cleanup()
+
+	var returnErr error
+
+	if s.cmd != nil {
+		returnErr = s.stopCommand(ctx)
+		s.cmd = nil
+	}
+	s.pgid = 0
+
+	if s.configFile != nil {
+		removeFile(s.configFile, "config file", slog.Default())
+		s.configFile = nil
+	}
+
+	if s.resultFile != nil {
+		removeFile(s.resultFile, "result file", slog.Default())
+		s.resultFile = nil
+	}
+
+	if s.waitChannel != nil {
+		close(s.waitChannel)
+		s.waitChannel = nil
+	}
+
+	s.active = false
+
+	return returnErr
+}
+
+func (s *Executor) stopCommand(ctx context.Context) error {
+	if s.cmd == nil || s.cmd.Process == nil {
+		return nil
+	}
 
 	s.startWait()
 
@@ -89,52 +124,15 @@ func (s *Executor) Stop(ctx context.Context) error {
 	// TODO: add force kill after X seconds
 	select {
 	case <-s.waitChannel:
-		// kill remaining children
-		if err := syscall.Kill(-s.pgid, syscall.SIGKILL); err != nil {
-			slog.Warn("failed to kill remaining children", "pgid", s.pgid, "err", err)
-		}
+		killProcessGroup(s.pgid)
 		return nil
 	case <-ctx.Done():
-		if err := syscall.Kill(-s.pgid, syscall.SIGKILL); err != nil {
-			slog.Warn("failed to kill remaining children", "pgid", s.pgid, "err", err)
-		}
+		killProcessGroup(s.pgid)
 		<-s.waitChannel
 		return ctx.Err()
 	}
 }
 
-func (s *Executor) cleanup() {
-	if s.configFile != nil {
-		if err := s.configFile.Close(); err != nil {
-			slog.Warn("failed to close config file", "err", err)
-		}
-		if err := os.Remove(s.configFile.Name()); err != nil {
-			slog.Warn("failed to remove config file", "err", err)
-		}
-		s.configFile = nil
-	}
-
-	if s.resultFile != nil {
-		if err := s.resultFile.Close(); err != nil {
-			slog.Warn("failed to close result file", "err", err)
-		}
-		if err := os.Remove(s.resultFile.Name()); err != nil {
-			slog.Warn("failed to remove result file", "err", err)
-		}
-		s.resultFile = nil
-	}
-
-	if s.waitChannel != nil {
-		close(s.waitChannel)
-		s.waitChannel = nil
-	}
-
-	s.cmd = nil
-	s.pgid = 0
-	s.active = false
-}
-
-// Note: function does not stop cmd, always run Stop function manually
 func (s *Executor) GetResult(ctx context.Context) ([]byte, error) {
 	if !s.active {
 		return []byte{}, ErrExecutorNotActive
@@ -194,4 +192,19 @@ func attachParams(cmdArgs []string, configFileName string, resultFileName string
 		"--match-config", configFileName,
 		"--match-result", resultFileName,
 	)
+}
+
+func removeFile(file *os.File, name string, logger *slog.Logger) {
+	if err := file.Close(); err != nil {
+		logger.Warn("failed to close temp file", "err", err, "fileName", name)
+	}
+	if err := os.Remove(file.Name()); err != nil {
+		logger.Warn("failed to remove temp file", "err", err, "fileName", name)
+	}
+}
+
+func killProcessGroup(pgid int) {
+	if err := syscall.Kill(-pgid, syscall.SIGKILL); err != nil {
+		slog.Warn("failed to kill remaining children", "pgid", pgid, "err", err)
+	}
 }

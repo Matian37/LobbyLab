@@ -3,6 +3,7 @@ package adapters
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -39,43 +40,66 @@ func TestCreateTempFile(t *testing.T) {
 	})
 }
 
-func TestExecutor_Cleanup(t *testing.T) {
-	t.Run("nil files", func(t *testing.T) {
-		exc := Executor{}
-		exc.cleanup()
-	})
-
+func TestRemoveFile(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
-		exc := Executor{
-			active:      true,
-			cmd:         exec.Command("echo"),
-			pgid:        1,
-			waitChannel: make(chan error),
-		}
-		configFile, err := os.CreateTemp("", "*")
+		file, err := os.CreateTemp("", "*")
 		require.NoError(t, err)
-		exc.configFile = configFile
-		resultFile, err := os.CreateTemp("", "*")
-		require.NoError(t, err)
-		exc.resultFile = resultFile
+		path := file.Name()
 
-		configPath := exc.configFile.Name()
-		resultPath := exc.resultFile.Name()
+		removeFile(file, "test file", slog.Default())
 
-		exc.cleanup()
-		require.Equal(t, Executor{}, exc)
-
-		_, err = os.Stat(configPath)
+		_, err = os.Stat(path)
 		assert.ErrorIs(t, err, os.ErrNotExist)
-		_, err = os.Stat(resultPath)
-		assert.Error(t, err, os.ErrNotExist)
+	})
+}
+
+func TestKillProcessGroup(t *testing.T) {
+	t.Run("kills group but leaves different one", func(t *testing.T) {
+		waitWithTimeout := func(cmd *exec.Cmd) {
+			t.Helper()
+			done := make(chan error, 1)
+			go func() { done <- cmd.Wait() }()
+			select {
+			case <-done:
+			case <-time.After(3 * time.Second):
+				t.Fatal("process did not exit in time")
+			}
+		}
+
+		leader := exec.Command("sleep", "inf")
+		leader.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+		require.NoError(t, leader.Start())
+		group := leader.Process.Pid
+
+		member := exec.Command("sleep", "inf")
+		member.SysProcAttr = &syscall.SysProcAttr{Setpgid: true, Pgid: group}
+		require.NoError(t, member.Start())
+
+		outsider := exec.Command("sleep", "inf")
+		outsider.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+		require.NoError(t, outsider.Start())
+
+		killProcessGroup(group)
+
+		// reap group members so the process group is actually gone
+		waitWithTimeout(leader)
+		waitWithTimeout(member)
+
+		assert.Eventually(t, func() bool {
+			return errors.Is(syscall.Kill(-group, 0), syscall.ESRCH)
+		}, 1*time.Second, 20*time.Millisecond)
+
+		// outsider in a different group is left untouched
+		assert.NoError(t, syscall.Kill(-outsider.Process.Pid, 0))
+		_ = outsider.Process.Kill()
+		waitWithTimeout(outsider)
 	})
 }
 
 func TestExecutor_StartWait(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
-		exc := Executor{}
-		require.NoError(t, exc.Start("", []string{"echo"}))
+		exc := NewExecutor([]string{"echo"})
+		require.NoError(t, exc.Start(""))
 
 		exc.startWait()
 		require.NotNil(t, exc.waitChannel)
@@ -85,17 +109,10 @@ func TestExecutor_StartWait(t *testing.T) {
 }
 
 func TestExecutor_Start(t *testing.T) {
-	t.Run("no command", func(t *testing.T) {
-		exc := Executor{}
-		err := exc.Start("", []string{})
-		assert.ErrorIs(t, err, ErrCommandEmpty)
-		assert.False(t, exc.active)
-	})
-
 	t.Run("success", func(t *testing.T) {
-		exc := Executor{}
+		exc := NewExecutor([]string{"echo"})
 
-		err := exc.Start("", []string{"echo"})
+		err := exc.Start("")
 		require.NoError(t, err)
 
 		require.NotNil(t, exc.cmd)
@@ -117,19 +134,44 @@ func TestExecutor_Start(t *testing.T) {
 	})
 
 	t.Run("already started", func(t *testing.T) {
-		exc := Executor{}
-		err := exc.Start("", []string{"echo"})
+		exc := NewExecutor([]string{"echo"})
+		err := exc.Start("")
 		require.NoError(t, err)
 
-		err = exc.Start("", []string{"echo"})
+		err = exc.Start("")
 		assert.ErrorIs(t, err, ErrExecutorAlreadyActive)
+	})
+
+	t.Run("partial start", func(t *testing.T) {
+		exc := NewExecutor([]string{})
+		err := exc.Start("")
+		require.ErrorIs(t, err, ErrGameServerFailedToStart)
+
+		assert.True(t, exc.active)
+		assert.NotNil(t, exc.configFile)
+		assert.NotNil(t, exc.resultFile)
+		assert.NotNil(t, exc.cmd)
+		assert.Zero(t, exc.pgid)
+	})
+
+	t.Run("does not mutate command", func(t *testing.T) {
+		command := make([]string, 1, 4)
+		command[0] = "echo"
+
+		exc := NewExecutor(command)
+		require.NoError(t, exc.Start(""))
+		defer func() { require.NoError(t, exc.Stop(context.Background())) }()
+
+		assert.Equal(t, []string{"echo"}, command)
+		assert.Equal(t, []string{"echo"}, exc.command)
+		assert.NotSame(t, &command[0], &exc.command[0])
 	})
 }
 
 func TestExecutor_Wait(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
-		exc := Executor{}
-		require.NoError(t, exc.Start("", []string{"sh", "-c", "exit 1"}))
+		exc := NewExecutor([]string{"sh", "-c", "exit 1"})
+		require.NoError(t, exc.Start(""))
 
 		err := exc.wait(context.Background())
 
@@ -138,8 +180,8 @@ func TestExecutor_Wait(t *testing.T) {
 	})
 
 	t.Run("context cancel", func(t *testing.T) {
-		exc := Executor{}
-		require.NoError(t, exc.Start("", []string{"sleep", "inf"}))
+		exc := NewExecutor([]string{"sleep", "inf"})
+		require.NoError(t, exc.Start(""))
 
 		ctx, cancel := context.WithCancel(context.Background())
 		cancel()
@@ -157,14 +199,14 @@ func TestExecutor_Stop(t *testing.T) {
 	}
 
 	t.Run("not started", func(t *testing.T) {
-		exc := Executor{}
+		exc := NewExecutor(nil)
 		err := exc.Stop(context.Background())
 		assert.ErrorIs(t, err, ErrExecutorNotActive)
 	})
 
 	t.Run("success", func(t *testing.T) {
-		exc := Executor{}
-		err := exc.Start("", []string{"sleep", "inf"})
+		exc := NewExecutor([]string{"sleep", "inf"})
+		err := exc.Start("")
 		require.NoError(t, err)
 
 		pgid := exc.pgid
@@ -174,13 +216,13 @@ func TestExecutor_Stop(t *testing.T) {
 		require.NoError(t, err)
 		assert.Nil(t, ctx.Err())
 
-		assert.Equal(t, exc, Executor{})
+		assert.Equal(t, &Executor{command: []string{"sleep", "inf"}}, exc)
 		assertProcessGroupEnded(pgid)
 	})
 
 	t.Run("context cancel", func(t *testing.T) {
-		exc := Executor{}
-		err := exc.Start("", []string{"echo"})
+		exc := NewExecutor([]string{"echo"})
+		err := exc.Start("")
 		require.NoError(t, err)
 
 		pgid := exc.pgid
@@ -194,10 +236,9 @@ func TestExecutor_Stop(t *testing.T) {
 	})
 
 	t.Run("process ignores SIGTERM", func(t *testing.T) {
-		exc := Executor{}
-
 		cmd := []string{"sh", "-c", "trap '' TERM; kill -USR1 $PPID; sleep inf"}
-		err := exc.Start("", cmd)
+		exc := NewExecutor(cmd)
+		err := exc.Start("")
 		require.NoError(t, err)
 
 		pgid := exc.pgid
@@ -216,10 +257,9 @@ func TestExecutor_Stop(t *testing.T) {
 	})
 
 	t.Run("process died but its child is alive", func(t *testing.T) {
-		exc := Executor{}
-
 		cmd := []string{"sh", "-c", "sleep inf & exit"}
-		require.NoError(t, exc.Start("", cmd))
+		exc := NewExecutor(cmd)
+		require.NoError(t, exc.Start(""))
 
 		pgid := exc.cmd.Process.Pid
 		require.NoError(t, exc.cmd.Wait())
@@ -234,6 +274,114 @@ func TestExecutor_Stop(t *testing.T) {
 			err := syscall.Kill(-pgid, 0)
 			return errors.Is(err, syscall.ESRCH)
 		}, 1*time.Second, 20*time.Millisecond)
+	})
+
+	t.Run("partially started", func(t *testing.T) {
+		exc := NewExecutor([]string{})
+		err := exc.Start("")
+		require.Error(t, err)
+
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		require.NoError(t, exc.Stop(ctx))
+		assert.False(t, exc.active)
+		assert.Nil(t, exc.configFile)
+		assert.Nil(t, exc.resultFile)
+		assert.Nil(t, exc.cmd)
+		assert.Zero(t, exc.pgid)
+	})
+
+	t.Run("does not mutate command", func(t *testing.T) {
+		command := make([]string, 1, 4)
+		command[0] = "echo"
+
+		exc := NewExecutor(command)
+		require.NoError(t, exc.Start(""))
+		require.NoError(t, exc.Stop(context.Background()))
+
+		assert.Equal(t, []string{"echo"}, command)
+		assert.Equal(t, []string{"echo"}, exc.command)
+	})
+
+	t.Run("partially initialized", func(t *testing.T) {
+		tests := []struct {
+			name  string
+			setup func(t *testing.T) *Executor
+		}{
+			{
+				name:  "active only",
+				setup: func(t *testing.T) *Executor { return &Executor{active: true} },
+			},
+			{
+				name: "cmd nil but pgid set",
+				setup: func(t *testing.T) *Executor {
+					return &Executor{active: true, pgid: 1234}
+				},
+			},
+			{
+				name: "config file only",
+				setup: func(t *testing.T) *Executor {
+					file, err := os.CreateTemp("", "*")
+					require.NoError(t, err)
+					return &Executor{active: true, configFile: file}
+				},
+			},
+			{
+				name: "result file only",
+				setup: func(t *testing.T) *Executor {
+					file, err := os.CreateTemp("", "*")
+					require.NoError(t, err)
+					return &Executor{active: true, resultFile: file}
+				},
+			},
+			{
+				name: "wait channel only",
+				setup: func(t *testing.T) *Executor {
+					return &Executor{active: true, waitChannel: make(chan error, 1)}
+				},
+			},
+			{
+				name: "all but cmd",
+				setup: func(t *testing.T) *Executor {
+					config, err := os.CreateTemp("", "*")
+					require.NoError(t, err)
+					result, err := os.CreateTemp("", "*")
+					require.NoError(t, err)
+					return &Executor{
+						active:      true,
+						pgid:        1234,
+						configFile:  config,
+						resultFile:  result,
+						waitChannel: make(chan error, 1),
+					}
+				},
+			},
+		}
+		for _, test := range tests {
+			t.Run(test.name, func(t *testing.T) {
+				exc := test.setup(t)
+
+				paths := []string{}
+				if exc.configFile != nil {
+					paths = append(paths, exc.configFile.Name())
+				}
+				if exc.resultFile != nil {
+					paths = append(paths, exc.resultFile.Name())
+				}
+
+				ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+				defer cancel()
+
+				require.NoError(t, exc.Stop(ctx))
+				assert.Equal(t, Executor{}, *exc)
+
+				for _, path := range paths {
+					_, err := os.Stat(path)
+					assert.ErrorIs(t, err, os.ErrNotExist)
+				}
+			})
+		}
 	})
 }
 
@@ -259,8 +407,8 @@ func TestExecutor_GetResult(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			exc := Executor{}
-			require.NoError(t, exc.Start("", []string{"echo"}))
+			exc := NewExecutor([]string{"echo"})
+			require.NoError(t, exc.Start(""))
 			defer func() { require.NoError(t, exc.Stop(context.Background())) }()
 
 			n, err := exc.resultFile.Write(test.payload)
@@ -275,8 +423,8 @@ func TestExecutor_GetResult(t *testing.T) {
 	}
 
 	t.Run("context canceled", func(t *testing.T) {
-		exc := Executor{}
-		require.NoError(t, exc.Start("config", []string{"sleep", "inf"}))
+		exc := NewExecutor([]string{"sleep", "inf"})
+		require.NoError(t, exc.Start("config"))
 		defer func() { require.NoError(t, exc.Stop(context.Background())) }()
 
 		ctx, cancel := context.WithCancel(context.Background())
@@ -315,12 +463,12 @@ func TestExecutor_LifeCycle(t *testing.T) {
 		},
 	}
 
-	exc := Executor{}
-
 	for idx, iteration := range iterations {
 		t.Logf("iteration %v", idx)
 
-		err := exc.Start("config", iteration.command)
+		exc := NewExecutor(iteration.command)
+
+		err := exc.Start("config")
 		require.NoError(t, err)
 
 		n, err := exc.resultFile.Write(iteration.expected)
@@ -343,6 +491,6 @@ func TestExecutor_LifeCycle(t *testing.T) {
 
 		err = exc.Stop(context.Background())
 		require.NoError(t, err)
-		require.Equal(t, Executor{}, exc)
+		require.Equal(t, &Executor{command: iteration.command}, exc)
 	}
 }

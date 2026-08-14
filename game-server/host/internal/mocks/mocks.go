@@ -153,17 +153,17 @@ func (mr *MockExecutorMockRecorder) GetResult(ctx any) *gomock.Call {
 }
 
 // Start mocks base method.
-func (m *MockExecutor) Start(config string, command []string) error {
+func (m *MockExecutor) Start(config string) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Start", config, command)
+	ret := m.ctrl.Call(m, "Start", config)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // Start indicates an expected call of Start.
-func (mr *MockExecutorMockRecorder) Start(config, command any) *gomock.Call {
+func (mr *MockExecutorMockRecorder) Start(config any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Start", reflect.TypeOf((*MockExecutor)(nil).Start), config, command)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Start", reflect.TypeOf((*MockExecutor)(nil).Start), config)
 }
 
 // Stop mocks base method.
