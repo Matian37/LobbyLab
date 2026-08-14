@@ -16,8 +16,8 @@ var (
 )
 
 type App struct {
-	conn        internal.BrokerConnection
-	server      internal.Executor
+	broker      internal.BrokerConnection
+	executor    internal.Executor
 	cmdArgs     []string
 	initialized bool
 
@@ -29,8 +29,8 @@ type App struct {
 
 func NewApp(brokerURI string, containerID string, cmdArgs []string) *App {
 	return &App{
-		conn:              adapters.NewConnection(brokerURI, containerID),
-		server:            adapters.NewExecutor(cmdArgs),
+		broker:            adapters.NewConnection(brokerURI, containerID),
+		executor:          adapters.NewExecutor(cmdArgs),
 		cmdArgs:           cmdArgs,
 		initTimeout:       5 * time.Second,
 		serverStopTimeout: 5 * time.Second,
@@ -44,7 +44,7 @@ func (app *App) Init() error {
 		return ErrAppAlreadyInitialized
 	}
 
-	if err := app.conn.Open(app.initTimeout); err != nil {
+	if err := app.broker.Open(app.initTimeout); err != nil {
 		return err
 	}
 	app.initialized = true
@@ -73,7 +73,7 @@ func (app *App) Run(ctx context.Context) error {
 
 func (app *App) runMatch(ctx context.Context) error {
 	slog.Debug("waiting for match config...")
-	config, err := app.conn.GetMatchConfig(ctx)
+	config, err := app.broker.GetMatchConfig(ctx)
 	if err != nil {
 		return fmt.Errorf("get match config failed: %w", err)
 	}
@@ -100,13 +100,13 @@ func (app *App) runMatch(ctx context.Context) error {
 
 func (app *App) runServer(ctx context.Context, config string) ([]byte, error) {
 	slog.Info("starting server...")
-	if err := app.server.Start(config); err != nil {
+	if err := app.executor.Start(config); err != nil {
 		return nil, fmt.Errorf("failed to start server: %w", err)
 	}
 	defer app.stopServer(ctx)
 
 	slog.Info("server started; waiting for the result...")
-	result, err := app.server.GetResult(ctx)
+	result, err := app.executor.GetResult(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get match result: %w", err)
 	}
@@ -117,7 +117,7 @@ func (app *App) stopServer(ctx context.Context) {
 	timeoutCtx, cancel := context.WithTimeout(ctx, app.serverStopTimeout)
 	defer cancel()
 
-	err := app.server.Stop(timeoutCtx)
+	err := app.executor.Stop(timeoutCtx)
 
 	// Stop errors are only logged since failure to stop does not affect server reuse.
 	if err != nil && !errors.Is(err, context.Canceled) {
@@ -131,7 +131,7 @@ func (app *App) sendCancel(matchID int) {
 	ctx, cancel := context.WithTimeout(context.Background(), app.sendCancelTimeout)
 	defer cancel()
 
-	if err := app.conn.SendCancel(ctx, matchID); err != nil {
+	if err := app.broker.SendCancel(ctx, matchID); err != nil {
 		slog.Error("send match cancel failed", "error", err)
 	}
 }
@@ -141,5 +141,5 @@ func (app *App) sendResult(ctx context.Context, matchID int, result []byte) erro
 
 	timeoutCtx, cancel := context.WithTimeout(ctx, app.sendResultTimeout)
 	defer cancel()
-	return app.conn.SendResult(timeoutCtx, matchID, result)
+	return app.broker.SendResult(timeoutCtx, matchID, result)
 }

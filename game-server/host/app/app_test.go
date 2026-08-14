@@ -18,8 +18,8 @@ func newMockApp(t *testing.T) (*mocks.MockBrokerConnection, *mocks.MockExecutor,
 	mockConn := mocks.NewMockBrokerConnection(ctrl)
 	mockSrv := mocks.NewMockExecutor(ctrl)
 	app := &App{
-		conn:              mockConn,
-		server:            mockSrv,
+		broker:            mockConn,
+		executor:          mockSrv,
 		cmdArgs:           []string{"./game"},
 		initTimeout:       150 * time.Millisecond,
 		serverStopTimeout: 150 * time.Millisecond,
@@ -51,14 +51,14 @@ func TestNewApp(t *testing.T) {
 
 	app := NewApp(brokerURI, containerID, cmdArgs)
 
-	assert.NotNil(t, app.conn)
-	assert.NotNil(t, app.server)
+	assert.NotNil(t, app.broker)
+	assert.NotNil(t, app.executor)
 	assert.Equal(t, cmdArgs, app.cmdArgs)
 	assert.False(t, app.initialized)
 	assert.Equal(t, 5*time.Second, app.serverStopTimeout)
 	assert.Equal(t, 15*time.Second, app.sendResultTimeout)
 	assert.Equal(t, 5*time.Second, app.sendCancelTimeout)
-	assert.NotNil(t, app.conn)
+	assert.NotNil(t, app.broker)
 }
 
 func TestApp_Init(t *testing.T) {
