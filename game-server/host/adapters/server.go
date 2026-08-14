@@ -13,16 +13,16 @@ import (
 )
 
 var (
-	ErrCommandEmpty             = errors.New("args not provided")
-	ErrFailedToCreateTempFile   = errors.New("failed to create temp file")
-	ErrFailedToWriteConfig      = errors.New("failed to write config")
-	ErrGameServerStartFailed    = errors.New("failed to start game server")
-	ErrGameServerNotStarted     = errors.New("game server not started")
-	ErrGameServerAlreadyStarted = errors.New("game server already started")
+	ErrCommandEmpty            = errors.New("args not provided")
+	ErrFailedToCreateTempFile  = errors.New("failed to create temp file")
+	ErrFailedToWriteConfig     = errors.New("failed to write config")
+	ErrGameServerFailedToStart = errors.New("failed to start game server")
+	ErrExecutorNotActive       = errors.New("executor not active")
+	ErrExecutorAlreadyActive   = errors.New("executor already active")
 )
 
 type Executor struct {
-	started bool
+	active bool
 
 	configFile *os.File
 	resultFile *os.File
@@ -37,25 +37,22 @@ func (s *Executor) Start(config string, command []string) error {
 	if len(command) == 0 {
 		return ErrCommandEmpty
 	}
-	if s.started {
-		return ErrGameServerAlreadyStarted
+	if s.active {
+		return ErrExecutorAlreadyActive
 	}
 
 	configFile, err := createTempFile("config")
 	if err != nil {
-		s.cleanup()
 		return err
 	}
 	s.configFile = configFile
 
 	if _, err := s.configFile.WriteString(config); err != nil {
-		s.cleanup()
 		return fmt.Errorf("%w: %w", ErrFailedToWriteConfig, err)
 	}
 
 	resultFile, err := createTempFile("result")
 	if err != nil {
-		s.cleanup()
 		return err
 	}
 	s.resultFile = resultFile
@@ -69,19 +66,17 @@ func (s *Executor) Start(config string, command []string) error {
 	}
 
 	if err := s.cmd.Start(); err != nil {
-		s.cleanup()
-		return fmt.Errorf("%w: %w", ErrGameServerStartFailed, err)
+		return fmt.Errorf("%w: %w", ErrGameServerFailedToStart, err)
 	}
 	s.pgid = s.cmd.Process.Pid
-	s.started = true
+	s.active = true
 
 	return nil
 }
 
 func (s *Executor) Stop(ctx context.Context) error {
-	// s.pgid == 0 means that process is already gone
-	if !s.started {
-		return ErrGameServerNotStarted
+	if !s.active {
+		return ErrExecutorNotActive
 	}
 	defer s.cleanup()
 
@@ -91,6 +86,7 @@ func (s *Executor) Stop(ctx context.Context) error {
 		slog.Warn("failed to send SIGTERM", "pid", s.cmd.Process.Pid, "err", err)
 	}
 
+	// TODO: add force kill after X seconds
 	select {
 	case <-s.waitChannel:
 		// kill remaining children
@@ -107,10 +103,41 @@ func (s *Executor) Stop(ctx context.Context) error {
 	}
 }
 
+func (s *Executor) cleanup() {
+	if s.configFile != nil {
+		if err := s.configFile.Close(); err != nil {
+			slog.Warn("failed to close config file", "err", err)
+		}
+		if err := os.Remove(s.configFile.Name()); err != nil {
+			slog.Warn("failed to remove config file", "err", err)
+		}
+		s.configFile = nil
+	}
+
+	if s.resultFile != nil {
+		if err := s.resultFile.Close(); err != nil {
+			slog.Warn("failed to close result file", "err", err)
+		}
+		if err := os.Remove(s.resultFile.Name()); err != nil {
+			slog.Warn("failed to remove result file", "err", err)
+		}
+		s.resultFile = nil
+	}
+
+	if s.waitChannel != nil {
+		close(s.waitChannel)
+		s.waitChannel = nil
+	}
+
+	s.cmd = nil
+	s.pgid = 0
+	s.active = false
+}
+
 // Note: function does not stop cmd, always run Stop function manually
 func (s *Executor) GetResult(ctx context.Context) ([]byte, error) {
-	if !s.started {
-		return []byte{}, ErrGameServerNotStarted
+	if !s.active {
+		return []byte{}, ErrExecutorNotActive
 	}
 
 	if err := s.wait(ctx); err != nil {
@@ -129,8 +156,8 @@ func (s *Executor) GetResult(ctx context.Context) ([]byte, error) {
 }
 
 func (s *Executor) wait(ctx context.Context) error {
-	if !s.started {
-		return ErrGameServerNotStarted
+	if !s.active {
+		return ErrExecutorNotActive
 	}
 
 	s.startWait()
@@ -143,8 +170,7 @@ func (s *Executor) wait(ctx context.Context) error {
 	}
 }
 
-// start wait goroutine and create waitChannel
-//
+// starts wait goroutine and creates waitChannel
 // Note: use this instead of s.cmd.Wait() and only when cmd has started
 func (s *Executor) startWait() {
 	if s.waitChannel == nil {
@@ -153,34 +179,6 @@ func (s *Executor) startWait() {
 			s.waitChannel <- s.cmd.Wait()
 		}()
 	}
-}
-
-func (s *Executor) cleanup() {
-	if s.configFile != nil {
-		if err := s.configFile.Close(); err != nil {
-			slog.Warn("failed to close config file", "err", err)
-		}
-		if err := os.Remove(s.configFile.Name()); err != nil {
-			slog.Warn("failed to remove config file", "err", err)
-		}
-		s.configFile = nil
-	}
-	if s.resultFile != nil {
-		if err := s.resultFile.Close(); err != nil {
-			slog.Warn("failed to close result file", "err", err)
-		}
-		if err := os.Remove(s.resultFile.Name()); err != nil {
-			slog.Warn("failed to remove result file", "err", err)
-		}
-		s.resultFile = nil
-	}
-	if s.waitChannel != nil {
-		close(s.waitChannel)
-		s.waitChannel = nil
-	}
-	s.cmd = nil
-	s.pgid = 0
-	s.started = false
 }
 
 func createTempFile(subname string) (*os.File, error) {
