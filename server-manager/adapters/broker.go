@@ -110,6 +110,10 @@ func (nc *NATSConnection) AssignJob(ctx context.Context, workerID string, config
 	timeoutCtx, stop := context.WithTimeout(ctx, nc.assignJobTimeout)
 	defer stop()
 
+	if len(workerID) > 12 {
+		workerID = workerID[:12]
+	}
+
 	_, err = nc.conn.RequestWithContext(
 		timeoutCtx,
 		assignSubject+"."+workerID,

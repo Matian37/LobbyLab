@@ -227,6 +227,8 @@ func (dc *DockerConnection) containerCreateOptions(portMap network.PortMap) clie
 			Env: []string{
 				"LOG_LEVEL=" + dc.config.GameServerLogLevel.String(),
 				"NATS_URI=" + dc.config.BrokerURI,
+				"PORT=" + dc.config.ClientPort.String(),
+				"HOST=" + dc.config.PublicHost,
 			},
 		},
 		HostConfig: &container.HostConfig{
@@ -241,7 +243,8 @@ func (dc *DockerConnection) containerCreateOptions(portMap network.PortMap) clie
 		},
 		NetworkingConfig: &network.NetworkingConfig{
 			EndpointsConfig: map[string]*network.EndpointSettings{
-				dc.config.BrokerNetworkName: {},
+				dc.config.BrokerNetworkName:    {},
+				"multiplayer-asset_public-net": {},
 			},
 		},
 	}

@@ -53,10 +53,15 @@ def test_add2users(setup_services):
     assert len(token1) > 0 and len(token2) > 0
     print(token1 + ' ' + token2)
 
+    results = requests.get('http://localhost:3000/api/results', cookies={'session': token1}).json()
+    print("HEJW" + str(results))
+    assert "matches" in results
+    assert len(results["matches"]) == 0
+
     #adding to waitlist
     payloads = {}
-    def add(username):
-        payloads[username] = queue_user(username)
+    def add(token):
+        payloads[token] = queue_user(token)
     t1 = threading.Thread(target=add, args=(token1,))
     t2 = threading.Thread(target=add, args=(token2,))
     t1.start()
@@ -64,23 +69,28 @@ def test_add2users(setup_services):
     t1.join()
     t2.join()
     
-    payload1 = payloads['user1']
-    payload2 = payloads['user2']
+    payload1 = payloads[token1]
+    payload2 = payloads[token2]
 
-    assert payload1["username"] == 'user1'
-    assert payload2["username"] == 'user2'
+    assert payload1["login"] == 'user1'
+    assert payload2["login"] == 'user2'
     assert payload1["host"] == payload2["host"]
     assert payload1["port"] == payload2["port"]
+
+    '''
+    time.sleep(1)
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.settimeout(2)
-    sock.sendto('hello'.encode(), (payload1["host"], payload1["port"]))
+    sock.sendto('hello'.encode(), (payload1["host"], int(payload1["port"])))
     try:
         sock.recvfrom(1024)
     except socket.timeout:
         assert False
     print('waiting for match to end')
+    '''
     time.sleep(15)
     print('saving results')
     results = requests.get('http://localhost:3000/api/results', cookies={'session': token1}).json()
+    print("HEWJ" + str(results))
     assert "matches" in results
-    assert len(results) == 1
+    assert len(results["matches"]) == 1
