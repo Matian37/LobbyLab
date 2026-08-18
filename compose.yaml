@@ -65,9 +65,9 @@ services:
       GAME_SERVER_COUNT: 2
       GAME_SERVER_EXPOSE_PORTS: "7777/udp,8080"
       GAME_SERVER_CLIENT_PORT: "7777/udp"
-      GAME_SERVER_LOG_LEVEL: debug
+      GAME_SERVER_LOG_LEVEL: info
       PLAYERS_PER_ROOM: 2
-      LOG_LEVEL: debug
+      LOG_LEVEL: info
     volumes:
       # TODO: required but dangerous, docker socket proxy would be safer instead
       - /var/run/docker.sock:/var/run/docker.sock

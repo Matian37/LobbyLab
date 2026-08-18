@@ -58,7 +58,6 @@ func (s *GameServer) Start(config string, command []string) error {
 	s.resultFile = resultFile
 
 	command = attachParams(slices.Clone(command), s.configFile.Name(), s.resultFile.Name())
-	slog.Debug("no siema eniu odpalam", "gameServerArgs", s.cmd.Args)
 	s.cmd = exec.Command(command[0], command[1:]...)
 	s.cmd.SysProcAttr = &syscall.SysProcAttr{
 		Setpgid:   true,

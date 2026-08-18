@@ -12,7 +12,7 @@ RUN cd host && go build -o /game-server-bin .
 # change it according to your needs
 FROM alpine:3.24 AS runner
 
-RUN apk add --no-cache socat bash
+RUN apk add --no-cache bash socat
 
 COPY --from=builder /game-server-bin /usr/local/bin/game-server
 
