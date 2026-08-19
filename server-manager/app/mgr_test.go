@@ -354,7 +354,7 @@ func TestWorkerManager_getWorkerByMatchID(t *testing.T) {
 		workers := []*Worker{
 			NewWorker("worker-0", "container-0", 3, 30*time.Second),
 			NewWorker("worker-1", "container-1", 3, 30*time.Second),
-			NewWorker("worker-3", "container-2", 3, 30*time.Second),
+			NewWorker("worker-2", "container-2", 3, 30*time.Second),
 			NewWorker("worker-3", "container-3", 3, 30*time.Second),
 		}
 		workers[0].SetOccupied(5)
@@ -496,12 +496,13 @@ func TestWorkerManager_restartWorker(t *testing.T) {
 	t.Run("container restart failed", func(t *testing.T) {
 		ctx := context.Background()
 
-		docker, _, _, wm := newMockWorkerManagerWithInit(t, []*Worker{})
+		workers := []*Worker{NewWorker("worker-0", "container-0", 3, 30*time.Second)}
+		docker, _, _, wm := newMockWorkerManagerWithInit(t, workers)
 		wantErr := errors.New("restart failed")
 
-		docker.EXPECT().RestartContainer(ctx, "").Return(wantErr)
+		docker.EXPECT().RestartContainer(ctx, "container-0").Return(wantErr)
 
-		assert.ErrorIs(t, wm.restartWorker(ctx, nil, 0, ""), wantErr)
+		assert.ErrorIs(t, wm.restartWorker(ctx, workers[0], 0), wantErr)
 	})
 
 	t.Run("worker changed state", func(t *testing.T) {
@@ -509,7 +510,7 @@ func TestWorkerManager_restartWorker(t *testing.T) {
 		docker, _, _, wm := newMockWorkerManagerWithInit(t, []*Worker{&Worker{stateID: 1}})
 		docker.EXPECT().RestartContainer(ctx, "").Return(nil)
 
-		err := wm.restartWorker(ctx, wm.workers[0], 0, "")
+		err := wm.restartWorker(ctx, wm.workers[0], 0)
 		assert.ErrorIs(t, err, ErrWorkerStateChanged)
 	})
 
@@ -541,7 +542,7 @@ func TestWorkerManager_restartWorker(t *testing.T) {
 
 		<-ready
 
-		err := wm.restartWorker(ctx, workers[0], stateID, workers[0].ContainerID)
+		err := wm.restartWorker(ctx, workers[0], stateID)
 		require.NoError(t, err)
 
 		assert.Equal(t, WorkerFree, workers[0].State)

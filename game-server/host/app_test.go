@@ -47,9 +47,9 @@ func newUniqueCtx(t *testing.T) context.Context {
 func TestNewApp(t *testing.T) {
 	cmdArgs := []string{"./game", "--arg1"}
 	brokerURI := "nats://localhost:4222"
-	containerID := "worker-1"
+	workerID := "worker-1"
 
-	app := NewApp(brokerURI, containerID, cmdArgs)
+	app := NewApp(brokerURI, workerID, cmdArgs)
 
 	assert.NotNil(t, app.conn)
 	assert.NotNil(t, app.server)
@@ -62,7 +62,7 @@ func TestNewApp(t *testing.T) {
 	nc, ok := app.conn.(*NATSConnection)
 	assert.True(t, ok, "NewApp should create a NATSConnection")
 	assert.Equal(t, brokerURI, nc.brokerURI)
-	assert.Equal(t, containerID, nc.containerID)
+	assert.Equal(t, workerID, nc.workerID)
 }
 
 func TestApp_Init(t *testing.T) {

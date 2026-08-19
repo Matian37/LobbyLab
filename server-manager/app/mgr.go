@@ -394,7 +394,7 @@ func (wm *WorkerManager) healthCheck(ctx context.Context) error {
 		stateID := worker.SetRestarting()
 
 		wm.wg.Go(func() {
-			err := wm.restartWorker(ctx, worker, stateID, worker.ContainerID)
+			err := wm.restartWorker(ctx, worker, stateID)
 			if err != nil && !errors.Is(err, ErrWorkerStateChanged) {
 				wm.logger.Error(
 					"failed to restart worker",
@@ -409,8 +409,8 @@ func (wm *WorkerManager) healthCheck(ctx context.Context) error {
 	return nil
 }
 
-func (wm *WorkerManager) restartWorker(ctx context.Context, worker *Worker, restartStateID int, containerID string) error {
-	err := wm.dockerConn.RestartContainer(ctx, containerID)
+func (wm *WorkerManager) restartWorker(ctx context.Context, worker *Worker, restartStateID int) error {
+	err := wm.dockerConn.RestartContainer(ctx, worker.ContainerID)
 	if err != nil {
 		return err
 	}

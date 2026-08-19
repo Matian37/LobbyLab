@@ -26,9 +26,9 @@ type App struct {
 	sendCancelTimeout time.Duration
 }
 
-func NewApp(brokerURI string, containerID string, cmdArgs []string) *App {
+func NewApp(brokerURI string, workerID string, cmdArgs []string) *App {
 	return &App{
-		conn:              NewConnection(brokerURI, containerID),
+		conn:              NewConnection(brokerURI, workerID),
 		server:            &GameServer{},
 		cmdArgs:           cmdArgs,
 		initTimeout:       5 * time.Second,

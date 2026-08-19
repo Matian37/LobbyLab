@@ -67,14 +67,14 @@ func newNATSServerWithoutResultStream(t *testing.T) string {
 
 func TestNewConnection(t *testing.T) {
 	brokerURI := "a"
-	containerID := "b"
+	workerID := "b"
 
-	c := NewConnection(brokerURI, containerID)
+	c := NewConnection(brokerURI, workerID)
 
 	assert.NotNil(t, c)
 
 	assert.Equal(t, brokerURI, c.brokerURI)
-	assert.Equal(t, containerID, c.containerID)
+	assert.Equal(t, workerID, c.workerID)
 
 	assert.Nil(t, c.conn)
 	assert.Nil(t, c.healthSub)
@@ -129,7 +129,7 @@ func TestNATSConnection_subscribeHealth(t *testing.T) {
 
 		msg, err := pub.Request(healthSubject, []byte{}, time.Second)
 		require.NoError(t, err)
-		assert.Equal(t, []byte(c.containerID), msg.Data)
+		assert.Equal(t, []byte(c.workerID), msg.Data)
 	})
 }
 
@@ -186,7 +186,7 @@ func TestNATSConnection_Open(t *testing.T) {
 	t.Run("partial opening", func(t *testing.T) {
 		addr := newNATSServer(t)
 
-		// space in containerID trigger error in subscribeAssign
+		// space in workerID trigger error in subscribeAssign
 		c := NewConnection(addr, "a b")
 		err := c.Open(150 * time.Millisecond)
 		assert.ErrorIs(t, err, nats.ErrBadSubject)
@@ -266,8 +266,8 @@ func TestNATSConnection_GetMatchConfig(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		addr := newNATSServer(t)
 
-		containerID := "a"
-		c := NewConnection(addr, containerID)
+		workerID := "a"
+		c := NewConnection(addr, workerID)
 		err := c.Open(150 * time.Millisecond)
 		require.NoError(t, err)
 
@@ -284,7 +284,7 @@ func TestNATSConnection_GetMatchConfig(t *testing.T) {
 			defer close(doneChan)
 
 			msg, err := nc.Request(
-				assignSubject+"."+containerID,
+				assignSubject+"."+workerID,
 				[]byte(expectedConfigJSON),
 				1*time.Second,
 			)

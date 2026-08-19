@@ -26,8 +26,8 @@ var (
 )
 
 type NATSConnection struct {
-	brokerURI   string
-	containerID string
+	brokerURI string
+	workerID  string
 
 	conn *nats.Conn
 	js   jetstream.JetStream
@@ -39,10 +39,10 @@ type NATSConnection struct {
 	closed bool
 }
 
-func NewConnection(brokerURI string, containerID string) *NATSConnection {
+func NewConnection(brokerURI string, workerID string) *NATSConnection {
 	return &NATSConnection{
-		brokerURI:   brokerURI,
-		containerID: containerID,
+		brokerURI: brokerURI,
+		workerID:  workerID,
 	}
 }
 
@@ -172,7 +172,7 @@ func (c *NATSConnection) SendResult(ctx context.Context, matchID int, result []b
 }
 
 func (c *NATSConnection) subscribeAssign() error {
-	sub, err := c.conn.SubscribeSync(assignSubject + "." + c.containerID)
+	sub, err := c.conn.SubscribeSync(assignSubject + "." + c.workerID)
 	if err != nil {
 		if err := c.Close(); err != nil {
 			slog.Warn("failed to close connection", "err", err)
@@ -194,7 +194,7 @@ func (c *NATSConnection) subscribeHealth() error {
 	sub, err := c.conn.Subscribe(healthSubject, func(msg *nats.Msg) {
 		slog.Debug("received ping, sending pong...")
 
-		if pongErr := c.conn.Publish(msg.Reply, []byte(c.containerID)); pongErr != nil {
+		if pongErr := c.conn.Publish(msg.Reply, []byte(c.workerID)); pongErr != nil {
 			slog.Error("failed to publish health response", "error", pongErr)
 		} else {
 			slog.Debug("pong sent successfuly")

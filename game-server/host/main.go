@@ -17,7 +17,7 @@ func setupLogger() {
 	setupLoggerWithWriter(os.Stdout)
 }
 
-func getID() (string, error) {
+func getWorkerID() (string, error) {
 	id, ok := os.LookupEnv("WORKER_ID")
 	if !ok {
 		return "", fmt.Errorf("WORKER_ID not set")
@@ -26,7 +26,7 @@ func getID() (string, error) {
 }
 
 func setupLoggerWithWriter(writer io.Writer) {
-	workerID, err := getID()
+	workerID, err := getWorkerID()
 	if err != nil {
 		workerID = "unknown"
 	}
@@ -76,7 +76,7 @@ func run() error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	workerID, err := getID()
+	workerID, err := getWorkerID()
 	if err != nil {
 		return err
 	}

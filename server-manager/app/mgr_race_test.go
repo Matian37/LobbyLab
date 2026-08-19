@@ -176,7 +176,7 @@ func TestRace_ServerManager_Restart(t *testing.T) {
 			wm.mu.Lock()
 			worker := *workers[0]
 			wm.mu.Unlock()
-			wm.restartWorker(context.Background(), workers[0], worker.stateID, worker.ContainerID)
+			wm.restartWorker(context.Background(), workers[0], worker.stateID)
 		})
 	}
 
