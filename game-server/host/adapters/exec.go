@@ -28,10 +28,9 @@ type Executor struct {
 	configFile *os.File
 	resultFile *os.File
 
-	cmd  *exec.Cmd
-	pgid int
-
-	waitChannel chan error
+	cmd       *exec.Cmd
+	cmdWaiter *CmdWaiter
+	pgid      int
 }
 
 func NewExecutor(command []string) *Executor {
@@ -69,6 +68,8 @@ func (s *Executor) Start(config string) error {
 		Pdeathsig: syscall.SIGKILL,
 	}
 
+	s.cmdWaiter = NewCmdWaiter(s.cmd)
+
 	if err := s.cmd.Start(); err != nil {
 		return fmt.Errorf("%w: %w", ErrGameServerFailedToStart, err)
 	}
@@ -89,6 +90,7 @@ func (s *Executor) Stop(ctx context.Context) error {
 		s.cmd = nil
 	}
 	s.pgid = 0
+	s.cmdWaiter = nil
 
 	if s.configFile != nil {
 		removeFile(s.configFile, "config file", slog.Default())
@@ -98,11 +100,6 @@ func (s *Executor) Stop(ctx context.Context) error {
 	if s.resultFile != nil {
 		removeFile(s.resultFile, "result file", slog.Default())
 		s.resultFile = nil
-	}
-
-	if s.waitChannel != nil {
-		close(s.waitChannel)
-		s.waitChannel = nil
 	}
 
 	s.active = false
@@ -115,21 +112,20 @@ func (s *Executor) stopCommand(ctx context.Context) error {
 		return nil
 	}
 
-	s.startWait()
+	s.cmdWaiter.WaitAsync()
 
 	if err := s.cmd.Process.Signal(syscall.SIGTERM); err != nil {
 		slog.Warn("failed to send SIGTERM", "pid", s.cmd.Process.Pid, "err", err)
 	}
 
 	// TODO: add force kill after X seconds
-	select {
-	case <-s.waitChannel:
+	if err := s.cmdWaiter.Wait(ctx); errors.Is(err, context.Canceled) {
+		killProcessGroup(s.pgid)
+		_ = s.cmdWaiter.Wait(context.Background())
+		return err
+	} else {
 		killProcessGroup(s.pgid)
 		return nil
-	case <-ctx.Done():
-		killProcessGroup(s.pgid)
-		<-s.waitChannel
-		return ctx.Err()
 	}
 }
 
@@ -138,7 +134,7 @@ func (s *Executor) GetResult(ctx context.Context) ([]byte, error) {
 		return []byte{}, ErrExecutorNotActive
 	}
 
-	if err := s.wait(ctx); err != nil {
+	if err := s.cmdWaiter.Wait(ctx); err != nil {
 		return []byte{}, err
 	}
 
@@ -151,32 +147,6 @@ func (s *Executor) GetResult(ctx context.Context) ([]byte, error) {
 		return []byte{}, err
 	}
 	return result, nil
-}
-
-func (s *Executor) wait(ctx context.Context) error {
-	if !s.active {
-		return ErrExecutorNotActive
-	}
-
-	s.startWait()
-	select {
-	case err := <-s.waitChannel:
-		s.waitChannel <- err
-		return err
-	case <-ctx.Done():
-		return ctx.Err()
-	}
-}
-
-// starts wait goroutine and creates waitChannel
-// Note: use this instead of s.cmd.Wait() and only when cmd has started
-func (s *Executor) startWait() {
-	if s.waitChannel == nil {
-		s.waitChannel = make(chan error, 1)
-		go func() {
-			s.waitChannel <- s.cmd.Wait()
-		}()
-	}
 }
 
 func createTempFile(subname string) (*os.File, error) {

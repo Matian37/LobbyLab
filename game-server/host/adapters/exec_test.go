@@ -96,18 +96,6 @@ func TestKillProcessGroup(t *testing.T) {
 	})
 }
 
-func TestExecutor_StartWait(t *testing.T) {
-	t.Run("success", func(t *testing.T) {
-		exc := NewExecutor([]string{"echo"})
-		require.NoError(t, exc.Start(""))
-
-		exc.startWait()
-		require.NotNil(t, exc.waitChannel)
-
-		assert.NoError(t, exc.Stop(context.Background()))
-	})
-}
-
 func TestExecutor_Start(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		exc := NewExecutor([]string{"echo"})
@@ -165,29 +153,6 @@ func TestExecutor_Start(t *testing.T) {
 		assert.Equal(t, []string{"echo"}, command)
 		assert.Equal(t, []string{"echo"}, exc.command)
 		assert.NotSame(t, &command[0], &exc.command[0])
-	})
-}
-
-func TestExecutor_Wait(t *testing.T) {
-	t.Run("success", func(t *testing.T) {
-		exc := NewExecutor([]string{"sh", "-c", "exit 1"})
-		require.NoError(t, exc.Start(""))
-
-		err := exc.wait(context.Background())
-
-		_, ok := err.(*exec.ExitError)
-		assert.True(t, ok)
-	})
-
-	t.Run("context cancel", func(t *testing.T) {
-		exc := NewExecutor([]string{"sleep", "inf"})
-		require.NoError(t, exc.Start(""))
-
-		ctx, cancel := context.WithCancel(context.Background())
-		cancel()
-
-		err := exc.wait(ctx)
-		assert.ErrorIs(t, err, context.Canceled)
 	})
 }
 
@@ -336,9 +301,9 @@ func TestExecutor_Stop(t *testing.T) {
 				},
 			},
 			{
-				name: "wait channel only",
+				name: "cmd waiter only",
 				setup: func(t *testing.T) *Executor {
-					return &Executor{active: true, waitChannel: make(chan error, 1)}
+					return &Executor{active: true, cmdWaiter: new(CmdWaiter)}
 				},
 			},
 			{
@@ -349,11 +314,11 @@ func TestExecutor_Stop(t *testing.T) {
 					result, err := os.CreateTemp("", "*")
 					require.NoError(t, err)
 					return &Executor{
-						active:      true,
-						pgid:        1234,
-						configFile:  config,
-						resultFile:  result,
-						waitChannel: make(chan error, 1),
+						active:     true,
+						pgid:       1234,
+						configFile: config,
+						resultFile: result,
+						cmdWaiter:  new(CmdWaiter),
 					}
 				},
 			},
