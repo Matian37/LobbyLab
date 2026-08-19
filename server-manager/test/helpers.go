@@ -5,6 +5,8 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -43,13 +45,20 @@ func getContainerWorkerID(t *testing.T, containerID string, cli *client.Client) 
 	return "", errors.New("worker ID not found")
 }
 
-func forEachHealthyWorker(t *testing.T, cli *client.Client, errChan chan error, fn func(containerID string, workerID string)) {
+func forEachHealthyWorker(
+	t *testing.T,
+	cli *client.Client,
+	errChan chan error,
+	workerCount int,
+	fn func(containerID string, workerID string),
+) {
 	t.Helper()
 	containers, err := cli.ContainerList(context.Background(), client.ContainerListOptions{})
 	if err != nil {
 		t.Fatalf("failed to list containers: %v", err)
 	}
 
+	seen := make(map[string]struct{})
 	for _, c := range containers.Items {
 		if !isContainerMine(t, &c) {
 			continue
@@ -63,6 +72,45 @@ func forEachHealthyWorker(t *testing.T, cli *client.Client, errChan chan error, 
 			errChan <- err
 			continue
 		}
+		if !isWorkerIDValid(workerID, workerCount) {
+			errChan <- fmt.Errorf("unexpected worker id: %s", workerID)
+			continue
+		}
+		if _, ok := seen[workerID]; ok {
+			errChan <- fmt.Errorf("duplicate worker id: %s", workerID)
+			continue
+		}
+		seen[workerID] = struct{}{}
+
 		fn(c.ID, workerID)
 	}
+}
+
+// forEachMatchingWorker calls fn for the single healthy worker matching
+// workerID and returns whether it was found. More than one matching worker is
+// reported as a duplicate.
+func forMatchingWorker(
+	t *testing.T,
+	cli *client.Client,
+	errChan chan error,
+	workerCount int,
+	workerID string,
+	fn func(),
+) bool {
+	t.Helper()
+
+	matched := false
+	forEachHealthyWorker(t, cli, errChan, workerCount, func(_ string, id string) {
+		if workerID != id {
+			return
+		}
+		matched = true
+		fn()
+	})
+	return matched
+}
+
+func isWorkerIDValid(workerID string, workerCount int) bool {
+	idx, err := strconv.Atoi(workerID)
+	return err == nil && idx >= 0 && idx < workerCount
 }

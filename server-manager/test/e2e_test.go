@@ -109,7 +109,7 @@ func setupNATSMock(t *testing.T, natsURI string, workerCount int, started *atomi
 	_, err = nc.Subscribe("workers.health", func(msg *nats.Msg) {
 		started.Store(true)
 
-		forEachHealthyWorker(t, cli, errChan, func(containerID string, workerID string) {
+		forEachHealthyWorker(t, cli, errChan, workerCount, func(containerID string, workerID string) {
 			_ = nc.Publish(msg.Reply, []byte(workerID))
 		})
 	})
@@ -123,15 +123,17 @@ func setupNATSMock(t *testing.T, natsURI string, workerCount int, started *atomi
 		require.Equal(t, 3, len(parts))
 		subjectWorkerID := parts[2]
 
-		responded := false
-		forEachHealthyWorker(t, cli, errChan, func(containerID string, workerID string) {
-			if subjectWorkerID == workerID {
-				_ = msg.Respond([]byte{})
-				responded = true
-			}
+		if !isWorkerIDValid(subjectWorkerID, workerCount) {
+			errChan <- fmt.Errorf("unexpected assign worker id: %s", subjectWorkerID)
+			return
+		}
+
+		responded := forMatchingWorker(t, cli, errChan, workerCount, subjectWorkerID, func() {
+			_ = msg.Respond([]byte{})
 		})
 		if !responded {
 			errChan <- fmt.Errorf("unknown worker id: %s", subjectWorkerID)
+			return
 		}
 	})
 	require.NoError(t, err)
