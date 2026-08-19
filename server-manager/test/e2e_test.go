@@ -104,7 +104,7 @@ func setupNATSMock(t *testing.T, natsURI string, workerCount int, started *atomi
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = cli.Close() })
 
-	errChan := make(chan error)
+	errChan := make(chan error, 128)
 
 	_, err = nc.Subscribe("workers.health", func(msg *nats.Msg) {
 		started.Store(true)
@@ -196,12 +196,22 @@ func setupTestEnvironment(t *testing.T, workerCount int) (
 }
 
 func checkErrChan(t *testing.T, errChan chan error) {
-	select {
-	case err := <-errChan:
-		close(errChan)
-		require.NoError(t, err)
-	default:
-		close(errChan)
+	t.Helper()
+
+	failed := false
+	for {
+		select {
+		case err := <-errChan:
+			if err != nil {
+				t.Errorf("errChan error: %v", err)
+				failed = true
+			}
+		default:
+			if failed {
+				t.Fail()
+			}
+			return
+		}
 	}
 }
 

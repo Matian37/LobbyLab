@@ -29,7 +29,7 @@ func getContainerWorkerID(t *testing.T, containerID string, cli *client.Client) 
 
 	res, err := cli.ContainerInspect(context.Background(), containerID, client.ContainerInspectOptions{})
 	if err != nil {
-		return "", errors.New("failed to inspect container")
+		return "", fmt.Errorf("failed to inspect container: %w", err)
 	}
 	if res.Container.Config == nil {
 		return "", errors.New("container config is nil")
@@ -55,7 +55,8 @@ func forEachHealthyWorker(
 	t.Helper()
 	containers, err := cli.ContainerList(context.Background(), client.ContainerListOptions{})
 	if err != nil {
-		t.Fatalf("failed to list containers: %v", err)
+		errChan <- fmt.Errorf("failed to list containers: %w", err)
+		return
 	}
 
 	seen := make(map[string]struct{})
