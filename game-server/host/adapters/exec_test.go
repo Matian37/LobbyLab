@@ -15,12 +15,12 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestAttachParams(t *testing.T) {
+func TestGenerateCommand(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		expected := []string{"a", "--match-config", "b", "--match-result", "c"}
 		inputCommand := []string{"a"}
 
-		result := attachParams(inputCommand, "b", "c")
+		result := generateCommand(inputCommand, "b", "c")
 		assert.Equal(t, expected, result)
 		assert.Equal(t, &inputCommand[0], &result[0])
 	})
@@ -79,7 +79,7 @@ func TestKillProcessGroup(t *testing.T) {
 		outsider.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 		require.NoError(t, outsider.Start())
 
-		killProcessGroup(group)
+		killProcessGroup(group, slog.Default())
 
 		// reap group members so the process group is actually gone
 		waitWithTimeout(leader)
@@ -151,8 +151,8 @@ func TestExecutor_Start(t *testing.T) {
 		defer func() { require.NoError(t, exc.Stop(context.Background())) }()
 
 		assert.Equal(t, []string{"echo"}, command)
-		assert.Equal(t, []string{"echo"}, exc.command)
-		assert.NotSame(t, &command[0], &exc.command[0])
+		assert.Equal(t, []string{"echo"}, exc.cmdArgs)
+		assert.NotSame(t, &command[0], &exc.cmdArgs[0])
 	})
 }
 
@@ -181,7 +181,7 @@ func TestExecutor_Stop(t *testing.T) {
 		require.NoError(t, err)
 		assert.Nil(t, ctx.Err())
 
-		assert.Equal(t, &Executor{command: []string{"sleep", "inf"}}, exc)
+		assert.Equal(t, &Executor{cmdArgs: []string{"sleep", "inf"}}, exc)
 		assertProcessGroupEnded(pgid)
 	})
 
@@ -266,7 +266,7 @@ func TestExecutor_Stop(t *testing.T) {
 		require.NoError(t, exc.Stop(context.Background()))
 
 		assert.Equal(t, []string{"echo"}, command)
-		assert.Equal(t, []string{"echo"}, exc.command)
+		assert.Equal(t, []string{"echo"}, exc.cmdArgs)
 	})
 
 	t.Run("partially initialized", func(t *testing.T) {
@@ -456,6 +456,6 @@ func TestExecutor_LifeCycle(t *testing.T) {
 
 		err = exc.Stop(context.Background())
 		require.NoError(t, err)
-		require.Equal(t, &Executor{command: iteration.command}, exc)
+		require.Equal(t, &Executor{cmdArgs: iteration.command}, exc)
 	}
 }

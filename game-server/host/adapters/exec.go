@@ -21,7 +21,7 @@ var (
 )
 
 type Executor struct {
-	command []string
+	cmdArgs []string
 
 	active bool
 
@@ -33,8 +33,8 @@ type Executor struct {
 	pgid      int
 }
 
-func NewExecutor(command []string) *Executor {
-	return &Executor{command: slices.Clone(command)}
+func NewExecutor(cmdArgs []string) *Executor {
+	return &Executor{cmdArgs: slices.Clone(cmdArgs)}
 }
 
 // starts the executor with given command
@@ -61,7 +61,7 @@ func (s *Executor) Start(config string) error {
 	}
 	s.resultFile = resultFile
 
-	command := attachParams(slices.Clone(s.command), s.configFile.Name(), s.resultFile.Name())
+	command := generateCommand(s.cmdArgs, s.configFile.Name(), s.resultFile.Name())
 	s.cmd = exec.Command(command[0], command[1:]...)
 	s.cmd.SysProcAttr = &syscall.SysProcAttr{
 		Setpgid:   true,
@@ -120,11 +120,11 @@ func (s *Executor) stopCommand(ctx context.Context) error {
 
 	// TODO: add force kill after X seconds
 	if err := s.cmdWaiter.Wait(ctx); errors.Is(err, context.Canceled) {
-		killProcessGroup(s.pgid)
+		killProcessGroup(s.pgid, slog.Default())
 		_ = s.cmdWaiter.Wait(context.Background())
 		return err
 	} else {
-		killProcessGroup(s.pgid)
+		killProcessGroup(s.pgid, slog.Default())
 		return nil
 	}
 }
@@ -157,8 +157,8 @@ func createTempFile(subname string) (*os.File, error) {
 	return configFile, nil
 }
 
-func attachParams(cmdArgs []string, configFileName string, resultFileName string) []string {
-	return append(cmdArgs,
+func generateCommand(cmdArgs []string, configFileName string, resultFileName string) []string {
+	return append(slices.Clone(cmdArgs),
 		"--match-config", configFileName,
 		"--match-result", resultFileName,
 	)
@@ -166,15 +166,23 @@ func attachParams(cmdArgs []string, configFileName string, resultFileName string
 
 func removeFile(file *os.File, name string, logger *slog.Logger) {
 	if err := file.Close(); err != nil {
-		logger.Warn("failed to close temp file", "err", err, "fileName", name)
+		logger.Warn(
+			fmt.Sprintf("failed to close %v file", name),
+			"err", err,
+			"path", file.Name(),
+		)
 	}
 	if err := os.Remove(file.Name()); err != nil {
-		logger.Warn("failed to remove temp file", "err", err, "fileName", name)
+		logger.Warn(
+			fmt.Sprintf("failed to remove %v file", name),
+			"err", err,
+			"path", file.Name(),
+		)
 	}
 }
 
-func killProcessGroup(pgid int) {
+func killProcessGroup(pgid int, logger *slog.Logger) {
 	if err := syscall.Kill(-pgid, syscall.SIGKILL); err != nil {
-		slog.Warn("failed to kill remaining children", "pgid", pgid, "err", err)
+		logger.Warn("failed to kill process group", "pgid", pgid, "err", err)
 	}
 }
