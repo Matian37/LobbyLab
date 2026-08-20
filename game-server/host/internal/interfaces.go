@@ -15,8 +15,8 @@ type BrokerConnection interface {
 	SendResult(ctx context.Context, matchID int, result []byte) error
 }
 
-type Server interface {
-	Start(config string, command []string) error
+type Executor interface {
+	Start(config string) error
 
 	// After Stop returns, the server must be ready to start again.
 	// This is a required invariant.
