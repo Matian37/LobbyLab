@@ -14,6 +14,17 @@ import (
 	"github.com/moby/moby/client"
 )
 
+type ForEachConfig struct {
+	client      *client.Client
+	errChan     chan error
+	workerCount int
+}
+
+type MatchingConfig struct {
+	ForEachConfig
+	workerID string
+}
+
 func isContainerMine(t *testing.T, c *container.Summary) bool {
 	t.Helper()
 	return c.Labels["com.github.multiplayer-asset.worker"] == "true"
@@ -47,15 +58,13 @@ func getContainerWorkerID(t *testing.T, containerID string, cli *client.Client) 
 
 func forEachHealthyWorker(
 	t *testing.T,
-	cli *client.Client,
-	errChan chan error,
-	workerCount int,
+	cfg ForEachConfig,
 	fn func(containerID string, workerID string),
 ) {
 	t.Helper()
-	containers, err := cli.ContainerList(context.Background(), client.ContainerListOptions{})
+	containers, err := cfg.client.ContainerList(context.Background(), client.ContainerListOptions{})
 	if err != nil {
-		errChan <- fmt.Errorf("failed to list containers: %w", err)
+		cfg.errChan <- fmt.Errorf("failed to list containers: %w", err)
 		return
 	}
 
@@ -68,17 +77,17 @@ func forEachHealthyWorker(
 			continue
 		}
 
-		workerID, err := getContainerWorkerID(t, c.ID, cli)
+		workerID, err := getContainerWorkerID(t, c.ID, cfg.client)
 		if err != nil {
-			errChan <- err
+			cfg.errChan <- err
 			continue
 		}
-		if !isWorkerIDValid(workerID, workerCount) {
-			errChan <- fmt.Errorf("unexpected worker id: %s", workerID)
+		if !isWorkerIDValid(workerID, cfg.workerCount) {
+			cfg.errChan <- fmt.Errorf("unexpected worker id: %s", workerID)
 			continue
 		}
 		if _, ok := seen[workerID]; ok {
-			errChan <- fmt.Errorf("duplicate worker id: %s", workerID)
+			cfg.errChan <- fmt.Errorf("duplicate worker id: %s", workerID)
 			continue
 		}
 		seen[workerID] = struct{}{}
@@ -87,28 +96,25 @@ func forEachHealthyWorker(
 	}
 }
 
-// forEachMatchingWorker calls fn for the single healthy worker matching
-// workerID and returns whether it was found. More than one matching worker is
-// reported as a duplicate.
 func forMatchingWorker(
 	t *testing.T,
-	cli *client.Client,
-	errChan chan error,
-	workerCount int,
-	workerID string,
+	cfg MatchingConfig,
 	fn func(),
-) bool {
+) {
 	t.Helper()
 
 	matched := false
-	forEachHealthyWorker(t, cli, errChan, workerCount, func(_ string, id string) {
-		if workerID != id {
+	forEachHealthyWorker(t, cfg.ForEachConfig, func(_ string, id string) {
+		if cfg.workerID != id {
 			return
 		}
 		matched = true
 		fn()
 	})
-	return matched
+
+	if !matched {
+		cfg.errChan <- fmt.Errorf("unknown worker id: %s", cfg.workerID)
+	}
 }
 
 func isWorkerIDValid(workerID string, workerCount int) bool {

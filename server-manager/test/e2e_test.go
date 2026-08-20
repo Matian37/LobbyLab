@@ -106,10 +106,16 @@ func setupNATSMock(t *testing.T, natsURI string, workerCount int, started *atomi
 
 	errChan := make(chan error, 128)
 
+	foreachCfg := ForEachConfig{
+		client:      cli,
+		errChan:     errChan,
+		workerCount: workerCount,
+	}
+
 	_, err = nc.Subscribe("workers.health", func(msg *nats.Msg) {
 		started.Store(true)
 
-		forEachHealthyWorker(t, cli, errChan, workerCount, func(containerID string, workerID string) {
+		forEachHealthyWorker(t, foreachCfg, func(_ string, workerID string) {
 			_ = nc.Publish(msg.Reply, []byte(workerID))
 		})
 	})
@@ -128,13 +134,13 @@ func setupNATSMock(t *testing.T, natsURI string, workerCount int, started *atomi
 			return
 		}
 
-		responded := forMatchingWorker(t, cli, errChan, workerCount, subjectWorkerID, func() {
-			_ = msg.Respond([]byte{})
-		})
-		if !responded {
-			errChan <- fmt.Errorf("unknown worker id: %s", subjectWorkerID)
-			return
-		}
+		forMatchingWorker(t,
+			MatchingConfig{
+				ForEachConfig: foreachCfg,
+				workerID:      subjectWorkerID,
+			},
+			func() { _ = msg.Respond([]byte{}) },
+		)
 	})
 	require.NoError(t, err)
 
@@ -198,18 +204,13 @@ func setupTestEnvironment(t *testing.T, workerCount int) (
 func checkErrChan(t *testing.T, errChan chan error) {
 	t.Helper()
 
-	failed := false
 	for {
 		select {
 		case err := <-errChan:
 			if err != nil {
 				t.Errorf("errChan error: %v", err)
-				failed = true
 			}
 		default:
-			if failed {
-				t.Fail()
-			}
 			return
 		}
 	}
