@@ -122,7 +122,6 @@ func (s *Executor) stopCommand(ctx context.Context) error {
 		s.logger.Warn("failed to send SIGTERM", "pid", s.cmd.Process.Pid, "err", err)
 	}
 
-	// TODO: add force kill after X seconds
 	if err := s.cmdWaiter.Wait(ctx); errors.Is(err, context.Canceled) {
 		killProcessGroup(s.pgid, s.logger)
 		_ = s.cmdWaiter.Wait(context.Background())

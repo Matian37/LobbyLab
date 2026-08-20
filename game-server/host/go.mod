@@ -4,6 +4,7 @@ go 1.26.3
 
 require (
 	github.com/caarlos0/env/v11 v11.4.1
+	github.com/cenkalti/backoff/v6 v6.0.1
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
 	github.com/nats-io/nats-server/v2 v2.14.1
 	github.com/nats-io/nats.go v1.52.0

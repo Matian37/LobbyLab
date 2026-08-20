@@ -8,6 +8,8 @@ import (
 	"server/adapters"
 	"server/internal"
 	"time"
+
+	"github.com/cenkalti/backoff/v6"
 )
 
 var (
@@ -81,7 +83,12 @@ func (s *Server) Run(ctx context.Context) error {
 
 	s.logger.Info("server loop started; ready for requests", "command", s.cmdArgs)
 
+	b := backoff.NewExponentialBackOff()
+
+	var iterationErr error
 	for ctx.Err() == nil {
+		HandleBackoff(ctx, b, iterationErr)
+
 		err := s.runMatch(ctx)
 		if errors.Is(err, context.Canceled) {
 			break
@@ -90,6 +97,8 @@ func (s *Server) Run(ctx context.Context) error {
 		} else {
 			s.logger.Info("match execution successful")
 		}
+
+		iterationErr = err
 	}
 
 	return ctx.Err()
@@ -111,7 +120,7 @@ func (s *Server) runMatch(ctx context.Context) error {
 		return fmt.Errorf("server execution failed: %w", err)
 	}
 
-	s.logger.Info("match result retrieved; sending to broker", "resultLen", len(result))
+	s.logger.Info("received match result; sending to broker", "resultLen", len(result))
 	s.logger.Debug("match result", "result", string(result))
 
 	if err := s.sendResult(ctx, config.MatchID, result); err != nil {
