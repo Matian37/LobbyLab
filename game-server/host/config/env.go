@@ -16,6 +16,7 @@ var ErrInvalidLogLevel = errors.New("invalid log level")
 type parsedConfig struct {
 	BrokerURI string `env:"NATS_URI,required,notEmpty"`
 	LogLevel  string `env:"LOG_LEVEL,required,notEmpty"`
+	WorkerID  string `env:"WORKER_ID,required,notEmpty"`
 }
 
 func parseLogLevel(value string) (slog.Level, error) {
@@ -49,11 +50,6 @@ func ReadConfig() (internal.Config, error) {
 		return internal.Config{}, fmt.Errorf("%w, \nUsage: %v \"COMMAND\"", err, os.Args[0])
 	}
 
-	hostname, err := os.Hostname()
-	if err != nil {
-		return internal.Config{}, fmt.Errorf("failed to get hostname: %w", err)
-	}
-
 	logLevel, err := parseLogLevel(parsed.LogLevel)
 	if err != nil {
 		return internal.Config{}, fmt.Errorf("%w: %w", ErrInvalidLogLevel, err)
@@ -61,7 +57,7 @@ func ReadConfig() (internal.Config, error) {
 
 	return internal.Config{
 		BrokerURI:      parsed.BrokerURI,
-		Hostname:       hostname,
+		WorkerID:       parsed.WorkerID,
 		GameServerArgs: gameServerArgs,
 		LogLevel:       logLevel,
 	}, nil

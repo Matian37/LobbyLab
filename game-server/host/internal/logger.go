@@ -11,7 +11,7 @@ func NewLogger(writer io.Writer, cfg Config) *slog.Logger {
 			writer,
 			&slog.HandlerOptions{Level: cfg.LogLevel},
 		).WithAttrs(
-			[]slog.Attr{slog.String("hostname", cfg.Hostname)},
+			[]slog.Attr{slog.String("workerID", cfg.WorkerID)},
 		),
 	)
 }

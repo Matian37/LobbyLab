@@ -26,9 +26,9 @@ var (
 )
 
 type NATSConnection struct {
-	brokerURI   string
-	containerID string
-	logger      *slog.Logger
+	brokerURI string
+	workerID  string
+	logger    *slog.Logger
 
 	conn *nats.Conn
 	js   jetstream.JetStream
@@ -39,11 +39,11 @@ type NATSConnection struct {
 	closed bool
 }
 
-func NewConnection(brokerURI string, containerID string, logger *slog.Logger) *NATSConnection {
+func NewConnection(brokerURI string, workerID string, logger *slog.Logger) *NATSConnection {
 	return &NATSConnection{
-		brokerURI:   brokerURI,
-		containerID: containerID,
-		logger:      logger.With("component", "broker"),
+		brokerURI: brokerURI,
+		workerID:  workerID,
+		logger:    logger.With("component", "broker"),
 	}
 }
 
@@ -166,7 +166,7 @@ func (c *NATSConnection) SendResult(ctx context.Context, matchID int, result []b
 }
 
 func (c *NATSConnection) subscribeAssign() error {
-	sub, err := c.conn.SubscribeSync(assignSubject + "." + c.containerID)
+	sub, err := c.conn.SubscribeSync(assignSubject + "." + c.workerID)
 	if err != nil {
 		return err
 	}
@@ -182,7 +182,7 @@ func (c *NATSConnection) subscribeHealth() error {
 	sub, err := c.conn.Subscribe(healthSubject, func(msg *nats.Msg) {
 		c.logger.Debug("received ping, sending pong...")
 
-		if err := c.conn.Publish(msg.Reply, []byte(c.containerID)); err != nil {
+		if err := c.conn.Publish(msg.Reply, []byte(c.workerID)); err != nil {
 			c.logger.Error("failed to publish pong", "error", err)
 		} else {
 			c.logger.Debug("pong sent successfuly")

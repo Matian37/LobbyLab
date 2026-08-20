@@ -17,6 +17,7 @@ func setAllEnvExcept(t *testing.T, except ...string) {
 	for _, e := range []struct{ key, val string }{
 		{"NATS_URI", "nats://localhost:4222"},
 		{"LOG_LEVEL", "info"},
+		{"WORKER_ID", "0"},
 	} {
 		if !slices.Contains(except, e.key) {
 			t.Setenv(e.key, e.val)
@@ -66,14 +67,11 @@ func TestReadConfig(t *testing.T) {
 		assert.Equal(t, "nats://localhost:4222", cfg.BrokerURI)
 		assert.Equal(t, slog.LevelInfo, cfg.LogLevel)
 		assert.Equal(t, []string{"./game", "--name", "my game"}, cfg.GameServerArgs)
-
-		hostname, err := os.Hostname()
-		require.NoError(t, err)
-		assert.Equal(t, hostname, cfg.Hostname)
+		assert.Equal(t, "0", cfg.WorkerID)
 	})
 
 	t.Run("missing required field", func(t *testing.T) {
-		for _, field := range []string{"NATS_URI", "LOG_LEVEL"} {
+		for _, field := range []string{"NATS_URI", "LOG_LEVEL", "WORKER_ID"} {
 			t.Run(field, func(t *testing.T) {
 				setAllEnvExcept(t, field)
 				setArgs(t, []string{"/bin/server", "./game"})
@@ -86,7 +84,7 @@ func TestReadConfig(t *testing.T) {
 	})
 
 	t.Run("empty field", func(t *testing.T) {
-		for _, field := range []string{"NATS_URI", "LOG_LEVEL"} {
+		for _, field := range []string{"NATS_URI", "LOG_LEVEL", "WORKER_ID"} {
 			t.Run(field, func(t *testing.T) {
 				setAllEnvExcept(t)
 				t.Setenv(field, "")

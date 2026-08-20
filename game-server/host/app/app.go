@@ -12,7 +12,7 @@ func Run(ctx context.Context, cfg internal.Config, logger *slog.Logger) error {
 	serverLogger := logger.With("component", "server")
 	serverLogger.Info("starting...")
 
-	return run(ctx, NewServer(cfg.BrokerURI, cfg.Hostname, cfg.GameServerArgs, logger), serverLogger)
+	return run(ctx, NewServer(cfg.BrokerURI, cfg.WorkerID, cfg.GameServerArgs, logger), serverLogger)
 }
 
 func run(ctx context.Context, server *Server, logger *slog.Logger) error {

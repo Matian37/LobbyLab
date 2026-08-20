@@ -12,7 +12,7 @@ import (
 
 func TestNewLogger(t *testing.T) {
 	t.Run("emits hostname and message", func(t *testing.T) {
-		cfg := Config{Hostname: "test-host", LogLevel: slog.LevelInfo}
+		cfg := Config{WorkerID: "test-host", LogLevel: slog.LevelInfo}
 
 		var buf bytes.Buffer
 		logger := NewLogger(&buf, cfg)
@@ -23,13 +23,13 @@ func TestNewLogger(t *testing.T) {
 		err := json.Unmarshal(buf.Bytes(), &parsed)
 		require.NoError(t, err)
 
-		assert.Equal(t, "test-host", parsed["hostname"])
+		assert.Equal(t, "test-host", parsed["workerID"])
 		assert.Equal(t, "test message", parsed["msg"])
 		assert.Equal(t, "extra_val", parsed["extra_key"])
 	})
 
 	t.Run("respects log level", func(t *testing.T) {
-		cfg := Config{Hostname: "test-host", LogLevel: slog.LevelInfo}
+		cfg := Config{WorkerID: "test-host", LogLevel: slog.LevelInfo}
 
 		var buf bytes.Buffer
 		logger := NewLogger(&buf, cfg)

@@ -49,9 +49,9 @@ func newUniqueCtx(t *testing.T) context.Context {
 func TestNewServer(t *testing.T) {
 	cmdArgs := []string{"./game", "--arg1"}
 	brokerURI := "nats://localhost:4222"
-	containerID := "worker-1"
+	workerID := "worker-1"
 
-	server := NewServer(brokerURI, containerID, cmdArgs, slog.New(slog.DiscardHandler))
+	server := NewServer(brokerURI, workerID, cmdArgs, slog.New(slog.DiscardHandler))
 
 	assert.NotNil(t, server.broker)
 	assert.NotNil(t, server.executor)

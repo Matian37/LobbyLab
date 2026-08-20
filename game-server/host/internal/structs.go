@@ -7,7 +7,7 @@ import (
 
 type Config struct {
 	BrokerURI      string
-	Hostname       string
+	WorkerID       string
 	GameServerArgs []string
 	LogLevel       slog.Level
 }
