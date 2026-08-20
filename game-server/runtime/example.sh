@@ -2,11 +2,16 @@
 
 trap 'exit 0' TERM
 
-match_result=""
+match_result_path=""
+match_config_path=""
 while [ $# -gt 0 ]; do
     case "$1" in
         --match-result)
-            match_result="$2"
+            match_result_path="$2"
+            shift 2
+            ;;
+        --match-config)
+            match_config_path="$2"
             shift 2
             ;;
         *)
@@ -14,11 +19,13 @@ while [ $# -gt 0 ]; do
             ;;
     esac
 done
-if [ -z "$match_result" ]; then
+if [ -z "$match_result_path" ]; then
     echo "error: --match-result flag is required" >&2
     exit 1
 fi
 
+match_config=$(cat "$match_config_path")
 
 timeout 5s socat -v UDP-LISTEN:7777,fork PIPE
-printf '{"port": "%s", "host": "%s"}' "$PORT" "$HOST" > "$match_result"
+
+printf $match_config > "$match_result_path"

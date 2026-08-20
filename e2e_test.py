@@ -47,11 +47,10 @@ def queue_user(token, username, ws_timeout):
     threading.Timer(ws_timeout, ws.close).start()
     ws.run_forever()
     if not match_found:
-        return False
-        
+        return False, None
+    
+    print("mam  payload  " + str(payload))
     assert payload["login"] == username
-
-    print("payload " + username + " " + str(payload))
 
     time.sleep(random.random())
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
@@ -62,7 +61,7 @@ def queue_user(token, username, ws_timeout):
             
         data, addr = sock.recvfrom(1024)
         assert data == b"PING"
-    return True
+    return True, payload["matchAuthToken"]
 
 def add_n_users(n):
     #registering
@@ -80,6 +79,7 @@ def add_n_users(n):
 
     #adding to waitlist and matching players
     threads = []
+    match_tokens = {}
     matched_players = 0
     def add(token, username):
         nonlocal matched_players
@@ -87,8 +87,10 @@ def add_n_users(n):
         ws_timeout = 5
         if n > PLAYERS_PER_ROOM * CONTAINERS:
             ws_timeout = 15 * CONTAINERS
-        if queue_user(token, username, ws_timeout) == True:
+        (result, match_token) = queue_user(token, username, ws_timeout)
+        if result == True:
             matched_players += 1
+        match_tokens[username] = match_token
     for i in range(n):
         threads.append(threading.Thread(target=add, args=(tokens[i], usernames[i])))
         threads[-1].start()
@@ -112,23 +114,22 @@ def add_n_users(n):
         match = results["matches"][0]
         assert match["canceled"] == False
         assert match["details"] != None
+        details = match["details"]
+        players = details["players"]
+        curr_match_tokens = []
+        for p in players:
+            curr_match_tokens.append(p["matchAuthToken"])
+
+        assert match_tokens[usernames[i]] in curr_match_tokens
 
     assert players_without_results == n % PLAYERS_PER_ROOM
-#no matches
-def test_add_1_user(setup_services):
-    add_n_users(1)
-#one container filled
-def test_add_2_users(setup_services):
-    add_n_users(2)
-#one container filled and one waiting user
-def test_add_3_users(setup_services):
-    add_n_users(3)
-#both containers filled
-def test_add_4_users(setup_services):
-    add_n_users(4)
-#both containers filled and one waiting user
-def test_add_5_users(setup_services):
-    add_n_users(5)
-#both containers filled and one container need to be freed
-def test_add_6_users(setup_services):
-    add_n_users(6)
+@pytest.mark.parametrize("n", [2])
+def test_add_users(setup_services, n):
+    add_n_users(n)
+
+'''
+    match tokeny asert
+do funkcji
+crash testy
+interactive??
+'''
