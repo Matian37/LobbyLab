@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"server/internal"
 	"server/internal/mocks"
 	"testing"
@@ -21,6 +22,7 @@ func newMockServer(t *testing.T) (*mocks.MockBrokerConnection, *mocks.MockExecut
 		broker:            mockConn,
 		executor:          mockSrv,
 		cmdArgs:           []string{"./game"},
+		logger:            slog.New(slog.DiscardHandler),
 		initTimeout:       150 * time.Millisecond,
 		serverStopTimeout: 150 * time.Millisecond,
 		sendResultTimeout: 150 * time.Millisecond,
@@ -49,7 +51,7 @@ func TestNewServer(t *testing.T) {
 	brokerURI := "nats://localhost:4222"
 	containerID := "worker-1"
 
-	server := NewServer(brokerURI, containerID, cmdArgs)
+	server := NewServer(brokerURI, containerID, cmdArgs, slog.New(slog.DiscardHandler))
 
 	assert.NotNil(t, server.broker)
 	assert.NotNil(t, server.executor)

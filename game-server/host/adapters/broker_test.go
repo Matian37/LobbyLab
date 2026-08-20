@@ -75,7 +75,7 @@ func TestNewConnection(t *testing.T) {
 	brokerURI := "a"
 	containerID := "b"
 
-	c := NewConnection(brokerURI, containerID)
+	c := NewConnection(brokerURI, containerID, testLogger)
 
 	require.NotNil(t, c)
 
@@ -93,7 +93,7 @@ func TestNATSConnection_subscribeAssign(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		addr := newNATSServer(t)
 
-		c := NewConnection(addr, "a")
+		c := NewConnection(addr, "a", testLogger)
 		c.conn = getHelperConn(t, addr)
 
 		require.NoError(t, c.subscribeAssign())
@@ -111,7 +111,7 @@ func TestNATSConnection_subscribeHealth(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		addr := newNATSServer(t)
 
-		c := NewConnection(addr, "a")
+		c := NewConnection(addr, "a", testLogger)
 		c.conn = getHelperConn(t, addr)
 
 		require.NoError(t, c.subscribeHealth())
@@ -135,7 +135,7 @@ func TestNATSConnection_Open(t *testing.T) {
 	})
 
 	t.Run("failure", func(t *testing.T) {
-		c := NewConnection("nats://10.255.255.1:4222", "b")
+		c := NewConnection("nats://10.255.255.1:4222", "b", testLogger)
 		err := c.Open(0)
 		assert.ErrorContains(t, err, "i/o timeout")
 
@@ -147,7 +147,7 @@ func TestNATSConnection_Open(t *testing.T) {
 	t.Run("missing result stream", func(t *testing.T) {
 		addr := newNATSServerWithoutResultStream(t)
 
-		c := NewConnection(addr, "a")
+		c := NewConnection(addr, "a", testLogger)
 		require.ErrorIs(t, c.Open(150*time.Millisecond), jetstream.ErrStreamNotFound)
 
 		assert.False(t, c.opened)
@@ -157,7 +157,7 @@ func TestNATSConnection_Open(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		addr := newNATSServer(t)
 
-		c := NewConnection(addr, "a")
+		c := NewConnection(addr, "a", testLogger)
 		require.NoError(t, c.Open(150*time.Millisecond))
 
 		assert.True(t, c.opened)
@@ -176,7 +176,7 @@ func TestNATSConnection_Open(t *testing.T) {
 		addr := newNATSServer(t)
 
 		// space in containerID triggers error in subscribeAssign
-		c := NewConnection(addr, "a b")
+		c := NewConnection(addr, "a b", testLogger)
 		assert.ErrorIs(t, c.Open(150*time.Millisecond), nats.ErrBadSubject)
 
 		assert.False(t, c.opened)
@@ -198,7 +198,7 @@ func TestNATSConnection_Close(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		addr := newNATSServer(t)
 
-		c := NewConnection(addr, "a")
+		c := NewConnection(addr, "a", testLogger)
 		require.NoError(t, c.Open(150*time.Millisecond))
 		require.True(t, c.conn.IsConnected())
 
@@ -210,7 +210,7 @@ func TestNATSConnection_Close(t *testing.T) {
 	t.Run("partially opened", func(t *testing.T) {
 		addr := newNATSServer(t)
 
-		c := NewConnection(addr, "a")
+		c := NewConnection(addr, "a", testLogger)
 		require.NoError(t, c.Open(150*time.Millisecond))
 		require.True(t, c.conn.IsConnected())
 
@@ -236,7 +236,7 @@ func TestNATSConnection_GetMatchConfig(t *testing.T) {
 	t.Run("context canceled", func(t *testing.T) {
 		addr := newNATSServer(t)
 
-		c := NewConnection(addr, "a")
+		c := NewConnection(addr, "a", testLogger)
 		require.NoError(t, c.Open(150*time.Millisecond))
 
 		ctx, cancel := context.WithCancel(context.Background())
@@ -250,7 +250,7 @@ func TestNATSConnection_GetMatchConfig(t *testing.T) {
 		addr := newNATSServer(t)
 
 		containerID := "a"
-		c := NewConnection(addr, containerID)
+		c := NewConnection(addr, containerID, testLogger)
 		require.NoError(t, c.Open(150*time.Millisecond))
 
 		nc := getHelperConn(t, addr)
@@ -306,7 +306,7 @@ func TestNATSConnection_SendCancel(t *testing.T) {
 	t.Run("context canceled", func(t *testing.T) {
 		addr := newNATSServer(t)
 
-		c := NewConnection(addr, "a")
+		c := NewConnection(addr, "a", testLogger)
 		require.NoError(t, c.Open(150*time.Millisecond))
 
 		ctx, cancel := context.WithCancel(context.Background())
@@ -319,7 +319,7 @@ func TestNATSConnection_SendCancel(t *testing.T) {
 		ctx := context.Background()
 		addr := newNATSServer(t)
 
-		c := NewConnection(addr, "a")
+		c := NewConnection(addr, "a", testLogger)
 		require.NoError(t, c.Open(150*time.Millisecond))
 
 		nc := getHelperConn(t, addr)
@@ -357,7 +357,7 @@ func TestNATSConnection_SendResult(t *testing.T) {
 	t.Run("context canceled", func(t *testing.T) {
 		addr := newNATSServer(t)
 
-		c := NewConnection(addr, "a")
+		c := NewConnection(addr, "a", testLogger)
 		require.NoError(t, c.Open(150*time.Millisecond))
 
 		ctx, cancel := context.WithCancel(context.Background())
@@ -371,7 +371,7 @@ func TestNATSConnection_SendResult(t *testing.T) {
 		ctx := context.Background()
 		addr := newNATSServer(t)
 
-		c := NewConnection(addr, "a")
+		c := NewConnection(addr, "a", testLogger)
 		require.NoError(t, c.Open(150*time.Millisecond))
 
 		nc := getHelperConn(t, addr)

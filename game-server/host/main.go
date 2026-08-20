@@ -7,6 +7,7 @@ import (
 	"os/signal"
 	"server/app"
 	"server/config"
+	"server/internal"
 	"syscall"
 )
 
@@ -17,11 +18,13 @@ func main() {
 		os.Exit(1)
 	}
 
+	logger := internal.NewLogger(os.Stdout, cfg)
+
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
 	defer stop()
 
-	if err := app.Run(ctx, cfg); err != nil {
-		slog.Error("application failed", "error", err)
+	if err := app.Run(ctx, cfg, logger); err != nil {
+		logger.Error("application failed", "error", err)
 		os.Exit(1)
 	}
 }

@@ -15,6 +15,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+var testLogger = slog.New(slog.DiscardHandler)
+
 func TestGenerateCommand(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		expected := []string{"a", "--match-config", "b", "--match-result", "c"}
@@ -98,7 +100,7 @@ func TestKillProcessGroup(t *testing.T) {
 
 func TestExecutor_Start(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
-		exc := NewExecutor([]string{"echo"})
+		exc := NewExecutor([]string{"echo"}, testLogger)
 
 		err := exc.Start("")
 		require.NoError(t, err)
@@ -122,7 +124,7 @@ func TestExecutor_Start(t *testing.T) {
 	})
 
 	t.Run("already started", func(t *testing.T) {
-		exc := NewExecutor([]string{"echo"})
+		exc := NewExecutor([]string{"echo"}, testLogger)
 		err := exc.Start("")
 		require.NoError(t, err)
 
@@ -131,7 +133,7 @@ func TestExecutor_Start(t *testing.T) {
 	})
 
 	t.Run("partial start", func(t *testing.T) {
-		exc := NewExecutor([]string{})
+		exc := NewExecutor([]string{}, testLogger)
 		err := exc.Start("")
 		require.ErrorIs(t, err, ErrGameServerFailedToStart)
 
@@ -146,7 +148,7 @@ func TestExecutor_Start(t *testing.T) {
 		command := make([]string, 1, 4)
 		command[0] = "echo"
 
-		exc := NewExecutor(command)
+		exc := NewExecutor(command, testLogger)
 		require.NoError(t, exc.Start(""))
 		defer func() { require.NoError(t, exc.Stop(context.Background())) }()
 
@@ -164,13 +166,13 @@ func TestExecutor_Stop(t *testing.T) {
 	}
 
 	t.Run("not started", func(t *testing.T) {
-		exc := NewExecutor(nil)
+		exc := NewExecutor(nil, testLogger)
 		err := exc.Stop(context.Background())
 		assert.ErrorIs(t, err, ErrExecutorNotActive)
 	})
 
 	t.Run("success", func(t *testing.T) {
-		exc := NewExecutor([]string{"sleep", "inf"})
+		exc := NewExecutor([]string{"sleep", "inf"}, testLogger)
 		err := exc.Start("")
 		require.NoError(t, err)
 
@@ -181,12 +183,12 @@ func TestExecutor_Stop(t *testing.T) {
 		require.NoError(t, err)
 		assert.Nil(t, ctx.Err())
 
-		assert.Equal(t, &Executor{cmdArgs: []string{"sleep", "inf"}}, exc)
+		assert.Equal(t, &Executor{cmdArgs: []string{"sleep", "inf"}, logger: exc.logger}, exc)
 		assertProcessGroupEnded(pgid)
 	})
 
 	t.Run("context cancel", func(t *testing.T) {
-		exc := NewExecutor([]string{"echo"})
+		exc := NewExecutor([]string{"echo"}, testLogger)
 		err := exc.Start("")
 		require.NoError(t, err)
 
@@ -202,7 +204,7 @@ func TestExecutor_Stop(t *testing.T) {
 
 	t.Run("process ignores SIGTERM", func(t *testing.T) {
 		cmd := []string{"sh", "-c", "trap '' TERM; kill -USR1 $PPID; sleep inf"}
-		exc := NewExecutor(cmd)
+		exc := NewExecutor(cmd, testLogger)
 		err := exc.Start("")
 		require.NoError(t, err)
 
@@ -223,7 +225,7 @@ func TestExecutor_Stop(t *testing.T) {
 
 	t.Run("process died but its child is alive", func(t *testing.T) {
 		cmd := []string{"sh", "-c", "sleep inf & exit"}
-		exc := NewExecutor(cmd)
+		exc := NewExecutor(cmd, testLogger)
 		require.NoError(t, exc.Start(""))
 
 		pgid := exc.cmd.Process.Pid
@@ -242,7 +244,7 @@ func TestExecutor_Stop(t *testing.T) {
 	})
 
 	t.Run("partially started", func(t *testing.T) {
-		exc := NewExecutor([]string{})
+		exc := NewExecutor([]string{}, testLogger)
 		err := exc.Start("")
 		require.Error(t, err)
 
@@ -261,7 +263,7 @@ func TestExecutor_Stop(t *testing.T) {
 		command := make([]string, 1, 4)
 		command[0] = "echo"
 
-		exc := NewExecutor(command)
+		exc := NewExecutor(command, testLogger)
 		require.NoError(t, exc.Start(""))
 		require.NoError(t, exc.Stop(context.Background()))
 
@@ -372,7 +374,7 @@ func TestExecutor_GetResult(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			exc := NewExecutor([]string{"echo"})
+			exc := NewExecutor([]string{"echo"}, testLogger)
 			require.NoError(t, exc.Start(""))
 			defer func() { require.NoError(t, exc.Stop(context.Background())) }()
 
@@ -388,7 +390,7 @@ func TestExecutor_GetResult(t *testing.T) {
 	}
 
 	t.Run("context canceled", func(t *testing.T) {
-		exc := NewExecutor([]string{"sleep", "inf"})
+		exc := NewExecutor([]string{"sleep", "inf"}, testLogger)
 		require.NoError(t, exc.Start("config"))
 		defer func() { require.NoError(t, exc.Stop(context.Background())) }()
 
@@ -431,7 +433,7 @@ func TestExecutor_LifeCycle(t *testing.T) {
 	for idx, iteration := range iterations {
 		t.Logf("iteration %v", idx)
 
-		exc := NewExecutor(iteration.command)
+		exc := NewExecutor(iteration.command, testLogger)
 
 		err := exc.Start("config")
 		require.NoError(t, err)
@@ -456,6 +458,6 @@ func TestExecutor_LifeCycle(t *testing.T) {
 
 		err = exc.Stop(context.Background())
 		require.NoError(t, err)
-		require.Equal(t, &Executor{cmdArgs: iteration.command}, exc)
+		require.Equal(t, &Executor{cmdArgs: iteration.command, logger: exc.logger}, exc)
 	}
 }

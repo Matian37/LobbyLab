@@ -20,6 +20,7 @@ type Server struct {
 	broker   internal.BrokerConnection
 	executor internal.Executor
 	cmdArgs  []string
+	logger   *slog.Logger
 	opened   bool
 	closed   bool
 
@@ -29,17 +30,20 @@ type Server struct {
 	sendCancelTimeout time.Duration
 }
 
-func NewServer(brokerURI string, containerID string, cmdArgs []string) *Server {
+func NewServer(brokerURI string, containerID string, cmdArgs []string, logger *slog.Logger) *Server {
 	return &Server{
-		broker:            adapters.NewConnection(brokerURI, containerID),
-		executor:          adapters.NewExecutor(cmdArgs),
+		broker:            adapters.NewConnection(brokerURI, containerID, logger),
+		executor:          adapters.NewExecutor(cmdArgs, logger),
 		cmdArgs:           cmdArgs,
+		logger:            logger.With("component", "server"),
 		initTimeout:       5 * time.Second,
 		serverStopTimeout: 5 * time.Second,
 		sendResultTimeout: 15 * time.Second,
 		sendCancelTimeout: 5 * time.Second,
 	}
 }
+
+// TODO: use s instead of server in functions
 
 func (server *Server) Open() error {
 	if server.closed {
@@ -77,16 +81,16 @@ func (server *Server) Run(ctx context.Context) error {
 		return ErrServerAlreadyClosed
 	}
 
-	slog.Info("server loop started; ready for requests", "command", server.cmdArgs)
+	server.logger.Info("server loop started; ready for requests", "command", server.cmdArgs)
 
 	for ctx.Err() == nil {
 		err := server.runMatch(ctx)
 		if errors.Is(err, context.Canceled) {
 			break
 		} else if err != nil {
-			slog.Error("match execution failed", "error", err)
+			server.logger.Error("match execution failed", "error", err)
 		} else {
-			slog.Info("match execution successful")
+			server.logger.Info("match execution successful")
 		}
 	}
 
@@ -94,14 +98,14 @@ func (server *Server) Run(ctx context.Context) error {
 }
 
 func (server *Server) runMatch(ctx context.Context) error {
-	slog.Debug("waiting for match config...")
+	server.logger.Debug("waiting for match config...")
 	config, err := server.broker.GetMatchConfig(ctx)
 	if err != nil {
 		return fmt.Errorf("get match config failed: %w", err)
 	}
 
-	slog.Info("received match config", "matchID", config.MatchID, "configLen", len(config.Config))
-	slog.Debug("match config", "config", config)
+	server.logger.Info("received match config", "matchID", config.MatchID, "configLen", len(config.Config))
+	server.logger.Debug("match config", "config", config)
 
 	result, err := server.runServer(ctx, string(config.Config))
 	if err != nil {
@@ -109,8 +113,8 @@ func (server *Server) runMatch(ctx context.Context) error {
 		return fmt.Errorf("server execution failed: %w", err)
 	}
 
-	slog.Info("match result retrieved; sending to broker", "resultLen", len(result))
-	slog.Debug("match result", "result", string(result))
+	server.logger.Info("match result retrieved; sending to broker", "resultLen", len(result))
+	server.logger.Debug("match result", "result", string(result))
 
 	if err := server.sendResult(ctx, config.MatchID, result); err != nil {
 		server.sendCancel(config.MatchID)
@@ -120,13 +124,13 @@ func (server *Server) runMatch(ctx context.Context) error {
 }
 
 func (server *Server) runServer(ctx context.Context, config string) ([]byte, error) {
-	slog.Info("starting server...")
+	server.logger.Info("starting server...")
 	if err := server.executor.Start(config); err != nil {
 		return nil, fmt.Errorf("failed to start server: %w", err)
 	}
 	defer server.stopServer(ctx)
 
-	slog.Info("server started; waiting for the result...")
+	server.logger.Info("server started; waiting for the result...")
 	result, err := server.executor.GetResult(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get match result: %w", err)
@@ -140,23 +144,23 @@ func (server *Server) stopServer(ctx context.Context) {
 
 	err := server.executor.Stop(timeoutCtx)
 	if err != nil && !errors.Is(err, context.Canceled) && !errors.Is(err, adapters.ErrExecutorNotActive) {
-		slog.Error("failed to stop server", "error", err)
+		server.logger.Error("failed to stop server", "error", err)
 	}
 }
 
 func (server *Server) sendCancel(matchID int) {
-	slog.Warn("sending match cancel...")
+	server.logger.Warn("sending match cancel...")
 
 	ctx, cancel := context.WithTimeout(context.Background(), server.sendCancelTimeout)
 	defer cancel()
 
 	if err := server.broker.SendCancel(ctx, matchID); err != nil {
-		slog.Error("send match cancel failed", "error", err)
+		server.logger.Error("send match cancel failed", "error", err)
 	}
 }
 
 func (server *Server) sendResult(ctx context.Context, matchID int, result []byte) error {
-	slog.Info("sending match result...")
+	server.logger.Info("sending match result...")
 
 	timeoutCtx, cancel := context.WithTimeout(ctx, server.sendResultTimeout)
 	defer cancel()

@@ -22,6 +22,7 @@ var (
 
 type Executor struct {
 	cmdArgs []string
+	logger  *slog.Logger
 
 	active bool
 
@@ -33,8 +34,11 @@ type Executor struct {
 	pgid      int
 }
 
-func NewExecutor(cmdArgs []string) *Executor {
-	return &Executor{cmdArgs: slices.Clone(cmdArgs)}
+func NewExecutor(cmdArgs []string, logger *slog.Logger) *Executor {
+	return &Executor{
+		cmdArgs: slices.Clone(cmdArgs),
+		logger:  logger.With("component", "executor"),
+	}
 }
 
 // starts the executor with given command
@@ -93,12 +97,12 @@ func (s *Executor) Stop(ctx context.Context) error {
 	s.cmdWaiter = nil
 
 	if s.configFile != nil {
-		removeFile(s.configFile, "config file", slog.Default())
+		removeFile(s.configFile, "config", s.logger)
 		s.configFile = nil
 	}
 
 	if s.resultFile != nil {
-		removeFile(s.resultFile, "result file", slog.Default())
+		removeFile(s.resultFile, "result", s.logger)
 		s.resultFile = nil
 	}
 
@@ -115,16 +119,16 @@ func (s *Executor) stopCommand(ctx context.Context) error {
 	s.cmdWaiter.WaitAsync()
 
 	if err := s.cmd.Process.Signal(syscall.SIGTERM); err != nil {
-		slog.Warn("failed to send SIGTERM", "pid", s.cmd.Process.Pid, "err", err)
+		s.logger.Warn("failed to send SIGTERM", "pid", s.cmd.Process.Pid, "err", err)
 	}
 
 	// TODO: add force kill after X seconds
 	if err := s.cmdWaiter.Wait(ctx); errors.Is(err, context.Canceled) {
-		killProcessGroup(s.pgid, slog.Default())
+		killProcessGroup(s.pgid, s.logger)
 		_ = s.cmdWaiter.Wait(context.Background())
 		return err
 	} else {
-		killProcessGroup(s.pgid, slog.Default())
+		killProcessGroup(s.pgid, s.logger)
 		return nil
 	}
 }

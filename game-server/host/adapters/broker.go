@@ -28,6 +28,7 @@ var (
 type NATSConnection struct {
 	brokerURI   string
 	containerID string
+	logger      *slog.Logger
 
 	conn *nats.Conn
 	js   jetstream.JetStream
@@ -38,10 +39,11 @@ type NATSConnection struct {
 	closed bool
 }
 
-func NewConnection(brokerURI string, containerID string) *NATSConnection {
+func NewConnection(brokerURI string, containerID string, logger *slog.Logger) *NATSConnection {
 	return &NATSConnection{
 		brokerURI:   brokerURI,
 		containerID: containerID,
+		logger:      logger.With("component", "broker"),
 	}
 }
 
@@ -178,12 +180,12 @@ func (c *NATSConnection) subscribeAssign() error {
 
 func (c *NATSConnection) subscribeHealth() error {
 	sub, err := c.conn.Subscribe(healthSubject, func(msg *nats.Msg) {
-		slog.Debug("received ping, sending pong...")
+		c.logger.Debug("received ping, sending pong...")
 
 		if err := c.conn.Publish(msg.Reply, []byte(c.containerID)); err != nil {
-			slog.Error("failed to publish health response", "error", err)
+			c.logger.Error("failed to publish pong", "error", err)
 		} else {
-			slog.Debug("pong sent successfuly")
+			c.logger.Debug("pong sent successfuly")
 		}
 	})
 	if err != nil {
