@@ -11,15 +11,17 @@ import (
 )
 
 var (
-	ErrServerNotInitialized     = errors.New("server not initialized")
-	ErrServerAlreadyInitialized = errors.New("server already initialized")
+	ErrServerNotOpened     = errors.New("server not opened")
+	ErrServerAlreadyOpened = errors.New("server already opened")
+	ErrServerAlreadyClosed = errors.New("server already closed")
 )
 
 type Server struct {
-	broker      internal.BrokerConnection
-	executor    internal.Executor
-	cmdArgs     []string
-	initialized bool
+	broker   internal.BrokerConnection
+	executor internal.Executor
+	cmdArgs  []string
+	opened   bool
+	closed   bool
 
 	initTimeout       time.Duration
 	serverStopTimeout time.Duration
@@ -39,21 +41,40 @@ func NewServer(brokerURI string, containerID string, cmdArgs []string) *Server {
 	}
 }
 
-func (server *Server) Init() error {
-	if server.initialized {
-		return ErrServerAlreadyInitialized
+func (server *Server) Open() error {
+	if server.closed {
+		return ErrServerAlreadyClosed
+	}
+	if server.opened {
+		return ErrServerAlreadyOpened
 	}
 
 	if err := server.broker.Open(server.initTimeout); err != nil {
 		return err
 	}
-	server.initialized = true
+	server.opened = true
 	return nil
 }
 
+func (server *Server) Close() error {
+	if !server.opened {
+		return ErrServerNotOpened
+	}
+	if server.closed {
+		return ErrServerAlreadyClosed
+	}
+	server.closed = true
+
+	server.stopServer(context.Background())
+	return server.broker.Close()
+}
+
 func (server *Server) Run(ctx context.Context) error {
-	if !server.initialized {
-		return ErrServerNotInitialized
+	if !server.opened {
+		return ErrServerNotOpened
+	}
+	if server.closed {
+		return ErrServerAlreadyClosed
 	}
 
 	slog.Info("server loop started; ready for requests", "gameServerArgs", server.cmdArgs)
@@ -118,9 +139,7 @@ func (server *Server) stopServer(ctx context.Context) {
 	defer cancel()
 
 	err := server.executor.Stop(timeoutCtx)
-
-	// Stop errors are only logged since failure to stop does not affect server reuse.
-	if err != nil && !errors.Is(err, context.Canceled) {
+	if err != nil && !errors.Is(err, context.Canceled) && !errors.Is(err, adapters.ErrExecutorNotActive) {
 		slog.Error("failed to stop server", "error", err)
 	}
 }

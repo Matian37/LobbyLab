@@ -81,10 +81,15 @@ func run() error {
 
 	app := app.NewServer(natsURI, containerID, cmdArgs)
 
-	if err := app.Init(); err != nil {
-		return fmt.Errorf("failed to init app: %w", err)
+	if err := app.Open(); err != nil {
+		return fmt.Errorf("failed to open app: %w", err)
 	}
-	slog.Info("successfuly initialized app")
+	slog.Info("successfully opened app")
+	defer func() {
+		if err := app.Close(); err != nil {
+			slog.Error("failed to close app", "error", err)
+		}
+	}()
 
 	errChan := make(chan error, 1)
 	go func() {

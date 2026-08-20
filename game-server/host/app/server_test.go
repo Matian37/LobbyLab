@@ -29,9 +29,9 @@ func newMockServer(t *testing.T) (*mocks.MockBrokerConnection, *mocks.MockExecut
 	return mockConn, mockSrv, server
 }
 
-func newMockServerWithInit(t *testing.T) (*mocks.MockBrokerConnection, *mocks.MockExecutor, *Server) {
+func newMockServerWithOpen(t *testing.T) (*mocks.MockBrokerConnection, *mocks.MockExecutor, *Server) {
 	mockConn, mockSrv, server := newMockServer(t)
-	server.initialized = true
+	server.opened = true
 	return mockConn, mockSrv, server
 }
 
@@ -54,27 +54,34 @@ func TestNewServer(t *testing.T) {
 	assert.NotNil(t, server.broker)
 	assert.NotNil(t, server.executor)
 	assert.Equal(t, cmdArgs, server.cmdArgs)
-	assert.False(t, server.initialized)
+	assert.False(t, server.opened)
+	assert.False(t, server.closed)
 	assert.Equal(t, 5*time.Second, server.serverStopTimeout)
 	assert.Equal(t, 15*time.Second, server.sendResultTimeout)
 	assert.Equal(t, 5*time.Second, server.sendCancelTimeout)
 	assert.NotNil(t, server.broker)
 }
 
-func TestServer_Init(t *testing.T) {
+func TestServer_Open(t *testing.T) {
+	t.Run("already opened", func(t *testing.T) {
+		server := Server{opened: true}
+		err := server.Open()
+		assert.ErrorIs(t, err, ErrServerAlreadyOpened)
+	})
+
+	t.Run("already closed", func(t *testing.T) {
+		server := Server{closed: true}
+		err := server.Open()
+		assert.ErrorIs(t, err, ErrServerAlreadyClosed)
+	})
+
 	t.Run("success", func(t *testing.T) {
 		mockConn, _, server := newMockServer(t)
 		mockConn.EXPECT().Open(server.initTimeout).Return(nil)
 
-		err := server.Init()
+		err := server.Open()
 		assert.NoError(t, err)
-		assert.True(t, server.initialized)
-	})
-
-	t.Run("already initialized", func(t *testing.T) {
-		server := Server{initialized: true}
-		err := server.Init()
-		assert.ErrorIs(t, err, ErrServerAlreadyInitialized)
+		assert.True(t, server.opened)
 	})
 
 	t.Run("connection error", func(t *testing.T) {
@@ -82,9 +89,43 @@ func TestServer_Init(t *testing.T) {
 		expectedErr := errors.New("")
 		mockConn.EXPECT().Open(server.initTimeout).Return(expectedErr)
 
-		err := server.Init()
+		err := server.Open()
 		assert.ErrorIs(t, err, expectedErr)
-		assert.False(t, server.initialized)
+		assert.False(t, server.opened)
+	})
+}
+
+func TestServer_Close(t *testing.T) {
+	t.Run("not opened", func(t *testing.T) {
+		server := Server{}
+		err := server.Close()
+		assert.ErrorIs(t, err, ErrServerNotOpened)
+	})
+
+	t.Run("already closed", func(t *testing.T) {
+		server := Server{opened: true, closed: true}
+		err := server.Close()
+		assert.ErrorIs(t, err, ErrServerAlreadyClosed)
+	})
+
+	t.Run("success", func(t *testing.T) {
+		mockConn, mockSrv, server := newMockServerWithOpen(t)
+		mockSrv.EXPECT().Stop(gomock.Any()).Return(nil)
+		mockConn.EXPECT().Close().Return(nil)
+
+		err := server.Close()
+		assert.NoError(t, err)
+		assert.True(t, server.closed)
+	})
+
+	t.Run("close error", func(t *testing.T) {
+		mockConn, mockSrv, server := newMockServerWithOpen(t)
+		mockSrv.EXPECT().Stop(gomock.Any()).Return(errors.New(""))
+		mockConn.EXPECT().Close().Return(errors.New(""))
+
+		err := server.Close()
+		assert.Error(t, err)
+		assert.True(t, server.closed)
 	})
 }
 
@@ -285,14 +326,20 @@ func TestServer_runMatch(t *testing.T) {
 }
 
 func TestServer_Run(t *testing.T) {
-	t.Run("not initialized", func(t *testing.T) {
+	t.Run("not opened", func(t *testing.T) {
 		server := Server{}
 		err := server.Run(context.Background())
-		assert.ErrorIs(t, err, ErrServerNotInitialized)
+		assert.ErrorIs(t, err, ErrServerNotOpened)
+	})
+
+	t.Run("already closed", func(t *testing.T) {
+		server := Server{opened: true, closed: true}
+		err := server.Run(context.Background())
+		assert.ErrorIs(t, err, ErrServerAlreadyClosed)
 	})
 
 	t.Run("context canceled", func(t *testing.T) {
-		_, _, server := newMockServerWithInit(t)
+		_, _, server := newMockServerWithOpen(t)
 
 		ctx, cancel := context.WithCancel(context.Background())
 		cancel()
@@ -302,7 +349,7 @@ func TestServer_Run(t *testing.T) {
 	})
 
 	t.Run("successful iterations", func(t *testing.T) {
-		mockConn, mockSrv, server := newMockServerWithInit(t)
+		mockConn, mockSrv, server := newMockServerWithOpen(t)
 
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
@@ -324,7 +371,7 @@ func TestServer_Run(t *testing.T) {
 	})
 
 	t.Run("continue after error", func(t *testing.T) {
-		mockConn, _, server := newMockServerWithInit(t)
+		mockConn, _, server := newMockServerWithOpen(t)
 
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
