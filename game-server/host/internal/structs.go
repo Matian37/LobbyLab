@@ -1,6 +1,16 @@
 package internal
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"log/slog"
+)
+
+type Config struct {
+	BrokerURI      string
+	Hostname       string
+	GameServerArgs []string
+	LogLevel       slog.Level
+}
 
 type Result struct {
 	Success bool            `json:"success"`
