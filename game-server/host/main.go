@@ -17,10 +17,18 @@ func setupLogger() {
 	setupLoggerWithWriter(os.Stdout)
 }
 
+func getWorkerID() (string, error) {
+	id, ok := os.LookupEnv("WORKER_ID")
+	if !ok {
+		return "", fmt.Errorf("WORKER_ID not set")
+	}
+	return id, nil
+}
+
 func setupLoggerWithWriter(writer io.Writer) {
-	hostname, err := os.Hostname()
+	workerID, err := getWorkerID()
 	if err != nil {
-		hostname = "unknown"
+		workerID = "unknown"
 	}
 
 	var level slog.Level
@@ -32,7 +40,7 @@ func setupLoggerWithWriter(writer io.Writer) {
 		slog.NewJSONHandler(
 			writer,
 			&slog.HandlerOptions{Level: level},
-		).WithAttrs([]slog.Attr{slog.String("hostname", hostname)}),
+		).WithAttrs([]slog.Attr{slog.String("workerID", workerID)}),
 	)
 	slog.SetDefault(logger)
 }
@@ -68,9 +76,9 @@ func run() error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	containerID, err := os.Hostname()
+	workerID, err := getWorkerID()
 	if err != nil {
-		return fmt.Errorf("failed to get hostname: %w", err)
+		return err
 	}
 
 	natsURI, ok := os.LookupEnv("NATS_URI")
@@ -78,7 +86,7 @@ func run() error {
 		return errors.New("failed to find NATS_URI env")
 	}
 
-	app := NewApp(natsURI, containerID, cmdArgs)
+	app := NewApp(natsURI, workerID, cmdArgs)
 
 	if err := app.Init(); err != nil {
 		return fmt.Errorf("failed to init app: %w", err)

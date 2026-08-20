@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"math/rand"
 	"server-manager/internal"
 	"server-manager/internal/mocks"
@@ -67,7 +68,13 @@ func TestRace_ServerManager_LifeCycle(t *testing.T) {
 			for i := range test.workersCount {
 				maxPingRetries := rand.Intn(10)
 				workerRestartTimeout := time.Duration(-20+rand.Intn(41)) * time.Second
-				workers = append(workers, NewWorker(strconv.Itoa(i), maxPingRetries, workerRestartTimeout))
+				worker := NewWorker(
+					fmt.Sprintf("wid-%v", i),
+					fmt.Sprintf("cid-%v", i),
+					maxPingRetries,
+					workerRestartTimeout,
+				)
+				workers = append(workers, worker)
 			}
 
 			docker, broker, db, wm := newMockWorkerManagerWithInit(t, workers)
@@ -157,7 +164,7 @@ func TestRace_ServerManager_LifeCycle(t *testing.T) {
 
 // restart is tested here, because data races can easily slip up in lifecycle tests for it
 func TestRace_ServerManager_Restart(t *testing.T) {
-	workers := []*Worker{NewWorker(strconv.Itoa(0), 0, -1*time.Second)}
+	workers := []*Worker{NewWorker("0", "0", 0, -1*time.Second)}
 	docker, _, _, wm := newMockWorkerManagerWithInit(t, workers)
 
 	docker.EXPECT().RestartContainer(gomock.Any(), gomock.Any()).AnyTimes().Return(nil)
@@ -169,7 +176,7 @@ func TestRace_ServerManager_Restart(t *testing.T) {
 			wm.mu.Lock()
 			worker := *workers[0]
 			wm.mu.Unlock()
-			wm.restartWorker(context.Background(), workers[0], worker.stateID, worker.ID)
+			wm.restartWorker(context.Background(), workers[0], worker.stateID)
 		})
 	}
 
