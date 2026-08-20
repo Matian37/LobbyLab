@@ -43,126 +43,124 @@ func NewServer(brokerURI string, containerID string, cmdArgs []string, logger *s
 	}
 }
 
-// TODO: use s instead of server in functions
-
-func (server *Server) Open() error {
-	if server.closed {
+func (s *Server) Open() error {
+	if s.closed {
 		return ErrServerAlreadyClosed
 	}
-	if server.opened {
+	if s.opened {
 		return ErrServerAlreadyOpened
 	}
 
-	if err := server.broker.Open(server.initTimeout); err != nil {
+	if err := s.broker.Open(s.initTimeout); err != nil {
 		return err
 	}
-	server.opened = true
+	s.opened = true
 	return nil
 }
 
-func (server *Server) Close() error {
-	if !server.opened {
+func (s *Server) Close() error {
+	if !s.opened {
 		return ErrServerNotOpened
 	}
-	if server.closed {
+	if s.closed {
 		return ErrServerAlreadyClosed
 	}
-	server.closed = true
+	s.closed = true
 
-	server.stopServer(context.Background())
-	return server.broker.Close()
+	s.stopServer(context.Background())
+	return s.broker.Close()
 }
 
-func (server *Server) Run(ctx context.Context) error {
-	if !server.opened {
+func (s *Server) Run(ctx context.Context) error {
+	if !s.opened {
 		return ErrServerNotOpened
 	}
-	if server.closed {
+	if s.closed {
 		return ErrServerAlreadyClosed
 	}
 
-	server.logger.Info("server loop started; ready for requests", "command", server.cmdArgs)
+	s.logger.Info("server loop started; ready for requests", "command", s.cmdArgs)
 
 	for ctx.Err() == nil {
-		err := server.runMatch(ctx)
+		err := s.runMatch(ctx)
 		if errors.Is(err, context.Canceled) {
 			break
 		} else if err != nil {
-			server.logger.Error("match execution failed", "error", err)
+			s.logger.Error("match execution failed", "error", err)
 		} else {
-			server.logger.Info("match execution successful")
+			s.logger.Info("match execution successful")
 		}
 	}
 
 	return ctx.Err()
 }
 
-func (server *Server) runMatch(ctx context.Context) error {
-	server.logger.Debug("waiting for match config...")
-	config, err := server.broker.GetMatchConfig(ctx)
+func (s *Server) runMatch(ctx context.Context) error {
+	s.logger.Debug("waiting for match config...")
+	config, err := s.broker.GetMatchConfig(ctx)
 	if err != nil {
 		return fmt.Errorf("get match config failed: %w", err)
 	}
 
-	server.logger.Info("received match config", "matchID", config.MatchID, "configLen", len(config.Config))
-	server.logger.Debug("match config", "config", config)
+	s.logger.Info("received match config", "matchID", config.MatchID, "configLen", len(config.Config))
+	s.logger.Debug("match config", "config", config)
 
-	result, err := server.runServer(ctx, string(config.Config))
+	result, err := s.runServer(ctx, string(config.Config))
 	if err != nil {
-		server.sendCancel(config.MatchID)
+		s.sendCancel(config.MatchID)
 		return fmt.Errorf("server execution failed: %w", err)
 	}
 
-	server.logger.Info("match result retrieved; sending to broker", "resultLen", len(result))
-	server.logger.Debug("match result", "result", string(result))
+	s.logger.Info("match result retrieved; sending to broker", "resultLen", len(result))
+	s.logger.Debug("match result", "result", string(result))
 
-	if err := server.sendResult(ctx, config.MatchID, result); err != nil {
-		server.sendCancel(config.MatchID)
+	if err := s.sendResult(ctx, config.MatchID, result); err != nil {
+		s.sendCancel(config.MatchID)
 		return fmt.Errorf("failed to send result: %w", err)
 	}
 	return nil
 }
 
-func (server *Server) runServer(ctx context.Context, config string) ([]byte, error) {
-	server.logger.Info("starting server...")
-	if err := server.executor.Start(config); err != nil {
+func (s *Server) runServer(ctx context.Context, config string) ([]byte, error) {
+	s.logger.Info("starting server...")
+	if err := s.executor.Start(config); err != nil {
 		return nil, fmt.Errorf("failed to start server: %w", err)
 	}
-	defer server.stopServer(ctx)
+	defer s.stopServer(ctx)
 
-	server.logger.Info("server started; waiting for the result...")
-	result, err := server.executor.GetResult(ctx)
+	s.logger.Info("server started; waiting for the result...")
+	result, err := s.executor.GetResult(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get match result: %w", err)
 	}
 	return result, nil
 }
 
-func (server *Server) stopServer(ctx context.Context) {
-	timeoutCtx, cancel := context.WithTimeout(ctx, server.serverStopTimeout)
+func (s *Server) stopServer(ctx context.Context) {
+	timeoutCtx, cancel := context.WithTimeout(ctx, s.serverStopTimeout)
 	defer cancel()
 
-	err := server.executor.Stop(timeoutCtx)
+	err := s.executor.Stop(timeoutCtx)
 	if err != nil && !errors.Is(err, context.Canceled) && !errors.Is(err, adapters.ErrExecutorNotActive) {
-		server.logger.Error("failed to stop server", "error", err)
+		s.logger.Error("failed to stop server", "error", err)
 	}
 }
 
-func (server *Server) sendCancel(matchID int) {
-	server.logger.Warn("sending match cancel...")
+func (s *Server) sendCancel(matchID int) {
+	s.logger.Warn("sending match cancel...")
 
-	ctx, cancel := context.WithTimeout(context.Background(), server.sendCancelTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), s.sendCancelTimeout)
 	defer cancel()
 
-	if err := server.broker.SendCancel(ctx, matchID); err != nil {
-		server.logger.Error("send match cancel failed", "error", err)
+	if err := s.broker.SendCancel(ctx, matchID); err != nil {
+		s.logger.Error("send match cancel failed", "error", err)
 	}
 }
 
-func (server *Server) sendResult(ctx context.Context, matchID int, result []byte) error {
-	server.logger.Info("sending match result...")
+func (s *Server) sendResult(ctx context.Context, matchID int, result []byte) error {
+	s.logger.Info("sending match result...")
 
-	timeoutCtx, cancel := context.WithTimeout(ctx, server.sendResultTimeout)
+	timeoutCtx, cancel := context.WithTimeout(ctx, s.sendResultTimeout)
 	defer cancel()
-	return server.broker.SendResult(timeoutCtx, matchID, result)
+	return s.broker.SendResult(timeoutCtx, matchID, result)
 }
