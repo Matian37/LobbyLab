@@ -94,7 +94,7 @@ func (dc *DockerConnection) SpawnContainer(ctx context.Context, workerID string)
 	return res.ID, nil
 }
 
-func (dc *DockerConnection) RestartContainer(ctx context.Context, id string) error {
+func (dc *DockerConnection) RestartContainer(ctx context.Context, containerID string) error {
 	if !dc.initialized {
 		return ErrDockerConnNotInit
 	}
@@ -107,7 +107,7 @@ func (dc *DockerConnection) RestartContainer(ctx context.Context, id string) err
 
 	_, err := dc.client.ContainerRestart(
 		timeoutCtx,
-		id,
+		containerID,
 		client.ContainerRestartOptions{Timeout: &dc.containerStopTimeout},
 	)
 	if err != nil {
@@ -116,7 +116,7 @@ func (dc *DockerConnection) RestartContainer(ctx context.Context, id string) err
 	return nil
 }
 
-func (dc *DockerConnection) RemoveContainer(ctx context.Context, id string) error {
+func (dc *DockerConnection) RemoveContainer(ctx context.Context, containerID string) error {
 	if !dc.initialized {
 		return ErrDockerConnNotInit
 	}
@@ -129,7 +129,7 @@ func (dc *DockerConnection) RemoveContainer(ctx context.Context, id string) erro
 
 	_, err := dc.client.ContainerRemove(
 		timeoutCtx,
-		id,
+		containerID,
 		client.ContainerRemoveOptions{Force: true, RemoveVolumes: true},
 	)
 	if err != nil {

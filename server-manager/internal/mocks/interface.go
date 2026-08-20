@@ -86,17 +86,17 @@ func (mr *MockDockerConnectionMockRecorder) Open(config any) *gomock.Call {
 }
 
 // RemoveContainer mocks base method.
-func (m *MockDockerConnection) RemoveContainer(ctx context.Context, id string) error {
+func (m *MockDockerConnection) RemoveContainer(ctx context.Context, containerID string) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "RemoveContainer", ctx, id)
+	ret := m.ctrl.Call(m, "RemoveContainer", ctx, containerID)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // RemoveContainer indicates an expected call of RemoveContainer.
-func (mr *MockDockerConnectionMockRecorder) RemoveContainer(ctx, id any) *gomock.Call {
+func (mr *MockDockerConnectionMockRecorder) RemoveContainer(ctx, containerID any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RemoveContainer", reflect.TypeOf((*MockDockerConnection)(nil).RemoveContainer), ctx, id)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RemoveContainer", reflect.TypeOf((*MockDockerConnection)(nil).RemoveContainer), ctx, containerID)
 }
 
 // RemoveZombieWorkers mocks base method.
@@ -114,17 +114,17 @@ func (mr *MockDockerConnectionMockRecorder) RemoveZombieWorkers(ctx any) *gomock
 }
 
 // RestartContainer mocks base method.
-func (m *MockDockerConnection) RestartContainer(ctx context.Context, id string) error {
+func (m *MockDockerConnection) RestartContainer(ctx context.Context, containerID string) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "RestartContainer", ctx, id)
+	ret := m.ctrl.Call(m, "RestartContainer", ctx, containerID)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // RestartContainer indicates an expected call of RestartContainer.
-func (mr *MockDockerConnectionMockRecorder) RestartContainer(ctx, id any) *gomock.Call {
+func (mr *MockDockerConnectionMockRecorder) RestartContainer(ctx, containerID any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RestartContainer", reflect.TypeOf((*MockDockerConnection)(nil).RestartContainer), ctx, id)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RestartContainer", reflect.TypeOf((*MockDockerConnection)(nil).RestartContainer), ctx, containerID)
 }
 
 // SpawnContainer mocks base method.
