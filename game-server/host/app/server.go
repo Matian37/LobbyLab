@@ -77,18 +77,19 @@ func (server *Server) Run(ctx context.Context) error {
 		return ErrServerAlreadyClosed
 	}
 
-	slog.Info("server loop started; ready for requests", "gameServerArgs", server.cmdArgs)
+	slog.Info("server loop started; ready for requests", "command", server.cmdArgs)
 
 	for ctx.Err() == nil {
-		if err := server.runMatch(ctx); err != nil {
-			if errors.Is(err, context.Canceled) {
-				break
-			}
+		err := server.runMatch(ctx)
+		if errors.Is(err, context.Canceled) {
+			break
+		} else if err != nil {
 			slog.Error("match execution failed", "error", err)
 		} else {
 			slog.Info("match execution successful")
 		}
 	}
+
 	return ctx.Err()
 }
 
@@ -98,6 +99,7 @@ func (server *Server) runMatch(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("get match config failed: %w", err)
 	}
+
 	slog.Info("received match config", "matchID", config.MatchID, "configLen", len(config.Config))
 	slog.Debug("match config", "config", config)
 
@@ -108,9 +110,7 @@ func (server *Server) runMatch(ctx context.Context) error {
 	}
 
 	slog.Info("match result retrieved; sending to broker", "resultLen", len(result))
-	if slog.Default().Enabled(context.Background(), slog.LevelDebug) {
-		slog.Debug("match result", "result", string(result))
-	}
+	slog.Debug("match result", "result", string(result))
 
 	if err := server.sendResult(ctx, config.MatchID, result); err != nil {
 		server.sendCancel(config.MatchID)
