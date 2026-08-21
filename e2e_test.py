@@ -7,6 +7,8 @@ import time
 import websocket
 import threading
 import random
+import re
+from playwright.sync_api import Page, expect
 
 #globals
 PLAYERS_PER_ROOM = 2
@@ -28,16 +30,18 @@ def log(args):
     msg = ''
     for a in args:
         msg += str(a) + ' '
-    print(msg)
+    print(f'\033[36m[E2E TEST LOGGER]: {msg}\033[0m')
 
 def restart_container(containers, off_time):
-    for c in containers:
-        log(['killing container', c])
-        subprocess.run(['docker', 'kill', c])
+    kill_container(containers)
     time.sleep(off_time)
     for c in containers:
         log(['restarting container', c])
         subprocess.run(['docker', 'start', c])
+def kill_container(containers):
+    for c in containers:
+        log(['killing container', c])
+        subprocess.run(['docker', 'kill', c])
 
 def get_containers_by_image(image):
     containers = []
@@ -263,8 +267,8 @@ def test_crash_game_server(setup_services):
 
     #restart containers when match is running
     kill = threading.Thread(
-        target=restart_container, 
-        args=(containers, 15,)
+        target=kill_container, 
+        args=(containers,)
     )
 
     for i in range(2):
@@ -280,7 +284,7 @@ def test_crash_game_server(setup_services):
     kill.join()
 
     #matches should be canceled
-    time.sleep(6)
+    time.sleep(17)
     for i in range(2):
         results = requests.get(
             'http://localhost:3000/api/results',
@@ -293,6 +297,41 @@ def test_crash_game_server(setup_services):
         log(["wynik ", match])
         assert match["canceled"] == True
 
-'''
-interactive??
-'''
+def test_browser(setup_services, page: Page):
+    page.goto("http://localhost:3000")
+
+    #make sure we are in main page and go to login page
+    expect(page.get_by_text('Log out')).to_be_visible()
+    page.get_by_text('Login').click()
+
+    #make sure we are in login page and try to log in
+    expect(page.get_by_text('Password')).to_be_visible()
+    error_text = page.locator('p')
+    expect(error_text).to_be_hidden()
+    for input in page.get_by_role('textbox').all():
+        input.fill('hej')
+    page.get_by_text('Submit').click()
+    expect(error_text).to_be_visible()
+    page.get_by_text('Back').click()
+
+    #make sure we are in main page and go to register page
+    expect(page.get_by_text('Log out')).to_be_visible()
+    page.get_by_text('Register').click()
+
+    #make sure we are in register page and register
+    expect(page.get_by_text('Password')).to_be_visible()
+    error_text = page.locator('p')
+    expect(error_text).to_be_hidden()
+    for input in page.get_by_role('textbox').all():
+        input.fill('hej')
+    page.get_by_text('Submit').click()
+    expect(error_text).to_be_visible()
+    for input in page.get_by_role('textbox').all():
+        input.fill('userandpassword')
+    page.get_by_text('Submit').click()
+
+    #we should be in main page and logged in
+    expect(page.get_by_text('Log out')).to_be_visible()
+    expect(page.get_by_role("heading")).to_have_text('userandpassword')
+    page.get_by_text('Log out').click()
+    expect(page.get_by_role('heading')).to_have_text('Log in')
