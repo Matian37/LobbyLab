@@ -25,7 +25,8 @@ if [ -z "$match_result_path" ]; then
 fi
 
 match_config=$(cat "$match_config_path")
+export match_config
 
-timeout 5s socat -v UDP-LISTEN:7777,fork PIPE
+timeout 5s socat -v UDP-LISTEN:7777,fork SYSTEM:"echo PING\"\$match_config\""
 
 printf $match_config > "$match_result_path"
