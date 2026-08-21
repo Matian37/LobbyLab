@@ -10,6 +10,11 @@ import random
 import re
 from playwright.sync_api import Page, expect
 
+#To run this test run the following command in main directory:
+#pytest -s e2e_test.py (-s flag shows all logs)
+#or
+#pytest -s e2e_test.py::{name_of_specific_test}
+
 #globals
 PLAYERS_PER_ROOM = 2
 CONTAINERS = 2
@@ -242,7 +247,6 @@ def test_crash_server_manager(setup_services, kill_before_queue):
         assert len(results["matches"]) == 1
         match = results["matches"][0]
         assert match["canceled"] == True
-
 
 def test_crash_game_server(setup_services):
     #registering
