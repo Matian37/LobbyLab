@@ -42,10 +42,10 @@ services:
       PORT: 3000
       LOG_LEVEL: info
       PUBLIC_GAME_LAUNCH_URL: ${PUBLIC_GAME_LAUNCH_URL}
-      GAME_CLIENT_FILE: game-client.zip
+      GAME_CLIENT_FILE: ${GAME_CLIENT_FILE}
       DOWNLOADS_DIR: /api/downloads
     volumes:
-      - ./data/downloads:/api/downloads
+      - ${DOWNLOADS_DIR}:/api/downloads
     ports:
       - "3000:3000"
     networks:
@@ -64,11 +64,11 @@ services:
       NATS_NETWORK_NAME: "LobbyLab_nats-net"
       PUBLIC_HOST: ${PUBLIC_HOST}
       GAME_SERVER_IMAGE: "game-server:latest"
-      GAME_SERVER_COUNT: 2
-      GAME_SERVER_EXPOSE_PORTS: "7777/udp,8080"
-      GAME_SERVER_CLIENT_PORT: "7777/udp"
+      GAME_SERVER_COUNT: ${GAME_SERVER_COUNT}
+      GAME_SERVER_EXPOSE_PORTS: ${GAME_SERVER_EXPOSE_PORTS}
+      GAME_SERVER_CLIENT_PORT: ${GAME_SERVER_CLIENT_PORT}
       GAME_SERVER_LOG_LEVEL: info
-      PLAYERS_PER_ROOM: 2
+      PLAYERS_PER_ROOM: ${PLAYERS_PER_ROOM}
       LOG_LEVEL: info
     volumes:
       # TODO: required but dangerous, docker socket proxy would be safer instead
