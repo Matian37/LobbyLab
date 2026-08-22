@@ -79,7 +79,7 @@ def register_user(username: str) -> str:
     assert isinstance(token, str)
     return token
 
-def ping_game_server(host: str, port: int) -> dict[str, Any]: #pyright: ignore[reportExplicitAny]
+def ping_game_server(host: str, port: int) -> dict[str, Any]: 
     time.sleep(random.random())
     with socket.socket(family=socket.AF_INET, type=socket.SOCK_DGRAM) as sock:
         sock.settimeout(3)
@@ -94,16 +94,16 @@ def ping_game_server(host: str, port: int) -> dict[str, Any]: #pyright: ignore[r
         assert data[:4] == b"PING"
 
         #returns match config
-        result = json.loads(s=data[4:].decode(encoding='utf-8')) #pyright: ignore[reportAny]
+        result = json.loads(s=data[4:].decode(encoding='utf-8')) 
         assert isinstance(result, dict)
-        return result #pyright: ignore[reportUnknownVariableType]
+        return result 
 
 def queue_user(token: str, username: str, ws_timeout: float) -> bool:
     payload = {}
     match_found = False
     def on_message(_ws: websocket.WebSocketApp, message: str) -> None:
         nonlocal payload, match_found
-        payload = json.loads(s=message)  #pyright: ignore[reportAny]
+        payload = json.loads(s=message)  
         assert isinstance(payload, dict)
         if "host" in payload: 
             match_found = True
@@ -113,8 +113,8 @@ def queue_user(token: str, username: str, ws_timeout: float) -> bool:
         header={"cookie": f"session={token}"},
         on_message=on_message,
     )
-    threading.Timer(interval=ws_timeout, function=ws.close).start() #pyright: ignore[reportUnknownMemberType, reportUnknownArgumentType]
-    _ = ws.run_forever() #pyright: ignore[reportUnknownMemberType]
+    threading.Timer(interval=ws_timeout, function=ws.close).start() 
+    _ = ws.run_forever() 
     if not match_found:
         return False
     
@@ -126,10 +126,10 @@ def queue_user(token: str, username: str, ws_timeout: float) -> bool:
         host=cast(str, payload["host"]), 
         port=int(cast(int, payload["port"]))
     )
-    players_in_match = match_config["players"] #pyright: ignore[reportAny]
+    players_in_match = match_config["players"] 
     match_tokens: list[str] = []
-    for p in players_in_match: #pyright: ignore[reportAny]
-        match_tokens.append(p["matchAuthToken"]) #pyright: ignore[reportAny]
+    for p in players_in_match: 
+        match_tokens.append(p["matchAuthToken"]) 
     
     assert payload["matchAuthToken"] in match_tokens
 
@@ -145,7 +145,7 @@ def add_n_users(n: int):
         assert len(tokens[-1]) > 0
 
     #should be no results yet
-    results = requests.get( #pyright: ignore[reportAny]
+    results = requests.get( 
         'http://localhost:3000/api/results',
         cookies={'session': tokens[0]}
     ).json()
@@ -186,12 +186,12 @@ def add_n_users(n: int):
     time.sleep(6)
     players_without_results = 0
     for i in range(n):
-        results = requests.get( #pyright: ignore[reportAny]
+        results = requests.get( 
             'http://localhost:3000/api/results',
             cookies={'session': tokens[i]}
         ).json()
         assert isinstance(results, dict)
-        results = cast(dict[str, Any], results) #pyright: ignore[reportExplicitAny]
+        results = cast(dict[str, Any], results) 
         assert "matches" in results
 
         if len(cast(list[object], results["matches"])) == 0:
@@ -199,7 +199,7 @@ def add_n_users(n: int):
             continue
 
         assert len(cast(list[object], results["matches"])) == 1
-        match = results["matches"][0] #pyright: ignore[reportAny]
+        match = results["matches"][0] 
         log(["match result for ", usernames[i], match])
 
         assert match["canceled"] == False
@@ -230,7 +230,7 @@ def test_crash_server_manager(kill_before_queue: bool) -> None:
         header={"cookie": f"session={token}"},
         )
 
-        _ = ws.run_forever() #pyright: ignore[reportUnknownMemberType]
+        _ = ws.run_forever() 
 
     #restarting container while matchmaking
     kill: Thread = threading.Thread(
@@ -255,7 +255,7 @@ def test_crash_server_manager(kill_before_queue: bool) -> None:
     time.sleep(6)
     #match should be canceled
     for i in range(2):
-        results = requests.get( #pyright: ignore[reportAny]
+        results = requests.get( 
             'http://localhost:3000/api/results',
             cookies={'session': tokens[i]}
         ).json()
@@ -286,7 +286,7 @@ def test_crash_game_server() -> None:
         header={"cookie": f"session={token}"},
         )
 
-        _ = ws.run_forever() #pyright: ignore[reportUnknownMemberType]
+        _ = ws.run_forever() 
 
     #restart containers when match is running
     kill: Thread = threading.Thread(
@@ -309,7 +309,7 @@ def test_crash_game_server() -> None:
     #matches should be canceled
     time.sleep(17)
     for i in range(2):
-        results = requests.get( #pyright: ignore[reportAny]
+        results = requests.get( 
             'http://localhost:3000/api/results',
             cookies={'session': tokens[i]}
         ).json()
