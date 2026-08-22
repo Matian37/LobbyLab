@@ -4,7 +4,7 @@ package app
 
 import (
 	"errors"
-	"server/internal/mocks"
+	"game-server/internal/mocks"
 	"testing"
 	"time"
 

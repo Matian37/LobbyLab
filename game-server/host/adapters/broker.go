@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"game-server/internal"
 	"log/slog"
-	"server/internal"
 	"time"
 
 	"github.com/nats-io/nats.go"

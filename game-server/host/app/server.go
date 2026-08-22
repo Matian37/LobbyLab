@@ -4,9 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"game-server/adapters"
+	"game-server/internal"
 	"log/slog"
-	"server/adapters"
-	"server/internal"
 	"time"
 
 	"github.com/cenkalti/backoff/v6"

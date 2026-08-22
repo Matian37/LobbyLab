@@ -3,9 +3,9 @@ package config
 import (
 	"errors"
 	"fmt"
+	"game-server/internal"
 	"log/slog"
 	"os"
-	"server/internal"
 
 	"github.com/caarlos0/env/v11"
 	"github.com/google/shlex"

@@ -4,10 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"game-server/config"
+	"game-server/internal"
 	"log/slog"
 	"os"
-	"server/config"
-	"server/internal"
 )
 
 func Run(ctx context.Context) error {

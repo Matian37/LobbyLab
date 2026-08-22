@@ -18,9 +18,8 @@ import (
 	"testing"
 	"time"
 
-	app "server/app"
-
-	"server/internal"
+	"game-server/app"
+	"game-server/internal"
 
 	"github.com/nats-io/nats-server/v2/server"
 	"github.com/nats-io/nats.go"

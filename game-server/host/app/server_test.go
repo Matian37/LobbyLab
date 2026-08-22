@@ -3,9 +3,9 @@ package app
 import (
 	"context"
 	"errors"
+	"game-server/internal"
+	"game-server/internal/mocks"
 	"log/slog"
-	"server/internal"
-	"server/internal/mocks"
 	"testing"
 	"time"
 

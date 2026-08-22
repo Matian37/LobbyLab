@@ -2,10 +2,10 @@ package main
 
 import (
 	"context"
+	"game-server/app"
 	"log/slog"
 	"os"
 	"os/signal"
-	"server/app"
 	"syscall"
 )
 

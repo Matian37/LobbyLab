@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	app "server/app"
+	"game-server/app"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

@@ -4,8 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"game-server/internal"
 	"net"
-	"server/internal"
 	"testing"
 	"time"
 
