@@ -1,14 +1,20 @@
-import subprocess
-import requests
 import json
-import pytest
-import socket
-import time
-import websocket
-import threading
 import random
-import re
+import socket
+import subprocess
+import threading
+import time
+from collections.abc import Generator
+from subprocess import CompletedProcess
+from threading import Thread
+from typing import Any, Literal, cast
+
+import pytest
+import requests
+import websocket
 from playwright.sync_api import Page, expect
+from requests.models import Response
+from websocket._app import WebSocketApp
 
 #To run this test run the following command in main directory:
 #pytest -s e2e_test.py (-s flag shows all logs)
@@ -20,134 +26,137 @@ PLAYERS_PER_ROOM = 2
 CONTAINERS = 2
 
 @pytest.fixture()
-def setup_services():
-  subprocess.run(['sudo', 'rm', '-rf', './data'])
-  subprocess.run(['make', 'up', 'UP_ARGS=-d'])
-  def stream_logs():
-    subprocess.run(['docker', 'compose', 'logs', '-f'])
-  log_thread = threading.Thread(target=stream_logs, daemon=True)
+def setup_services() -> Generator[None, None, None]:
+  _ = subprocess.run(['sudo', 'rm', '-rf', './data'], check=True)
+  _ = subprocess.run(['make', 'up', 'UP_ARGS=-d'], check=True)
+  def stream_logs() -> None:
+    _ = subprocess.run(['docker', 'compose', 'logs', '-f'], check=True)
+  log_thread: Thread = threading.Thread(target=stream_logs, daemon=True)
   log_thread.start()
   time.sleep(4)
   yield
-  subprocess.run(['make', 'down', 'DOWN_ARGS=-t 0 -v']) 
+  _ = subprocess.run(['make', 'down', 'DOWN_ARGS=-t 0 -v'], check=True) 
 
-def log(args):
+def log(args: list[object]) -> None:
     msg = ''
     for a in args:
         msg += str(a) + ' '
     print(f'\033[36m[E2E TEST LOGGER]: {msg}\033[0m')
 
-def restart_container(containers, off_time):
+def restart_container(containers: list[str], off_time: float) -> None:
     kill_container(containers)
     time.sleep(off_time)
     for c in containers:
-        log(['restarting container', c])
-        subprocess.run(['docker', 'start', c])
-def kill_container(containers):
+        log(args=['restarting container', c])
+        _ = subprocess.run(['docker', 'start', c], check=True)
+def kill_container(containers: list[str]) -> None:
     for c in containers:
-        log(['killing container', c])
-        subprocess.run(['docker', 'kill', c])
+        log(args=['killing container', c])
+        _ = subprocess.run(['docker', 'kill', c], check=True)
 
-def get_containers_by_image(image):
-    containers = []
-
-    result = subprocess.run(
+def get_containers_by_image(image: str) -> list[str]:
+    result: CompletedProcess[str] = subprocess.run(
         ["docker", "ps", "-q", "--filter", f"ancestor={image}"],
         capture_output=True,
         text=True,
+        check=True,
     )
-    container_ids = result.stdout.strip()
-    for c_id in container_ids.splitlines():
-        containers.append(c_id)
+    container_ids: str = result.stdout.strip()
+    containers: list[str] = container_ids.splitlines()
 
     return containers
 
-def register_user(username):
-    response = requests.post(
-        'http://localhost:3000/api/register',
+def register_user(username: str) -> str:
+    response: Response = requests.post(
+        url='http://localhost:3000/api/register',
         json={'login': username,
         'password': 'passawubasd!!'
     })
 
     assert response.json() == {}
-    token = response.cookies.get('session')
+    token = response.cookies.get(name='session')
+    assert isinstance(token, str)
     return token
 
-def ping_game_server(host, port):
+def ping_game_server(host: str, port: int) -> dict[str, Any]: #pyright: ignore[reportExplicitAny]
     time.sleep(random.random())
-    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+    with socket.socket(family=socket.AF_INET, type=socket.SOCK_DGRAM) as sock:
         sock.settimeout(3)
             
         message = b"PING"
-        sock.sendto(
+        _ = sock.sendto(
             message, 
             (host, port)
         )
             
-        data, addr = sock.recvfrom(1024)
+        data: bytes = sock.recvfrom(1024)[0]
         assert data[:4] == b"PING"
 
         #returns match config
-        return json.loads(data[4:].decode('utf-8'))
+        result = json.loads(s=data[4:].decode(encoding='utf-8')) #pyright: ignore[reportAny]
+        assert isinstance(result, dict)
+        return result #pyright: ignore[reportUnknownVariableType]
 
-def queue_user(token, username, ws_timeout):
-    payload = None
+def queue_user(token: str, username: str, ws_timeout: float) -> tuple[Literal[False], None] | Literal[True]:
+    payload = {}
     match_found = False
-    def on_message(ws, message):
+    def on_message(_ws: websocket.WebSocketApp, message: str) -> None:
         nonlocal payload, match_found
-        payload = json.loads(message)
+        payload = json.loads(s=message)  #pyright: ignore[reportAny]
+        assert isinstance(payload, dict)
         if "host" in payload: 
             match_found = True
 
-    ws = websocket.WebSocketApp(
+    ws: WebSocketApp = websocket.WebSocketApp(
         "ws://localhost:3000/api/connection",
         header={"cookie": f"session={token}"},
         on_message=on_message,
     )
-    threading.Timer(ws_timeout, ws.close).start()
-    ws.run_forever()
+    threading.Timer(interval=ws_timeout, function=ws.close).start() #pyright: ignore[reportUnknownMemberType, reportUnknownArgumentType]
+    _ = ws.run_forever() #pyright: ignore[reportUnknownMemberType]
     if not match_found:
         return False, None
     
-    log([username, ": Queued user payload", payload])
+    log(args=[username, ": Queued user payload", payload])
 
     assert payload["login"] == username
 
     match_config = ping_game_server(
-        payload["host"], 
-        int(payload["port"])
+        host=cast(str, payload["host"]), 
+        port=int(cast(int, payload["port"]))
     )
-    players_in_match = match_config["players"]
-    match_tokens = []
-    for p in players_in_match:
-        match_tokens.append(p["matchAuthToken"])
+    players_in_match = match_config["players"] #pyright: ignore[reportAny]
+    match_tokens: list[str] = []
+    for p in players_in_match: #pyright: ignore[reportAny]
+        match_tokens.append(p["matchAuthToken"]) #pyright: ignore[reportAny]
     
     assert payload["matchAuthToken"] in match_tokens
 
     return True
 
-def add_n_users(n):
+def add_n_users(n: int):
     #registering
-    tokens = []
-    usernames = []
+    tokens: list[str] = []
+    usernames: list[str] = []
     for i in range(n):
         usernames.append('user' + str(i))
         tokens.append(register_user(usernames[-1]))
         assert len(tokens[-1]) > 0
 
     #should be no results yet
-    results = requests.get(
+    results = requests.get( #pyright: ignore[reportAny]
         'http://localhost:3000/api/results',
         cookies={'session': tokens[0]}
     ).json()
+    assert isinstance(results, dict)
 
     assert "matches" in results
-    assert len(results["matches"]) == 0
+    assert len(cast(list[object], results["matches"])) == 0
 
     #adding to waitlist and matching players
-    threads = []
+    threads: list[threading.Thread] = []
     matched_players = 0
-    def add(token, username):
+    def add(token: str, username: str) -> None:
         nonlocal matched_players
         #if some players have to wait for a free container then ws_timeout has to be longer
         ws_timeout = 5
@@ -176,19 +185,20 @@ def add_n_users(n):
     time.sleep(6)
     players_without_results = 0
     for i in range(n):
-        results = requests.get(
+        results = requests.get( #pyright: ignore[reportAny]
             'http://localhost:3000/api/results',
             cookies={'session': tokens[i]}
         ).json()
-
+        assert isinstance(results, dict)
+        results = cast(dict[str, Any], results) #pyright: ignore[reportExplicitAny]
         assert "matches" in results
 
-        if len(results["matches"]) == 0:
+        if len(cast(list[object], results["matches"])) == 0:
             players_without_results += 1
             continue
 
-        assert len(results["matches"]) == 1
-        match = results["matches"][0]
+        assert len(cast(list[object], results["matches"])) == 1
+        match = results["matches"][0] #pyright: ignore[reportAny]
         log(["match result for ", usernames[i], match])
 
         assert match["canceled"] == False
@@ -196,34 +206,36 @@ def add_n_users(n):
 
     assert players_without_results == n % PLAYERS_PER_ROOM
 
-@pytest.mark.parametrize("n", [1, 2, 5, 6])
-def test_add_users(setup_services, n):
+@pytest.mark.usefixtures("setup_services")
+@pytest.mark.parametrize(argnames="n", argvalues=[1, 2, 5, 6])
+def test_add_users(n: int) -> None:
     add_n_users(n)
 
-@pytest.mark.parametrize("kill_before_queue", [True, False])
-def test_crash_server_manager(setup_services, kill_before_queue):
+@pytest.mark.usefixtures("setup_services")
+@pytest.mark.parametrize(argnames="kill_before_queue", argvalues=[True, False])
+def test_crash_server_manager(kill_before_queue: bool) -> None:
     #registering
-    tokens = []
-    usernames = []
+    tokens: list[str] = []
+    usernames: list[str] = []
     for i in range(2):
         usernames.append('user' + str(i))
-        tokens.append(register_user(usernames[-1]))
+        tokens.append(register_user(username=usernames[-1]))
 
-    threads = []
+    threads: list[Thread] = []
 
-    def add(token):
-        ws = websocket.WebSocketApp(
-        "ws://localhost:3000/api/connection",
+    def add(token: str) -> None:
+        ws: WebSocketApp = websocket.WebSocketApp(
+        url="ws://localhost:3000/api/connection",
         header={"cookie": f"session={token}"},
         )
 
-        ws.run_forever()
+        _ = ws.run_forever() #pyright: ignore[reportUnknownMemberType]
 
     #restarting container while matchmaking
-    kill = threading.Thread(
+    kill: Thread = threading.Thread(
         target=restart_container, 
         args=(
-            ['multiplayer-asset-server-manager-1'], 5,
+                ['multiplayer-asset-server-manager-1'], 5,
             )
         )  
 
@@ -242,35 +254,41 @@ def test_crash_server_manager(setup_services, kill_before_queue):
     time.sleep(6)
     #match should be canceled
     for i in range(2):
-        results = requests.get('http://localhost:3000/api/results', cookies={'session': tokens[i]}).json()
+        results = requests.get( #pyright: ignore[reportAny]
+            'http://localhost:3000/api/results',
+            cookies={'session': tokens[i]}
+        ).json()
+        assert isinstance(results, dict)
+
         assert "matches" in results
-        assert len(results["matches"]) == 1
-        match = results["matches"][0]
+        assert len(cast(list[object], results["matches"])) == 1
+        match = cast(dict[str, object], results["matches"][0])
         assert match["canceled"] == True
 
-def test_crash_game_server(setup_services):
+@pytest.mark.usefixtures("setup_services")
+def test_crash_game_server() -> None:
     #registering
-    tokens = []
-    usernames = []
+    tokens: list[str] = []
+    usernames: list[str] = []
     for i in range(2):
         usernames.append('user' + str(i))
-        tokens.append(register_user(usernames[-1]))
+        tokens.append(register_user(username=usernames[-1]))
 
-    threads = []
+    threads: list[Thread] = []
 
     #find all containers of image game-server
-    containers = get_containers_by_image('game-server')
+    containers: list[str] = get_containers_by_image(image='game-server')
 
-    def add(token):
-        ws = websocket.WebSocketApp(
-        "ws://localhost:3000/api/connection",
+    def add(token: str) -> None:
+        ws: WebSocketApp = websocket.WebSocketApp(
+        url="ws://localhost:3000/api/connection",
         header={"cookie": f"session={token}"},
         )
 
-        ws.run_forever()
+        _ = ws.run_forever() #pyright: ignore[reportUnknownMemberType]
 
     #restart containers when match is running
-    kill = threading.Thread(
+    kill: Thread = threading.Thread(
         target=kill_container, 
         args=(containers,)
     )
@@ -290,19 +308,21 @@ def test_crash_game_server(setup_services):
     #matches should be canceled
     time.sleep(17)
     for i in range(2):
-        results = requests.get(
+        results = requests.get( #pyright: ignore[reportAny]
             'http://localhost:3000/api/results',
             cookies={'session': tokens[i]}
         ).json()
+        assert isinstance(results, dict)
 
         assert "matches" in results
-        assert len(results["matches"]) == 1
-        match = results["matches"][0]
+        assert len(cast(list[object], results["matches"])) == 1 
+        match = cast(dict[str, object], results["matches"][0])
         log(["wynik ", match])
         assert match["canceled"] == True
 
-def test_browser(setup_services, page: Page):
-    page.goto("http://localhost:3000")
+@pytest.mark.usefixtures("setup_services")
+def test_browser(page: Page) -> None:
+    _ = page.goto("http://localhost:3000")
 
     #make sure we are in main page and go to login page
     expect(page.get_by_text('Log out')).to_be_visible()
