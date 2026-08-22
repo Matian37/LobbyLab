@@ -53,12 +53,16 @@ describe('GET', () => {
         db.getLoginFromToken.mockResolvedValue('user1');
         db.getMatchResults.mockResolvedValue([
             {
+                id: 1,
                 details: { players: ['user1', 'user2'], winner: 'user1' },
                 canceled: false,
+                active: false,
             },
             {
-                details: { players: ['user1', 'user3'], winner: 'user1' },
+                id: 2,
+                details: null,
                 canceled: true,
+                active: false,
             },
         ]);
 
@@ -70,12 +74,16 @@ describe('GET', () => {
         expect(await response.json()).toEqual({
             matches: [
                 {
+                    id: 1,
                     details: { players: ['user1', 'user2'], winner: 'user1' },
                     canceled: false,
+                    active: false,
                 },
                 {
-                    details: { players: ['user1', 'user3'], winner: 'user1' },
+                    id: 2,
+                    details: null,
                     canceled: true,
+                    active: false,
                 },
             ],
         });

@@ -10,7 +10,7 @@ const EXAMPLE_SESSION_TOKEN = 'a'.repeat(SESSION_TOKEN_LENGTH);
 
 vi.mock('$lib/db.js', () => {
     return {
-        sessionExist: vi.fn(),
+        getLoginFromToken: vi.fn(),
     };
 });
 
@@ -27,32 +27,36 @@ describe('GET', () => {
 
         await expectError(response, ERRORS.noSessionToken);
         expect(validate.validateSession).toHaveBeenCalledWith(cookies);
-        expect(db.sessionExist).not.toHaveBeenCalled();
+        expect(db.getLoginFromToken).not.toHaveBeenCalled();
     });
 
-    it('returns 200 with exists: true when session exists', async () => {
-        db.sessionExist.mockResolvedValue(true);
+    it('deletes the stale cookie when the session does not exist', async () => {
+        db.getLoginFromToken.mockResolvedValue(null);
+        const cookies = { get: () => EXAMPLE_SESSION_TOKEN, delete: vi.fn() };
 
-        const response = await api.GET({
-            cookies: { get: () => EXAMPLE_SESSION_TOKEN },
-        });
+        const response = await api.GET({ cookies });
 
         expect(response.status).toBe(200);
-        expect(await response.json()).toEqual({ exists: true });
+        expect(await response.json()).toEqual({ login: null });
         expect(validate.validateSession).toHaveBeenCalled();
-        expect(db.sessionExist).toHaveBeenCalledWith(EXAMPLE_SESSION_TOKEN);
+        expect(db.getLoginFromToken).toHaveBeenCalledWith(
+            EXAMPLE_SESSION_TOKEN
+        );
+        expect(cookies.delete).toHaveBeenCalledWith('session', { path: '/' });
     });
 
-    it('returns 200 with exists: false when session does not exist', async () => {
-        db.sessionExist.mockResolvedValue(false);
+    it('returns the login when the session exists', async () => {
+        db.getLoginFromToken.mockResolvedValue('user1');
+        const cookies = { get: () => EXAMPLE_SESSION_TOKEN, delete: vi.fn() };
 
-        const response = await api.GET({
-            cookies: { get: () => EXAMPLE_SESSION_TOKEN },
-        });
+        const response = await api.GET({ cookies });
 
         expect(response.status).toBe(200);
-        expect(await response.json()).toEqual({ exists: false });
+        expect(await response.json()).toEqual({ login: 'user1' });
         expect(validate.validateSession).toHaveBeenCalled();
-        expect(db.sessionExist).toHaveBeenCalledWith(EXAMPLE_SESSION_TOKEN);
+        expect(db.getLoginFromToken).toHaveBeenCalledWith(
+            EXAMPLE_SESSION_TOKEN
+        );
+        expect(cookies.delete).not.toHaveBeenCalled();
     });
 });

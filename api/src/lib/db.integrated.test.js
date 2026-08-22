@@ -365,6 +365,8 @@ describe('getMatchResults', () => {
             name: 'returns match for user in its players',
             matches: [
                 {
+                    id: 1,
+                    active: false,
                     players: ['user1', 'user6'],
                     winner: 'user6',
                     canceled: false,
@@ -372,6 +374,8 @@ describe('getMatchResults', () => {
             ],
             expected: [
                 {
+                    id: 1,
+                    active: false,
                     details: {
                         players: ['user1', 'user6'],
                         winner: 'user6',
@@ -381,51 +385,72 @@ describe('getMatchResults', () => {
             ],
         },
         {
+            name: 'returns matches sorted by id in descending order',
+            matches: [
+                {
+                    id: 1,
+                    active: false,
+                    players: ['user1', 'user2'],
+                    winner: 'user2',
+                    canceled: false,
+                },
+                {
+                    id: 2,
+                    active: false,
+                    players: ['user1', 'user2'],
+                    winner: 'user1',
+                    canceled: false,
+                },
+                {
+                    id: 3,
+                    active: false,
+                    players: ['user1', 'user2'],
+                    winner: 'user2',
+                    canceled: false,
+                },
+            ],
+            expected: [
+                {
+                    id: 3,
+                    active: false,
+                    details: {
+                        players: ['user1', 'user2'],
+                        winner: 'user2',
+                    },
+                    canceled: false,
+                },
+                {
+                    id: 2,
+                    active: false,
+                    details: {
+                        players: ['user1', 'user2'],
+                        winner: 'user1',
+                    },
+                    canceled: false,
+                },
+                {
+                    id: 1,
+                    active: false,
+                    details: {
+                        players: ['user1', 'user2'],
+                        winner: 'user2',
+                    },
+                    canceled: false,
+                },
+            ],
+        },
+        {
             name: 'returns empty array for user not in its players',
             matches: [
                 {
+                    id: 1,
+                    active: true,
                     players: ['user5', 'user6'],
                     winner: 'user5',
                     canceled: false,
                 },
             ],
             expected: [],
-        },
-        {
-            name: 'returns multiple matches for existing user',
-            matches: [
-                {
-                    players: ['user1', 'user6'],
-                    winner: 'user1',
-                    canceled: false,
-                },
-                {
-                    players: ['user5', 'user1'],
-                    winner: 'user5',
-                    canceled: true,
-                },
-                {
-                    players: ['user3', 'user4'],
-                    winner: 'user3',
-                    canceled: false,
-                },
-            ],
-            expected: [
-                {
-                    details: {
-                        players: ['user1', 'user6'],
-                        winner: 'user1',
-                    },
-                    canceled: false,
-                },
-                {
-                    details: {
-                        players: ['user5', 'user1'],
-                        winner: 'user5',
-                    },
-                    canceled: true,
-                },
-            ],
         },
     ])('$name', async ({ matches, expected }) => {
         const createdPlayers = new Set();
@@ -440,20 +465,17 @@ describe('getMatchResults', () => {
         }
 
         for (const match of matches) {
-            const { canceled, ...results } = match;
+            const { id, active, canceled, ...results } = match;
 
-            const match_id = (
-                await helperSql`
-                    INSERT INTO matches (host, port, results, canceled)
-                    VALUES ('', 0, ${helperSql.json(results)}, ${canceled})
-                    RETURNING id
-                `
-            )[0].id;
+            await helperSql`
+                INSERT INTO matches (id, host, port, results, canceled, active)
+                VALUES (${id}, '', 0, ${helperSql.json(results)}, ${canceled}, ${active})
+            `;
 
-            for (const player of match.players) {
+            for (const player of results.players) {
                 await helperSql`
                     INSERT INTO user_matches (user_id, match_id)
-                    VALUES (${player}, ${match_id})
+                    VALUES (${player}, ${id})
                 `;
             }
         }
