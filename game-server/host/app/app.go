@@ -5,14 +5,24 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"os"
+	"server/config"
 	"server/internal"
 )
 
-func Run(ctx context.Context, cfg internal.Config, logger *slog.Logger) error {
+func Run(ctx context.Context) error {
+	cfg, err := config.ReadConfig()
+	if err != nil {
+		return fmt.Errorf("failed to load config: %w", err)
+	}
+
+	logger := internal.NewLogger(os.Stdout, cfg)
+
 	serverLogger := logger.With("component", "server")
 	serverLogger.Info("starting...")
 
-	return run(ctx, NewServer(cfg.BrokerURI, cfg.WorkerID, cfg.GameServerArgs, logger), serverLogger)
+	server := NewServer(cfg.BrokerURI, cfg.WorkerID, cfg.GameServerArgs, logger)
+	return run(ctx, server, serverLogger)
 }
 
 func run(ctx context.Context, server *Server, logger *slog.Logger) error {
