@@ -8,7 +8,7 @@ import zipfile
 from collections.abc import Generator
 from subprocess import CompletedProcess
 from threading import Thread
-from typing import Any, Literal, cast
+from typing import Any, cast
 
 import pytest
 import requests
@@ -98,7 +98,7 @@ def ping_game_server(host: str, port: int) -> dict[str, Any]: #pyright: ignore[r
         assert isinstance(result, dict)
         return result #pyright: ignore[reportUnknownVariableType]
 
-def queue_user(token: str, username: str, ws_timeout: float) -> tuple[Literal[False], None] | Literal[True]:
+def queue_user(token: str, username: str, ws_timeout: float) -> bool:
     payload = {}
     match_found = False
     def on_message(_ws: websocket.WebSocketApp, message: str) -> None:
@@ -116,7 +116,7 @@ def queue_user(token: str, username: str, ws_timeout: float) -> tuple[Literal[Fa
     threading.Timer(interval=ws_timeout, function=ws.close).start() #pyright: ignore[reportUnknownMemberType, reportUnknownArgumentType]
     _ = ws.run_forever() #pyright: ignore[reportUnknownMemberType]
     if not match_found:
-        return False, None
+        return False
     
     log(args=[username, ": Queued user payload", payload])
 
