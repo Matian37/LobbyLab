@@ -353,6 +353,8 @@ def test_browser(page: Page) -> None:
 
     form(form_name='Login', input_value='userpassword', fake=False)
 
+    _ = subprocess.run(["sudo", "chmod", "-R", "777", "./data"], check=False)
+
     zip_file_value = ''
     for _ in range(10):
         zip_file_value += str(random.randint(1, 10))
