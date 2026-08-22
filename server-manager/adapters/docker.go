@@ -227,8 +227,6 @@ func (dc *DockerConnection) containerCreateOptions(portMap network.PortMap) clie
 			Env: []string{
 				"LOG_LEVEL=" + dc.config.GameServerLogLevel.String(),
 				"NATS_URI=" + dc.config.BrokerURI,
-				"PORT=" + dc.config.ClientPort.String(),
-				"HOST=" + dc.config.PublicHost,
 			},
 		},
 		HostConfig: &container.HostConfig{
