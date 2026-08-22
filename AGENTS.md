@@ -39,6 +39,7 @@ It handles user login, game server management, and matchmaking logic. Runs every
   - to run specific test use `npm test -- --testNamePattern=<test pattern string>`
   - to run unit tests `npm run test:unit`
   - to run integration tests `npm run test:integration`
+  - to run e2e tests `npm run test:e2e`
 - server-manager:
   - to run specific test `go test -v --tags=<file test tag> -run=<testname> --timeout 1m ./...`
   - to run unit tests `go test -v --timeout 1m ./...`
@@ -46,7 +47,8 @@ It handles user login, game server management, and matchmaking logic. Runs every
   - to run integration tests `go test -v -tags=integration -run="^TestIntegration" --timeout 1m ./...`
   - to run e2e tests `go test -v -tags=e2e -run="^TestE2E" --timeout 3m ./...`
 - game-server:
-  - to run tests `go test -v --timeout 1m ./...`
+  - to run unit tests `go test -v --timeout 1m ./...`
+  - to run e2e tests `go test -v -tags=e2e -run="^TestE2E" --timeout 3m ./...`
 - project:
   - to run basic tests `act`
   - to run specific workflow `act -W ./.github/workflows/<workflowname>`

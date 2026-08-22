@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"server-manager/adapters"
 	"server-manager/internal"
+	"strconv"
 	"sync"
 	"time"
 
@@ -96,12 +97,15 @@ func (wm *WorkerManager) Start(ctx context.Context) error {
 		return fmt.Errorf("failed to remove zombie workers: %w", err)
 	}
 
-	for range wm.workerCount {
-		id, err := wm.dockerConn.SpawnContainer(ctx)
+	for idx := range wm.workerCount {
+		workerID := strconv.Itoa(idx)
+
+		containerID, err := wm.dockerConn.SpawnContainer(ctx, workerID)
 		if err != nil {
 			return fmt.Errorf("%w: %w", ErrFailedToSpawnWorker, err)
 		}
-		wm.workers = append(wm.workers, NewWorker(id, wm.workerMaxPingRetries, wm.workerRestartTimeout))
+		worker := NewWorker(workerID, containerID, wm.workerMaxPingRetries, wm.workerRestartTimeout)
+		wm.workers = append(wm.workers, worker)
 	}
 
 	wm.saveResultChan = make(chan internal.Result, wm.resultChanSize)
@@ -133,10 +137,15 @@ func (wm *WorkerManager) Shutdown() {
 	}
 
 	for _, worker := range wm.workers {
-		wm.logger.Debug("killing worker", "worker", worker.ID)
-		err := wm.dockerConn.KillContainer(context.Background(), worker.ID)
+		wm.logger.Debug("killing worker", "worker", worker.ID, "container", worker.ContainerID)
+		err := wm.dockerConn.RemoveContainer(context.Background(), worker.ContainerID)
 		if err != nil {
-			wm.logger.Error("failed to kill worker", "worker", worker.ID, "error", err)
+			wm.logger.Error(
+				"failed to kill worker",
+				"worker", worker.ID,
+				"container", worker.ContainerID,
+				"error", err,
+			)
 		}
 	}
 
@@ -285,7 +294,7 @@ func (wm *WorkerManager) AssignMatch(ctx context.Context, config internal.MatchC
 		return internal.ServerInfo{}, ErrNoFreeWorker
 	}
 
-	port, err := wm.dockerConn.GetGamePort(ctx, worker.ID)
+	port, err := wm.dockerConn.GetGamePort(ctx, worker.ContainerID)
 	if err != nil {
 		return internal.ServerInfo{}, err
 	}
@@ -326,7 +335,11 @@ func (wm *WorkerManager) handleResults(ctx context.Context) error {
 	if worker != nil {
 		worker.SetFree()
 		wm.newfreeWorker.Signal()
-		wm.logger.Info("worker ready to handle matches", "worker", worker.ID)
+		wm.logger.Info(
+			"worker ready to handle matches",
+			"worker", worker.ID,
+			"container", worker.ContainerID,
+		)
 	} else {
 		wm.logger.Debug("worker not found for match", "matchID", res.MatchID)
 	}
@@ -345,34 +358,50 @@ func (wm *WorkerManager) healthCheck(ctx context.Context) error {
 	defer wm.mu.Unlock()
 
 	for _, worker := range wm.workers {
-		// worker hostnames are short versions of the full container ID
-		// so to match it exactly, we need to shorten the worker ID to 12 characters
-		_, pong := responders[shortenID(worker.ID)]
+		_, pong := responders[worker.ID]
 		worker.HandlePong(pong)
 
 		if worker.IsHealthy() {
 			continue
 		}
 
-		wm.logger.Info("worker unhealthy, restarting", "worker", worker.ID)
+		wm.logger.Info(
+			"worker unhealthy, restarting",
+			"worker", worker.ID,
+			"container", worker.ContainerID,
+		)
 
 		if worker.State == WorkerOccupied {
-			wm.logger.Info("canceling match due to worker's health", "worker", worker.ID, "matchID", worker.matchID)
+			wm.logger.Info(
+				"canceling match due to worker's health",
+				"worker", worker.ID,
+				"container", worker.ContainerID,
+				"matchID", worker.matchID,
+			)
 			wm.saveResultChan <- internal.Result{
 				MatchID: worker.matchID,
 				Success: false,
 				Details: []byte("{}"),
 			}
 		} else {
-			wm.logger.Debug("worker not running any match, skipping match cancelation", "worker", worker.ID)
+			wm.logger.Debug(
+				"worker not running any match, skipping match cancelation",
+				"worker", worker.ID,
+				"container", worker.ContainerID,
+			)
 		}
 
 		stateID := worker.SetRestarting()
 
 		wm.wg.Go(func() {
-			err := wm.restartWorker(ctx, worker, stateID, worker.ID)
+			err := wm.restartWorker(ctx, worker, stateID)
 			if err != nil && !errors.Is(err, ErrWorkerStateChanged) {
-				wm.logger.Error("failed to restart worker", "worker", worker.ID, "error", err)
+				wm.logger.Error(
+					"failed to restart worker",
+					"worker", worker.ID,
+					"container", worker.ContainerID,
+					"error", err,
+				)
 			}
 		})
 	}
@@ -380,8 +409,8 @@ func (wm *WorkerManager) healthCheck(ctx context.Context) error {
 	return nil
 }
 
-func (wm *WorkerManager) restartWorker(ctx context.Context, worker *Worker, restartStateID int, workerID string) error {
-	err := wm.dockerConn.RestartContainer(ctx, workerID)
+func (wm *WorkerManager) restartWorker(ctx context.Context, worker *Worker, restartStateID int) error {
+	err := wm.dockerConn.RestartContainer(ctx, worker.ContainerID)
 	if err != nil {
 		return err
 	}
@@ -415,11 +444,4 @@ func (wm *WorkerManager) getFreeWorker() *Worker {
 		}
 	}
 	return nil
-}
-
-func shortenID(id string) string {
-	if len(id) > 12 {
-		return id[0:12]
-	}
-	return id
 }

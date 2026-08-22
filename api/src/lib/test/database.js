@@ -6,13 +6,21 @@ import postgres from 'postgres';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-export async function setupDatabase() {
+export async function setupDatabase({ port } = {}) {
     console.log('[db] starting container...');
-    const container = await new PostgreSqlContainer('postgres:18.4-alpine')
+
+    let setupContainer = await new PostgreSqlContainer('postgres:18.4-alpine')
         .withUsername('postgres')
         .withPassword('123')
-        .withDatabase('postgres')
-        .start();
+        .withDatabase('postgres');
+    if (port) {
+        setupContainer = setupContainer.withExposedPorts({
+            container: 5432,
+            host: port,
+        });
+    }
+
+    const container = await setupContainer.start();
 
     const databaseUrl = container.getConnectionUri();
     process.env.DATABASE_URL = databaseUrl;

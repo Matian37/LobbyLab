@@ -10,9 +10,9 @@ import (
 type DockerConnection interface {
 	Open(config *EnvConfig) error
 	Close() error
-	SpawnContainer(ctx context.Context) (string, error)
-	RestartContainer(ctx context.Context, id string) error
-	KillContainer(ctx context.Context, id string) error
+	SpawnContainer(ctx context.Context, workerID string) (string, error)
+	RestartContainer(ctx context.Context, containerID string) error
+	RemoveContainer(ctx context.Context, containerID string) error
 	GetGamePort(ctx context.Context, containerID string) (string, error)
 	RemoveZombieWorkers(ctx context.Context) error
 }

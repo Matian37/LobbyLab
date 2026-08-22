@@ -1,3 +1,5 @@
 *.env
 data/
 __pycache__/
+api/test-results/
+api/playwright-report/

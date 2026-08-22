@@ -71,20 +71,6 @@ func (mr *MockDockerConnectionMockRecorder) GetGamePort(ctx, containerID any) *g
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetGamePort", reflect.TypeOf((*MockDockerConnection)(nil).GetGamePort), ctx, containerID)
 }
 
-// KillContainer mocks base method.
-func (m *MockDockerConnection) KillContainer(ctx context.Context, id string) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "KillContainer", ctx, id)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// KillContainer indicates an expected call of KillContainer.
-func (mr *MockDockerConnectionMockRecorder) KillContainer(ctx, id any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "KillContainer", reflect.TypeOf((*MockDockerConnection)(nil).KillContainer), ctx, id)
-}
-
 // Open mocks base method.
 func (m *MockDockerConnection) Open(config *internal.EnvConfig) error {
 	m.ctrl.T.Helper()
@@ -97,6 +83,20 @@ func (m *MockDockerConnection) Open(config *internal.EnvConfig) error {
 func (mr *MockDockerConnectionMockRecorder) Open(config any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Open", reflect.TypeOf((*MockDockerConnection)(nil).Open), config)
+}
+
+// RemoveContainer mocks base method.
+func (m *MockDockerConnection) RemoveContainer(ctx context.Context, containerID string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "RemoveContainer", ctx, containerID)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// RemoveContainer indicates an expected call of RemoveContainer.
+func (mr *MockDockerConnectionMockRecorder) RemoveContainer(ctx, containerID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RemoveContainer", reflect.TypeOf((*MockDockerConnection)(nil).RemoveContainer), ctx, containerID)
 }
 
 // RemoveZombieWorkers mocks base method.
@@ -114,32 +114,32 @@ func (mr *MockDockerConnectionMockRecorder) RemoveZombieWorkers(ctx any) *gomock
 }
 
 // RestartContainer mocks base method.
-func (m *MockDockerConnection) RestartContainer(ctx context.Context, id string) error {
+func (m *MockDockerConnection) RestartContainer(ctx context.Context, containerID string) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "RestartContainer", ctx, id)
+	ret := m.ctrl.Call(m, "RestartContainer", ctx, containerID)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // RestartContainer indicates an expected call of RestartContainer.
-func (mr *MockDockerConnectionMockRecorder) RestartContainer(ctx, id any) *gomock.Call {
+func (mr *MockDockerConnectionMockRecorder) RestartContainer(ctx, containerID any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RestartContainer", reflect.TypeOf((*MockDockerConnection)(nil).RestartContainer), ctx, id)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RestartContainer", reflect.TypeOf((*MockDockerConnection)(nil).RestartContainer), ctx, containerID)
 }
 
 // SpawnContainer mocks base method.
-func (m *MockDockerConnection) SpawnContainer(ctx context.Context) (string, error) {
+func (m *MockDockerConnection) SpawnContainer(ctx context.Context, workerID string) (string, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SpawnContainer", ctx)
+	ret := m.ctrl.Call(m, "SpawnContainer", ctx, workerID)
 	ret0, _ := ret[0].(string)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // SpawnContainer indicates an expected call of SpawnContainer.
-func (mr *MockDockerConnectionMockRecorder) SpawnContainer(ctx any) *gomock.Call {
+func (mr *MockDockerConnectionMockRecorder) SpawnContainer(ctx, workerID any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SpawnContainer", reflect.TypeOf((*MockDockerConnection)(nil).SpawnContainer), ctx)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SpawnContainer", reflect.TypeOf((*MockDockerConnection)(nil).SpawnContainer), ctx, workerID)
 }
 
 // MockBrokerConnection is a mock of BrokerConnection interface.

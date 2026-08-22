@@ -282,9 +282,14 @@ func TestIntegration_DatabaseConnection_AddMatch(t *testing.T) {
 		require.Equal(t, "1234/udp", port)
 
 		var userMatchID int
-		err = d.conn.QueryRow(ctx, "SELECT match_id FROM users WHERE login='user1'").Scan(&userMatchID)
+		var queuedUntil *time.Time
+		err = d.conn.QueryRow(
+			ctx,
+			"SELECT match_id, queued_until FROM users WHERE login='user1'",
+		).Scan(&userMatchID, &queuedUntil)
 		require.NoError(t, err)
-		require.Equal(t, matchID, userMatchID)
+		assert.Equal(t, matchID, userMatchID)
+		require.Nil(t, queuedUntil)
 
 		rows, err := d.conn.Query(ctx, "SELECT user_id, match_id FROM user_matches ORDER BY (user_id, match_id)")
 		require.NoError(t, err)

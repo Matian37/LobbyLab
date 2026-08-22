@@ -10,7 +10,6 @@ import (
 
 func newTestWorkerFree(stateID int) Worker {
 	return Worker{
-		ID:              "test",
 		State:           WorkerFree,
 		stateID:         stateID,
 		stateValidUntil: time.Time{},
@@ -20,7 +19,6 @@ func newTestWorkerFree(stateID int) Worker {
 
 func newTestWorkerOccupied(stateID int, matchID int) Worker {
 	return Worker{
-		ID:              "test",
 		State:           WorkerOccupied,
 		stateID:         stateID,
 		stateValidUntil: time.Time{},
@@ -30,7 +28,6 @@ func newTestWorkerOccupied(stateID int, matchID int) Worker {
 
 func newTestWorkerRestarting(stateID int, now time.Time) Worker {
 	return Worker{
-		ID:              "test",
 		State:           WorkerRestarting,
 		stateID:         stateID,
 		stateValidUntil: now.Add(time.Hour),
@@ -39,10 +36,11 @@ func newTestWorkerRestarting(stateID int, now time.Time) Worker {
 }
 
 func TestNewWorker(t *testing.T) {
-	worker := NewWorker("test-id", 3, 30*time.Second)
+	worker := NewWorker("wid", "cid", 3, 30*time.Second)
 	require.NotNil(t, worker)
 
-	assert.Equal(t, "test-id", worker.ID)
+	assert.Equal(t, "wid", worker.ID)
+	assert.Equal(t, "cid", worker.ContainerID)
 	assert.Equal(t, WorkerFree, worker.State)
 	assert.Equal(t, 3, worker.maxPingRetries)
 	assert.Equal(t, 30*time.Second, worker.restartTimeout)
@@ -325,7 +323,7 @@ func TestWorker_IsHealthy(t *testing.T) {
 
 func TestWorker_LifeCycle(t *testing.T) {
 	t.Run("worker fail limit exceeded", func(t *testing.T) {
-		worker := NewWorker("test", 1, 30*time.Second)
+		worker := NewWorker("wid", "cid", 1, 30*time.Second)
 
 		worker.HandlePong(false)
 		require.True(t, worker.IsHealthy())
@@ -335,14 +333,14 @@ func TestWorker_LifeCycle(t *testing.T) {
 	})
 
 	t.Run("worker no fail limit for restarting", func(t *testing.T) {
-		worker := NewWorker("test", 0, 30*time.Second)
+		worker := NewWorker("wid", "cid", 0, 30*time.Second)
 		worker.SetRestarting()
 		worker.HandlePong(false)
 		assert.True(t, worker.IsHealthy())
 	})
 
 	t.Run("worker fail flow", func(t *testing.T) {
-		worker := NewWorker("test", 0, 1000*time.Hour)
+		worker := NewWorker("wid", "cid", 0, 1000*time.Hour)
 		require.True(t, worker.IsHealthy())
 
 		worker.HandlePong(false)
@@ -353,7 +351,7 @@ func TestWorker_LifeCycle(t *testing.T) {
 	})
 
 	t.Run("stateID increments monotonically", func(t *testing.T) {
-		worker := NewWorker("test", 3, 30*time.Second)
+		worker := NewWorker("wid", "cid", 3, 30*time.Second)
 
 		require.Equal(t, 1, worker.SetOccupied(1))
 		require.Equal(t, 2, worker.SetFree())

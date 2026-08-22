@@ -113,32 +113,32 @@ func (mr *MockBrokerConnectionMockRecorder) SendResult(ctx, matchID, result any)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SendResult", reflect.TypeOf((*MockBrokerConnection)(nil).SendResult), ctx, matchID, result)
 }
 
-// MockServer is a mock of Server interface.
-type MockServer struct {
+// MockExecutor is a mock of Executor interface.
+type MockExecutor struct {
 	ctrl     *gomock.Controller
-	recorder *MockServerMockRecorder
+	recorder *MockExecutorMockRecorder
 	isgomock struct{}
 }
 
-// MockServerMockRecorder is the mock recorder for MockServer.
-type MockServerMockRecorder struct {
-	mock *MockServer
+// MockExecutorMockRecorder is the mock recorder for MockExecutor.
+type MockExecutorMockRecorder struct {
+	mock *MockExecutor
 }
 
-// NewMockServer creates a new mock instance.
-func NewMockServer(ctrl *gomock.Controller) *MockServer {
-	mock := &MockServer{ctrl: ctrl}
-	mock.recorder = &MockServerMockRecorder{mock}
+// NewMockExecutor creates a new mock instance.
+func NewMockExecutor(ctrl *gomock.Controller) *MockExecutor {
+	mock := &MockExecutor{ctrl: ctrl}
+	mock.recorder = &MockExecutorMockRecorder{mock}
 	return mock
 }
 
 // EXPECT returns an object that allows the caller to indicate expected use.
-func (m *MockServer) EXPECT() *MockServerMockRecorder {
+func (m *MockExecutor) EXPECT() *MockExecutorMockRecorder {
 	return m.recorder
 }
 
 // GetResult mocks base method.
-func (m *MockServer) GetResult(ctx context.Context) ([]byte, error) {
+func (m *MockExecutor) GetResult(ctx context.Context) ([]byte, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetResult", ctx)
 	ret0, _ := ret[0].([]byte)
@@ -147,27 +147,27 @@ func (m *MockServer) GetResult(ctx context.Context) ([]byte, error) {
 }
 
 // GetResult indicates an expected call of GetResult.
-func (mr *MockServerMockRecorder) GetResult(ctx any) *gomock.Call {
+func (mr *MockExecutorMockRecorder) GetResult(ctx any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetResult", reflect.TypeOf((*MockServer)(nil).GetResult), ctx)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetResult", reflect.TypeOf((*MockExecutor)(nil).GetResult), ctx)
 }
 
 // Start mocks base method.
-func (m *MockServer) Start(config string, command []string) error {
+func (m *MockExecutor) Start(config string) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Start", config, command)
+	ret := m.ctrl.Call(m, "Start", config)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // Start indicates an expected call of Start.
-func (mr *MockServerMockRecorder) Start(config, command any) *gomock.Call {
+func (mr *MockExecutorMockRecorder) Start(config any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Start", reflect.TypeOf((*MockServer)(nil).Start), config, command)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Start", reflect.TypeOf((*MockExecutor)(nil).Start), config)
 }
 
 // Stop mocks base method.
-func (m *MockServer) Stop(ctx context.Context) error {
+func (m *MockExecutor) Stop(ctx context.Context) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Stop", ctx)
 	ret0, _ := ret[0].(error)
@@ -175,7 +175,7 @@ func (m *MockServer) Stop(ctx context.Context) error {
 }
 
 // Stop indicates an expected call of Stop.
-func (mr *MockServerMockRecorder) Stop(ctx any) *gomock.Call {
+func (mr *MockExecutorMockRecorder) Stop(ctx any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Stop", reflect.TypeOf((*MockServer)(nil).Stop), ctx)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Stop", reflect.TypeOf((*MockExecutor)(nil).Stop), ctx)
 }

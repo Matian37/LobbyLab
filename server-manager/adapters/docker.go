@@ -64,7 +64,7 @@ func (dc *DockerConnection) Open(config *internal.EnvConfig) error {
 	return nil
 }
 
-func (dc *DockerConnection) SpawnContainer(ctx context.Context) (string, error) {
+func (dc *DockerConnection) SpawnContainer(ctx context.Context, workerID string) (string, error) {
 	if !dc.initialized {
 		return "", ErrDockerConnNotInit
 	}
@@ -77,7 +77,7 @@ func (dc *DockerConnection) SpawnContainer(ctx context.Context) (string, error) 
 	timeoutCtx, cancel := context.WithTimeout(ctx, dc.createTimeout)
 	defer cancel()
 
-	res, err := dc.client.ContainerCreate(timeoutCtx, dc.containerCreateOptions(portMap))
+	res, err := dc.client.ContainerCreate(timeoutCtx, dc.containerCreateOptions(portMap, workerID))
 	if err != nil {
 		return "", err
 	}
@@ -94,7 +94,7 @@ func (dc *DockerConnection) SpawnContainer(ctx context.Context) (string, error) 
 	return res.ID, nil
 }
 
-func (dc *DockerConnection) RestartContainer(ctx context.Context, id string) error {
+func (dc *DockerConnection) RestartContainer(ctx context.Context, containerID string) error {
 	if !dc.initialized {
 		return ErrDockerConnNotInit
 	}
@@ -107,7 +107,7 @@ func (dc *DockerConnection) RestartContainer(ctx context.Context, id string) err
 
 	_, err := dc.client.ContainerRestart(
 		timeoutCtx,
-		id,
+		containerID,
 		client.ContainerRestartOptions{Timeout: &dc.containerStopTimeout},
 	)
 	if err != nil {
@@ -116,7 +116,7 @@ func (dc *DockerConnection) RestartContainer(ctx context.Context, id string) err
 	return nil
 }
 
-func (dc *DockerConnection) KillContainer(ctx context.Context, id string) error {
+func (dc *DockerConnection) RemoveContainer(ctx context.Context, containerID string) error {
 	if !dc.initialized {
 		return ErrDockerConnNotInit
 	}
@@ -127,7 +127,11 @@ func (dc *DockerConnection) KillContainer(ctx context.Context, id string) error 
 	timeoutCtx, cancel := context.WithTimeout(ctx, dc.killTimeout)
 	defer cancel()
 
-	_, err := dc.client.ContainerKill(timeoutCtx, id, client.ContainerKillOptions{})
+	_, err := dc.client.ContainerRemove(
+		timeoutCtx,
+		containerID,
+		client.ContainerRemoveOptions{Force: true, RemoveVolumes: true},
+	)
 	if err != nil {
 		return err
 	}
@@ -154,7 +158,15 @@ func (dc *DockerConnection) RemoveZombieWorkers(ctx context.Context) error {
 	}
 
 	for _, c := range containers.Items {
-		if _, err := dc.client.ContainerKill(timeoutCtx, c.ID, client.ContainerKillOptions{}); err != nil {
+		_, err := dc.client.ContainerRemove(
+			timeoutCtx,
+			c.ID,
+			client.ContainerRemoveOptions{
+				Force:         true,
+				RemoveVolumes: true,
+			},
+		)
+		if err != nil {
 			slog.Error("failed to kill zombie container", "id", c.ID, "error", err)
 		}
 	}
@@ -216,7 +228,10 @@ func (dc *DockerConnection) getPorts(ctx context.Context, containerID string) (n
 
 // NOTE: portMap must have unspecified host ports
 // NOTE: due to container spawning nature, logs cannot be attached to compose logs
-func (dc *DockerConnection) containerCreateOptions(portMap network.PortMap) client.ContainerCreateOptions {
+func (dc *DockerConnection) containerCreateOptions(
+	portMap network.PortMap,
+	workerID string,
+) client.ContainerCreateOptions {
 	options := client.ContainerCreateOptions{
 		Image: dc.config.Image,
 		Config: &container.Config{
@@ -227,6 +242,7 @@ func (dc *DockerConnection) containerCreateOptions(portMap network.PortMap) clie
 			Env: []string{
 				"LOG_LEVEL=" + dc.config.GameServerLogLevel.String(),
 				"NATS_URI=" + dc.config.BrokerURI,
+				"WORKER_ID=" + workerID,
 			},
 		},
 		HostConfig: &container.HostConfig{
