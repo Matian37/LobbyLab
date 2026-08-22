@@ -87,7 +87,15 @@ def register_user(username: str) -> str:
     assert isinstance(token, str)
     return token
 
-
+def create_users(number: int) -> tuple[list[str], list[str]]:
+    tokens: list[str] = []
+    usernames: list[str] = []
+    for i in range(number):
+        usernames.append("user" + str(i))
+        tokens.append(register_user(usernames[-1]))
+        assert len(tokens[-1]) > 0
+    return tokens, usernames
+ 
 def ping_game_server(host: str, port: int) -> dict[str, Any]:
     time.sleep(random.random())
     with socket.socket(family=socket.AF_INET, type=socket.SOCK_DGRAM) as sock:
@@ -145,12 +153,7 @@ def queue_user(token: str, username: str, ws_timeout: float) -> bool:
 
 def add_n_users(n: int):
     # registering
-    tokens: list[str] = []
-    usernames: list[str] = []
-    for i in range(n):
-        usernames.append("user" + str(i))
-        tokens.append(register_user(usernames[-1]))
-        assert len(tokens[-1]) > 0
+    (tokens, usernames) = create_users(n)
 
     # should be no results yet
     results = requests.get(
@@ -228,11 +231,7 @@ def test_add_users(n: int) -> None:
 @pytest.mark.parametrize(argnames="kill_before_queue", argvalues=[True, False])
 def test_crash_server_manager(kill_before_queue: bool) -> None:
     # registering
-    tokens: list[str] = []
-    usernames: list[str] = []
-    for i in range(2):
-        usernames.append("user" + str(i))
-        tokens.append(register_user(username=usernames[-1]))
+    tokens, _ = create_users(2)
 
     threads: list[Thread] = []
 
@@ -282,11 +281,7 @@ def test_crash_server_manager(kill_before_queue: bool) -> None:
 @pytest.mark.usefixtures("setup_services")
 def test_crash_game_server() -> None:
     # registering
-    tokens: list[str] = []
-    usernames: list[str] = []
-    for i in range(2):
-        usernames.append("user" + str(i))
-        tokens.append(register_user(username=usernames[-1]))
+    tokens, _ = create_users(2)
 
     threads: list[Thread] = []
 
