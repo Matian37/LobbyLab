@@ -47,7 +47,8 @@ It handles user login, game server management, and matchmaking logic. Runs every
   - to run integration tests `go test -v -tags=integration -run="^TestIntegration" --timeout 1m ./...`
   - to run e2e tests `go test -v -tags=e2e -run="^TestE2E" --timeout 3m ./...`
 - game-server:
-  - to run tests `go test -v --timeout 1m ./...`
+  - to run unit tests `go test -v --timeout 1m ./...`
+  - to run e2e tests `go test -v -tags=e2e -run="^TestE2E" --timeout 3m ./...`
 - project:
   - to run basic tests `act`
   - to run specific workflow `act -W ./.github/workflows/<workflowname>`
