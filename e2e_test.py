@@ -4,6 +4,7 @@ import socket
 import subprocess
 import threading
 import time
+import zipfile
 from collections.abc import Generator
 from subprocess import CompletedProcess
 from threading import Thread
@@ -324,38 +325,49 @@ def test_crash_game_server() -> None:
 def test_browser(page: Page) -> None:
     _ = page.goto("http://localhost:3000")
 
-    #make sure we are in main page and go to login page
-    expect(page.get_by_text('Log out')).to_be_visible()
-    page.get_by_text('Login').click()
+    def form(form_name: str, input_value: str, fake: bool) -> None:
+        #make sure we are in main page and go to form page
+        expect(page.get_by_text('Log out')).to_be_visible()
+        page.get_by_text(form_name).click()
 
-    #make sure we are in login page and try to log in
-    expect(page.get_by_text('Password')).to_be_visible()
-    error_text = page.locator('p')
-    expect(error_text).to_be_hidden()
-    for input in page.get_by_role('textbox').all():
-        input.fill('hej')
-    page.get_by_text('Submit').click()
-    expect(error_text).to_be_visible()
-    page.get_by_text('Back').click()
+        #make sure we are in form page and try to fill form
+        expect(page.get_by_text('Password')).to_be_visible()
+        error_text = page.locator('p')
+        expect(error_text).to_be_hidden()
+        for input in page.get_by_role('textbox').all():
+            input.fill(input_value)
+        page.get_by_text('Submit').click()
+        if fake:
+            expect(error_text).to_be_visible()
+            page.get_by_text('Back').click()
+        else:
+            expect(page.get_by_text('Log out')).to_be_visible()
+            expect(page.get_by_role("heading")).to_have_text(expected=input_value)
 
-    #make sure we are in main page and go to register page
-    expect(page.get_by_text('Log out')).to_be_visible()
-    page.get_by_text('Register').click()
+    form(form_name='Login', input_value='hej', fake=True)
+    form(form_name='Register', input_value='hej', fake=True)
+    form(form_name='Register', input_value='userpassword', fake=False)
 
-    #make sure we are in register page and register
-    expect(page.get_by_text('Password')).to_be_visible()
-    error_text = page.locator('p')
-    expect(error_text).to_be_hidden()
-    for input in page.get_by_role('textbox').all():
-        input.fill('hej')
-    page.get_by_text('Submit').click()
-    expect(error_text).to_be_visible()
-    for input in page.get_by_role('textbox').all():
-        input.fill('userandpassword')
-    page.get_by_text('Submit').click()
-
-    #we should be in main page and logged in
-    expect(page.get_by_text('Log out')).to_be_visible()
-    expect(page.get_by_role("heading")).to_have_text('userandpassword')
     page.get_by_text('Log out').click()
-    expect(page.get_by_role('heading')).to_have_text('Log in')
+    expect(page.get_by_role('heading')).to_have_text(expected='Log in')
+
+    form(form_name='Login', input_value='userpassword', fake=False)
+
+    zip_file_value = ''
+    for _ in range(10):
+        zip_file_value += str(random.randint(1, 10))
+    with open("./data/downloads/game-client.txt", "w") as f:
+        _ = f.write(zip_file_value)
+    with zipfile.ZipFile("./data/downloads/game-client.zip", mode="w", compression=zipfile.ZIP_DEFLATED) as zip_file:
+        zip_file.write("./data/downloads/game-client.txt", arcname="game-client.txt")
+
+    with page.expect_download() as download_info:
+        page.get_by_test_id('download-client').click()
+    download = download_info.value
+
+    download.save_as('./data/hej.zip')
+    with zipfile.ZipFile('./data/hej.zip', 'r') as zip_ref:
+        zip_ref.extractall('./data')
+    with open("./data/game-client.txt", "r") as f:
+        val = f.read()
+        assert val == zip_file_value
