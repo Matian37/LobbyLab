@@ -535,7 +535,7 @@ func TestIntegration_DatabaseConnection_RemoveMatchStatus(t *testing.T) {
 			SELECT
 				login,
 				match_id,
-				queued_until < NOW() AS notQueued,
+				queued_until IS NULL AS notQueued,
 				match_auth_token AS matchAuthToken
 			FROM users
 			ORDER BY login
