@@ -14,7 +14,7 @@ services:
       timeout: 2s
       start_period: 10s
     volumes:
-      - ./data/db:/var/lib/postgresql
+      - postgres_data:/var/lib/postgresql
       - ./init.sql:/docker-entrypoint-initdb.d/init.sql
     networks:
       - db-net
@@ -23,7 +23,7 @@ services:
     image: nats:2.14-alpine
     command: ["-js", "-m", "8222", "-sd", "/data"]
     volumes:
-      - ./data/nats:/data
+      - nats_data:/data
     networks:
       - nats-net
     healthcheck:
@@ -46,7 +46,7 @@ services:
       GAME_CLIENT_FILE: game-client.zip
       DOWNLOADS_DIR: /api/downloads
     volumes:
-      - ./data/downloads:/api/downloads
+      - ${DOWNLOADS_FOLDER}:/api/downloads
     ports:
       - "3000:3000"
     networks:
@@ -94,3 +94,7 @@ networks:
   public-net:
     driver: bridge
     internal: false
+
+volumes:
+  postgres_data:
+  nats_data:
