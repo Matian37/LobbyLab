@@ -258,6 +258,13 @@ func (dc *DatabaseConnection) RemoveMatchStatus(ctx context.Context, matchID int
 }
 
 func (dc *DatabaseConnection) SetupMatchmaking(ctx context.Context) error {
+	if !dc.connOpened {
+		return ErrDBConnNotOpen
+	}
+	if dc.closed {
+		return ErrDBConnClosed
+	}
+
 	tx, err := dc.conn.Begin(ctx)
 	if err != nil {
 		return err
