@@ -6,9 +6,9 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
-	"server-manager/app"
-	"server-manager/config"
-	"server-manager/internal"
+	"github.com/Matian37/multiplayer-asset/server-manager/app"
+	"github.com/Matian37/multiplayer-asset/server-manager/config"
+	"github.com/Matian37/multiplayer-asset/server-manager/internal"
 	"syscall"
 )
 

@@ -2,7 +2,7 @@ package main
 
 import (
 	"context"
-	"game-server/app"
+	"github.com/Matian37/multiplayer-asset/game-server/app"
 	"log/slog"
 	"os"
 	"os/signal"

@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"log/slog"
-	"server-manager/adapters"
-	"server-manager/internal"
+	"github.com/Matian37/multiplayer-asset/server-manager/adapters"
+	"github.com/Matian37/multiplayer-asset/server-manager/internal"
 	"sync"
 	"time"
 

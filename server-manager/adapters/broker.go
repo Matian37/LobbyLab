@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"math"
-	"server-manager/internal"
+	"github.com/Matian37/multiplayer-asset/server-manager/internal"
 	"sync"
 	"time"
 

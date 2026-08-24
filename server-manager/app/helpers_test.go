@@ -3,7 +3,7 @@ package app
 import (
 	"context"
 	"errors"
-	"server-manager/internal/mocks"
+	"github.com/Matian37/multiplayer-asset/server-manager/internal/mocks"
 	"testing"
 	"time"
 

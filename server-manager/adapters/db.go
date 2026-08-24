@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"server-manager/internal"
+	"github.com/Matian37/multiplayer-asset/server-manager/internal"
 
 	"github.com/jackc/pgx/v5"
 )

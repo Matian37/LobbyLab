@@ -11,8 +11,8 @@ import (
 	"testing"
 	"time"
 
-	"server-manager/internal"
-	"server-manager/internal/mocks"
+	"github.com/Matian37/multiplayer-asset/server-manager/internal"
+	"github.com/Matian37/multiplayer-asset/server-manager/internal/mocks"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

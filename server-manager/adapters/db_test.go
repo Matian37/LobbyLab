@@ -6,7 +6,7 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"server-manager/internal"
+	"github.com/Matian37/multiplayer-asset/server-manager/internal"
 	"testing"
 	"time"
 

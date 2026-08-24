@@ -4,8 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"game-server/config"
-	"game-server/internal"
+	"github.com/Matian37/multiplayer-asset/game-server/config"
+	"github.com/Matian37/multiplayer-asset/game-server/internal"
 	"log/slog"
 	"os"
 )

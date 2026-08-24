@@ -1,4 +1,4 @@
-module game-server
+module github.com/Matian37/multiplayer-asset/game-server
 
 go 1.26.3
 

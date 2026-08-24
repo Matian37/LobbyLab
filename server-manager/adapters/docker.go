@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
-	"server-manager/internal"
+	"github.com/Matian37/multiplayer-asset/server-manager/internal"
 	"time"
 
 	"github.com/moby/moby/api/types/container"

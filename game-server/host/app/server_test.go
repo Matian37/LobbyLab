@@ -3,8 +3,8 @@ package app
 import (
 	"context"
 	"errors"
-	"game-server/internal"
-	"game-server/internal/mocks"
+	"github.com/Matian37/multiplayer-asset/game-server/internal"
+	"github.com/Matian37/multiplayer-asset/game-server/internal/mocks"
 	"log/slog"
 	"testing"
 	"time"

@@ -3,7 +3,7 @@ package app
 import (
 	"context"
 	"log/slog"
-	"server-manager/internal"
+	"github.com/Matian37/multiplayer-asset/server-manager/internal"
 )
 
 func Run(ctx context.Context, config *internal.EnvConfig, logger *slog.Logger) error {

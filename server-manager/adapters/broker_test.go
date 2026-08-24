@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"server-manager/internal"
+	"github.com/Matian37/multiplayer-asset/server-manager/internal"
 
 	"github.com/nats-io/nats-server/v2/server"
 	"github.com/nats-io/nats.go"

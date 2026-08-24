@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"game-server/internal"
+	"github.com/Matian37/multiplayer-asset/game-server/internal"
 	"net"
 	"testing"
 	"time"

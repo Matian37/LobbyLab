@@ -5,8 +5,8 @@ import (
 	"errors"
 	"io"
 	"log/slog"
-	"server-manager/internal"
-	"server-manager/internal/mocks"
+	"github.com/Matian37/multiplayer-asset/server-manager/internal"
+	"github.com/Matian37/multiplayer-asset/server-manager/internal/mocks"
 	"testing"
 	"time"
 

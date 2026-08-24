@@ -12,7 +12,7 @@ package mocks
 import (
 	context "context"
 	reflect "reflect"
-	internal "server-manager/internal"
+	internal "github.com/Matian37/multiplayer-asset/server-manager/internal"
 	time "time"
 
 	gomock "go.uber.org/mock/gomock"

@@ -14,8 +14,8 @@ import (
 	"testing"
 	"time"
 
-	"server-manager/app"
-	"server-manager/internal"
+	"github.com/Matian37/multiplayer-asset/server-manager/app"
+	"github.com/Matian37/multiplayer-asset/server-manager/internal"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/moby/moby/api/types/container"
