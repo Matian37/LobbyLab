@@ -535,7 +535,7 @@ func TestIntegration_DatabaseConnection_RemoveMatchStatus(t *testing.T) {
 			SELECT
 				login,
 				match_id,
-				queued_until < NOW() AS notQueued,
+				queued_until IS NULL AS notQueued,
 				match_auth_token AS matchAuthToken
 			FROM users
 			ORDER BY login
@@ -557,6 +557,95 @@ func TestIntegration_DatabaseConnection_RemoveMatchStatus(t *testing.T) {
 			{Login: "user2", MatchID: nil, NotQueued: false, MatchAuthToken: nil},
 			{Login: "user3", MatchID: new(2), NotQueued: false, MatchAuthToken: new("t2")},
 			{Login: "user4", MatchID: nil, NotQueued: true, MatchAuthToken: nil},
+		})
+	})
+}
+
+func TestIntegration_SetupMatchmaking(t *testing.T) {
+	t.Run("not open", func(t *testing.T) {
+		dc := DatabaseConnection{}
+		err := dc.SetupMatchmaking(context.Background())
+		assert.ErrorIs(t, err, ErrDBConnNotOpen)
+	})
+
+	t.Run("closed", func(t *testing.T) {
+		dc := DatabaseConnection{connOpened: true, closed: true}
+		err := dc.SetupMatchmaking(context.Background())
+		assert.ErrorIs(t, err, ErrDBConnClosed)
+	})
+
+	t.Run("success", func(t *testing.T) {
+		restartDB(t)
+
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		helperConn := newHelperConn(t)
+		_, err := helperConn.Exec(ctx,
+			`
+			INSERT INTO matches (id, host, port, active, canceled, results)
+			VALUES
+				(1, '', '', false, true, '{}'),
+				(2, '', '', false, false, '{"example": {"id": 1}}'),
+				(3, '', '', true, false, NULL)
+			`,
+		)
+		require.NoError(t, err)
+
+		_, err = helperConn.Exec(ctx, `
+			INSERT INTO users (login, password, match_id, queued_until, match_auth_token)
+			VALUES
+				('user1', '', 1, NULL, 't1'),
+				('user2', '', NULL, NULL, NULL),
+				('user3', '', NULL, NOW() + INTERVAL '5 hours', NULL)
+		`)
+		require.NoError(t, err)
+
+		d := newDBConnWithOpen(t)
+		require.NoError(t, d.SetupMatchmaking(ctx))
+
+		rows, err := d.conn.Query(
+			ctx, `
+			SELECT
+				login,
+				match_id,
+				queued_until IS NULL AS notQueued,
+				match_auth_token AS matchAuthToken
+			FROM users
+			ORDER BY login
+			`,
+		)
+		require.NoError(t, err)
+
+		type User struct {
+			Login          string
+			MatchID        *int
+			NotQueued      bool
+			MatchAuthToken *string
+		}
+		users, err := pgx.CollectRows(rows, pgx.RowToStructByName[User])
+		require.NoError(t, err)
+		require.Equal(t, users, []User{
+			{Login: "user1", MatchID: nil, NotQueued: true, MatchAuthToken: nil},
+			{Login: "user2", MatchID: nil, NotQueued: true, MatchAuthToken: nil},
+			{Login: "user3", MatchID: nil, NotQueued: true, MatchAuthToken: nil},
+		})
+
+		rows, err = d.conn.Query(ctx, "SELECT id, active, canceled, results::text FROM matches ORDER BY id")
+		require.NoError(t, err)
+
+		type Match struct {
+			ID       int
+			Active   bool
+			Canceled bool
+			Results  *string
+		}
+		matches, err := pgx.CollectRows(rows, pgx.RowToStructByName[Match])
+		require.NoError(t, err)
+		require.Equal(t, matches, []Match{
+			{ID: 1, Active: false, Canceled: true, Results: new("{}")},
+			{ID: 2, Active: false, Canceled: false, Results: new(`{"example": {"id": 1}}`)},
+			{ID: 3, Active: false, Canceled: true, Results: new("{}")},
 		})
 	})
 }

@@ -248,7 +248,7 @@ func (dc *DatabaseConnection) RemoveMatchStatus(ctx context.Context, matchID int
 		UPDATE users
 		SET
 			match_id = NULL,
-			queued_until = NOW() - INTERVAL '5 seconds',
+			queued_until = NULL,
 			match_auth_token = NULL
 		WHERE match_id = $1
 		`,
@@ -258,6 +258,13 @@ func (dc *DatabaseConnection) RemoveMatchStatus(ctx context.Context, matchID int
 }
 
 func (dc *DatabaseConnection) SetupMatchmaking(ctx context.Context) error {
+	if !dc.connOpened {
+		return ErrDBConnNotOpen
+	}
+	if dc.closed {
+		return ErrDBConnClosed
+	}
+
 	tx, err := dc.conn.Begin(ctx)
 	if err != nil {
 		return err
@@ -271,7 +278,7 @@ func (dc *DatabaseConnection) SetupMatchmaking(ctx context.Context) error {
 		UPDATE users
 		SET
 			match_id = NULL,
-			queued_until = NOW() - INTERVAL '5 seconds',
+			queued_until = NULL,
 			match_auth_token = NULL
 		`,
 	)
