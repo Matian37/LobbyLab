@@ -92,7 +92,6 @@ func (m *Matchmaker) Shutdown() {
 }
 
 func (m *Matchmaker) createMatch(ctx context.Context, matchUsers []internal.User) (int, error) {
-	// TODO: pass universal seceret, which distinguish players from unauthorized users
 	gameConfig, err := json.Marshal(struct {
 		Players []internal.User `json:"players"`
 	}{Players: matchUsers})
