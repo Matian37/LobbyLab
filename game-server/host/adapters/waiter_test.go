@@ -59,9 +59,10 @@ func TestCmdWaiter_Wait(t *testing.T) {
 		err := w.Wait(ctx)
 		assert.ErrorIs(t, err, context.Canceled)
 
-		// cleanup so the wait goroutine and sleep process are reaped
-		require.NoError(t, cmd.Process.Kill())
-		require.Error(t, w.Wait(context.Background()))
+		t.Cleanup(func() {
+			require.NoError(t, cmd.Process.Kill())
+			require.Error(t, cmd.Wait())
+		})
 	})
 
 	t.Run("success", func(t *testing.T) {

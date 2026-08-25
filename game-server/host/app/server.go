@@ -4,10 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/Matian37/multiplayer-asset/game-server/adapters"
-	"github.com/Matian37/multiplayer-asset/game-server/internal"
 	"log/slog"
 	"time"
+
+	"github.com/Matian37/multiplayer-asset/game-server/adapters"
+	"github.com/Matian37/multiplayer-asset/game-server/internal"
 
 	"github.com/cenkalti/backoff/v6"
 )

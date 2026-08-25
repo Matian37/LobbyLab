@@ -4,10 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/Matian37/multiplayer-asset/game-server/internal"
 	"net"
 	"testing"
 	"time"
+
+	"github.com/Matian37/multiplayer-asset/game-server/internal"
 
 	"github.com/nats-io/nats-server/v2/server"
 	"github.com/nats-io/nats.go"

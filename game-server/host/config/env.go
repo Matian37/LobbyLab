@@ -3,9 +3,10 @@ package config
 import (
 	"errors"
 	"fmt"
-	"github.com/Matian37/multiplayer-asset/game-server/internal"
 	"log/slog"
 	"os"
+
+	"github.com/Matian37/multiplayer-asset/game-server/internal"
 
 	"github.com/caarlos0/env/v11"
 	"github.com/google/shlex"

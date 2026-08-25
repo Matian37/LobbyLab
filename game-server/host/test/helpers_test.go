@@ -51,8 +51,10 @@ const (
 	healthSubject  = "workers.health"
 	assignSubject  = "workers.assign"
 	resultsSubject = "workers.results"
-	testWorkerID   = "e2e-worker"
 )
+const resultStreamName = "RESULT"
+
+const testWorkerID = "e2e-worker"
 
 func testDataPath(t *testing.T, name gameScript) string {
 	t.Helper()
@@ -92,11 +94,11 @@ func setupNATS(t *testing.T) (nc *nats.Conn, resultSub *nats.Subscription) {
 	addr := fmt.Sprintf("nats://127.0.0.1:%d", s.Addr().(*net.TCPAddr).Port)
 	t.Setenv("NATS_URI", addr)
 
-	nc, resultSub = setupStream(t, addr)
+	nc, resultSub = setupResultStream(t, addr)
 	return
 }
 
-func setupStream(t *testing.T, addr string) (*nats.Conn, *nats.Subscription) {
+func setupResultStream(t *testing.T, addr string) (*nats.Conn, *nats.Subscription) {
 	t.Helper()
 
 	nc, err := nats.Connect(addr)
@@ -109,7 +111,7 @@ func setupStream(t *testing.T, addr string) (*nats.Conn, *nats.Subscription) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	_, err = js.CreateStream(ctx, jetstream.StreamConfig{
-		Name:     "RESULT",
+		Name:     resultStreamName,
 		Subjects: []string{resultsSubject},
 	})
 	require.NoError(t, err)
@@ -154,7 +156,7 @@ func startApp(t *testing.T, script gameScript) (context.CancelFunc, chan error) 
 	return cancel, res
 }
 
-func waitForWorkerReady(t *testing.T, nc *nats.Conn) {
+func waitForAppStart(t *testing.T, nc *nats.Conn) {
 	t.Helper()
 	require.Eventually(t, func() bool {
 		msg, err := nc.Request(healthSubject, nil, 500*time.Millisecond)
@@ -225,7 +227,7 @@ func assignMatch(t *testing.T, nc *nats.Conn, matchID int, config json.RawMessag
 	require.NoError(t, err, "worker should acknowledge match assignment")
 }
 
-func expectResult(t *testing.T, sub *nats.Subscription) internal.Result {
+func requireResult(t *testing.T, sub *nats.Subscription) internal.Result {
 	t.Helper()
 	msg, err := sub.NextMsg(15 * time.Second)
 	require.NoError(t, err, "timed out waiting for match result")
@@ -235,17 +237,17 @@ func expectResult(t *testing.T, sub *nats.Subscription) internal.Result {
 	return r
 }
 
-func requireSuccessResult(t *testing.T, r internal.Result, matchID int, details string) {
+func requireSuccessResult(t *testing.T, r internal.Result, wantMatchID int, wantDetails string) {
 	t.Helper()
 	assert.True(t, r.Success)
-	assert.Equal(t, matchID, r.MatchID)
-	assert.JSONEq(t, details, string(r.Details))
+	assert.Equal(t, wantMatchID, r.MatchID)
+	assert.JSONEq(t, wantDetails, string(r.Details))
 }
 
-func requireCancelResult(t *testing.T, r internal.Result, matchID int) {
+func requireCancelResult(t *testing.T, r internal.Result, wantMatchID int) {
 	t.Helper()
 	assert.False(t, r.Success)
-	assert.Equal(t, matchID, r.MatchID)
+	assert.Equal(t, wantMatchID, r.MatchID)
 	assert.JSONEq(t, "{}", string(r.Details))
 }
 

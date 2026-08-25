@@ -22,10 +22,10 @@ func Run(ctx context.Context) error {
 	serverLogger.Info("starting...")
 
 	server := NewServer(cfg.BrokerURI, cfg.WorkerID, cfg.GameServerArgs, logger)
-	return run(ctx, server, serverLogger)
+	return runServer(ctx, server, serverLogger)
 }
 
-func run(ctx context.Context, server *Server, logger *slog.Logger) error {
+func runServer(ctx context.Context, server *Server, logger *slog.Logger) error {
 	logger.Debug("opening server...")
 
 	if err := server.Open(); err != nil {

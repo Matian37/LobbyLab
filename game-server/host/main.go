@@ -2,11 +2,12 @@ package main
 
 import (
 	"context"
-	"github.com/Matian37/multiplayer-asset/game-server/app"
 	"log/slog"
 	"os"
 	"os/signal"
 	"syscall"
+
+	"github.com/Matian37/multiplayer-asset/game-server/app"
 )
 
 func main() {

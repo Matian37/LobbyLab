@@ -23,7 +23,7 @@ func TestRun(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		cancel()
 
-		assert.NoError(t, run(ctx, server, logger))
+		assert.NoError(t, runServer(ctx, server, logger))
 	})
 
 	t.Run("open error", func(t *testing.T) {
@@ -31,7 +31,7 @@ func TestRun(t *testing.T) {
 		expectedErr := errors.New("")
 		mockConn.EXPECT().Open(server.initTimeout).Return(expectedErr)
 
-		assert.ErrorIs(t, run(context.Background(), server, logger), expectedErr)
+		assert.ErrorIs(t, runServer(context.Background(), server, logger), expectedErr)
 	})
 
 	t.Run("run error", func(t *testing.T) {
@@ -43,6 +43,6 @@ func TestRun(t *testing.T) {
 		ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(-time.Second))
 		defer cancel()
 
-		assert.ErrorIs(t, run(ctx, server, logger), context.DeadlineExceeded)
+		assert.ErrorIs(t, runServer(ctx, server, logger), context.DeadlineExceeded)
 	})
 }
