@@ -106,7 +106,7 @@ The Go wrapper launches your game server as a child process and passes two comma
   {"winner": "player1", "score": 10}
   ```
 
-Your game server must read `--match-config` at startup, run the match, write results to `--match-result`, and then exit.
+Your game server must read `--match-config` at startup, run the match, write results to `--match-result`, and then exit with zero status code.
 
 ### 3. Docker Compose (compose.yaml)
 
