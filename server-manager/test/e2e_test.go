@@ -216,6 +216,21 @@ func checkErrChan(t *testing.T, errChan chan error) {
 	}
 }
 
+func newGeneralConfig(workerCount int, natsURI string) *internal.EnvConfig {
+	return &internal.EnvConfig{
+		Image:                  "busybox:latest",
+		Workercount:            workerCount,
+		ExposePorts:            network.PortSet{network.MustParsePort("8080"): {}},
+		ClientPort:             network.MustParsePort("8080"),
+		BrokerURI:              natsURI,
+		BrokerNetworkName:      "bridge", // prevents docker network not found errors
+		PublicHost:             "127.0.0.1",
+		DatabaseURI:            dbConnString,
+		PlayersPerRoom:         2,
+		TestMakeContainerDummy: true,
+	}
+}
+
 func waitForAppStart(t *testing.T, started *atomic.Bool, appResChan chan error) {
 	t.Helper()
 
@@ -290,19 +305,7 @@ func TestE2E_GracefulShutdown(t *testing.T) {
 	workerCount := 2
 	natsURI, started, errChan := setupTestEnvironment(t, workerCount)
 
-	cfg := &internal.EnvConfig{
-		Image:                  "busybox:latest",
-		Workercount:            workerCount,
-		ExposePorts:            network.PortSet{network.MustParsePort("8080"): {}},
-		ClientPort:             network.MustParsePort("8080"),
-		BrokerURI:              natsURI,
-		BrokerNetworkName:      "bridge", // prevents docker network not found errors
-		PublicHost:             "127.0.0.1",
-		DatabaseURI:            dbConnString,
-		PlayersPerRoom:         2,
-		TestMakeContainerDummy: true,
-	}
-
+	cfg := newGeneralConfig(workerCount, natsURI)
 	appResult := runApp(t, ctx, cfg)
 
 	waitForAppStart(t, started, appResult)
@@ -364,22 +367,11 @@ func TestE2E_RemoveZombieWorkers(t *testing.T) {
 	workerCount := 1
 	natsURI, started, errChan := setupTestEnvironment(t, workerCount)
 
-	cfg := &internal.EnvConfig{
-		Image:                  "busybox:latest",
-		Workercount:            workerCount,
-		ExposePorts:            network.PortSet{network.MustParsePort("8080"): {}},
-		ClientPort:             network.MustParsePort("8080"),
-		BrokerURI:              natsURI,
-		BrokerNetworkName:      "bridge", // prevents docker network not found errors
-		PublicHost:             "127.0.0.1",
-		DatabaseURI:            dbConnString,
-		PlayersPerRoom:         2,
-		TestMakeContainerDummy: true,
-	}
-
 	zombieID := runZombieContainer(t, ctx)
 
+	cfg := newGeneralConfig(workerCount, natsURI)
 	appResult := runApp(t, ctx, cfg)
+
 	waitForAppStart(t, started, appResult)
 
 	cli, err := client.New()
@@ -412,19 +404,7 @@ func TestE2E_AppLifecycle(t *testing.T) {
 	workerCount := 1
 	natsURI, started, errChan := setupTestEnvironment(t, workerCount)
 
-	cfg := &internal.EnvConfig{
-		Image:                  "busybox:latest",
-		Workercount:            workerCount,
-		ExposePorts:            network.PortSet{network.MustParsePort("8080"): {}},
-		ClientPort:             network.MustParsePort("8080"),
-		BrokerURI:              natsURI,
-		BrokerNetworkName:      "bridge", // prevents docker network not found errors
-		PublicHost:             "127.0.0.1",
-		DatabaseURI:            dbConnString,
-		PlayersPerRoom:         2,
-		TestMakeContainerDummy: true,
-	}
-
+	cfg := newGeneralConfig(workerCount, natsURI)
 	appResult := runApp(t, ctx, cfg)
 
 	dbConn, err := pgx.Connect(ctx, dbConnString)
@@ -557,19 +537,7 @@ func TestE2E_WorkersOverloadWithMatches(t *testing.T) {
 	workerCount := 2
 	natsURI, started, errChan := setupTestEnvironment(t, workerCount)
 
-	cfg := &internal.EnvConfig{
-		Image:                  "busybox:latest",
-		Workercount:            workerCount,
-		ExposePorts:            network.PortSet{network.MustParsePort("8080"): {}},
-		ClientPort:             network.MustParsePort("8080"),
-		BrokerURI:              natsURI,
-		BrokerNetworkName:      "bridge", // prevents docker network not found errors
-		PublicHost:             "127.0.0.1",
-		DatabaseURI:            dbConnString,
-		PlayersPerRoom:         2,
-		TestMakeContainerDummy: true,
-	}
-
+	cfg := newGeneralConfig(workerCount, natsURI)
 	appResult := runApp(t, ctx, cfg)
 
 	dbConn, err := pgx.Connect(ctx, dbConnString)
@@ -687,19 +655,7 @@ func TestE2E_WorkerFailureAndRestart(t *testing.T) {
 	workerCount := 1
 	natsURI, started, errChan := setupTestEnvironment(t, workerCount)
 
-	cfg := &internal.EnvConfig{
-		Image:                  "busybox:latest",
-		Workercount:            workerCount,
-		ExposePorts:            network.PortSet{network.MustParsePort("8080"): {}},
-		ClientPort:             network.MustParsePort("8080"),
-		BrokerURI:              natsURI,
-		BrokerNetworkName:      "bridge", // prevents docker network not found errors
-		PublicHost:             "127.0.0.1",
-		DatabaseURI:            dbConnString,
-		PlayersPerRoom:         2,
-		TestMakeContainerDummy: true,
-	}
-
+	cfg := newGeneralConfig(workerCount, natsURI)
 	appResult := runApp(t, ctx, cfg)
 
 	dbConn, err := pgx.Connect(ctx, dbConnString)
@@ -804,19 +760,7 @@ func TestE2E_NoMatchWithoutEnoughPlayers(t *testing.T) {
 	workerCount := 1
 	natsURI, started, errChan := setupTestEnvironment(t, workerCount)
 
-	cfg := &internal.EnvConfig{
-		Image:                  "busybox:latest",
-		Workercount:            workerCount,
-		ExposePorts:            network.PortSet{network.MustParsePort("8080"): {}},
-		ClientPort:             network.MustParsePort("8080"),
-		BrokerURI:              natsURI,
-		BrokerNetworkName:      "bridge", // prevents docker network not found errors
-		PublicHost:             "127.0.0.1",
-		DatabaseURI:            dbConnString,
-		PlayersPerRoom:         2,
-		TestMakeContainerDummy: true,
-	}
-
+	cfg := newGeneralConfig(workerCount, natsURI)
 	appResult := runApp(t, ctx, cfg)
 
 	dbConn, err := pgx.Connect(ctx, dbConnString)
