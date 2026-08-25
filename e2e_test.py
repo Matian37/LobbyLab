@@ -1,5 +1,6 @@
 import json
 import logging
+import os
 import random
 import shutil
 import socket
@@ -22,6 +23,7 @@ GAME_SERVER_COUNT = 2
 PLAYERS_PER_ROOM = 2
 GAME_SERVER_IMAGE = "game-server:latest"
 GAME_CLIENT_FILENAME = "game-client.zip"
+PROJECT_FOLDER = os.path.dirname(os.path.abspath(__file__))
 
 logger = logging.getLogger(__name__)
 
@@ -30,12 +32,13 @@ def start_services(downloads_folder: str) -> None:
     _ = subprocess.run(
         ["make", "up", "UP_ARGS=-d"],
         check=True,
-        env={"DOWNLOADS_FOLDER": downloads_folder},
+        env={**os.environ,"DOWNLOADS_FOLDER": downloads_folder},
+        cwd=PROJECT_FOLDER,
     )
 
 
 def stop_services(fail_on_game_server: bool = False) -> None:
-    _ = subprocess.run(["make", "down", "DOWN_ARGS=-t 10 -v"], check=True)
+    _ = subprocess.run(["make", "down", "DOWN_ARGS=-t 10 -v"], check=True, cwd=PROJECT_FOLDER,)
 
     images = get_containers_by_image(GAME_SERVER_IMAGE)
     kill_containers(images)
@@ -55,7 +58,7 @@ def wait_for_log(
         cmd += ["--since", since.isoformat()]
 
     while time.time() - start < timeout:
-        result = subprocess.run(cmd, capture_output=True, text=True, check=False)
+        result = subprocess.run(cmd, capture_output=True, text=True, check=False, cwd=PROJECT_FOLDER,)
         if target in result.stdout:
             return
         time.sleep(0.5)
@@ -64,7 +67,7 @@ def wait_for_log(
 
 
 def stream_logs() -> subprocess.Popen:
-    return subprocess.Popen(["make", "logs", "LOG_ARGS=-f"])
+    return subprocess.Popen(["make", "logs", "LOG_ARGS=-f"], cwd=PROJECT_FOLDER,)
 
 
 def wait_for_server_manager(since: datetime | None = None) -> None:
@@ -113,13 +116,13 @@ def restart_containers(containers: list[str]) -> None:
 
     for c in containers:
         logger.info("restarting container %s", c)
-        _ = subprocess.run(["docker", "start", c], check=True)
+        _ = subprocess.run(["docker", "start", c], check=True, cwd=PROJECT_FOLDER,)
 
 
 def kill_containers(containers: list[str]) -> None:
     for c in containers:
         logger.info("killing container %s", c)
-        _ = subprocess.run(["docker", "kill", c], check=True)
+        _ = subprocess.run(["docker", "kill", c], check=True, cwd=PROJECT_FOLDER,)
 
 
 def get_containers_by_image(image: str) -> list[str]:
@@ -128,6 +131,7 @@ def get_containers_by_image(image: str) -> list[str]:
         capture_output=True,
         text=True,
         check=True,
+        cwd=PROJECT_FOLDER,
     )
     return result.stdout.strip().splitlines()
 
