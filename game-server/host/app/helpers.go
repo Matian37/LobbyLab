@@ -7,6 +7,8 @@ import (
 	"github.com/cenkalti/backoff/v6"
 )
 
+// If the error is nil, resets the backoff;
+// otherwise waits for the value of the next backoff interval.
 func HandleBackoff(ctx context.Context, b backoff.BackOff, err error) {
 	if err == nil {
 		b.Reset()

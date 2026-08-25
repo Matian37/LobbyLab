@@ -1,5 +1,10 @@
 //go:build e2e
 
+// End-to-end tests for the game server.
+//
+// Tests use scripts inside the testdata directory for actual game servers.
+// Some of them use SCRIPT_PID_FILE environment var to provide information
+// about his and child process IDs to tests.
 package main
 
 import (
@@ -90,6 +95,7 @@ func TestE2E_ConfigParsingFailure(t *testing.T) {
 	}
 }
 
+// Verifies that match is processed successfully and result is published.
 func TestE2E_SuccessfulMatch(t *testing.T) {
 	verifyNoGoroutineLeaks(t)
 
@@ -123,6 +129,8 @@ func TestE2E_GameServerFailureCancelsMatch(t *testing.T) {
 	requirePingerOK(t, pingerErrChan)
 }
 
+// Verifies that a game server which writes an invalid result
+// causes the match to be canceled and a cancel result to be published.
 func TestE2E_InvalidResultCancelsMatch(t *testing.T) {
 	verifyNoGoroutineLeaks(t)
 
@@ -138,6 +146,7 @@ func TestE2E_InvalidResultCancelsMatch(t *testing.T) {
 	requirePingerOK(t, pingerErrChan)
 }
 
+// Verifies that an assignment with invalid JSON is not acknowledged to broker.
 func TestE2E_InvalidAssignmentCancelsMatch(t *testing.T) {
 	verifyNoGoroutineLeaks(t)
 
@@ -243,6 +252,7 @@ func TestE2E_GracefulShutdownWithHangingMatch(t *testing.T) {
 	requirePingerOK(t, pingerErrChan)
 }
 
+// Runs a sequence of matches with different outcomes to test the application's behavior.
 func TestE2E_MultipleMatchesMixedOutcomes(t *testing.T) {
 	verifyNoGoroutineLeaks(t)
 

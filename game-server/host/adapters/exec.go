@@ -20,6 +20,17 @@ var (
 	ErrExecutorAlreadyActive   = errors.New("executor already active")
 )
 
+// Executor implements internal.Executor, which manages the life cycle of the
+// actual game server process.
+//
+// When started it creates two temporary files: one for the match configuration and one
+// for the result. It injects them into the command line arguments before launching
+// the game server (--match-config <path> and --match-result <path>).
+// Configuration file is for actual game server to read from and result file to write to.
+//
+// Match is finished when game server exits and nonzero exit code indicates a failure.
+//
+// Executor can be started again after stopping. It's reusable.
 type Executor struct {
 	cmdArgs []string
 	logger  *slog.Logger
@@ -41,8 +52,8 @@ func NewExecutor(cmdArgs []string, logger *slog.Logger) *Executor {
 	}
 }
 
-// starts the executor with given command
-// NOTE: requires command to be non-empty
+// Launches the configured game server process with the given configuration.
+// Function returns error when the executor is already active.
 func (s *Executor) Start(config string) error {
 	if s.active {
 		return ErrExecutorAlreadyActive
@@ -82,6 +93,7 @@ func (s *Executor) Start(config string) error {
 	return nil
 }
 
+// Stops the running game server process and cleans up resources.
 func (s *Executor) Stop(ctx context.Context) error {
 	if !s.active {
 		return ErrExecutorNotActive
@@ -111,6 +123,13 @@ func (s *Executor) Stop(ctx context.Context) error {
 	return returnErr
 }
 
+// Stops the running game server process.
+//
+// It sends SIGTERM to the process and waits for it to exit.
+// After that it sends SIGKILL to the process group to kill leftover children.
+// However, if the context is canceled, it sends SIGKILL immediately instead.
+//
+// Returns process exit error or nil if the process does not exist.
 func (s *Executor) stopCommand(ctx context.Context) error {
 	if s.cmd == nil || s.cmd.Process == nil {
 		return nil
@@ -132,6 +151,7 @@ func (s *Executor) stopCommand(ctx context.Context) error {
 	}
 }
 
+// Blocks until the process exits, then reads the result file and returns its content.
 func (s *Executor) GetResult(ctx context.Context) ([]byte, error) {
 	if !s.active {
 		return []byte{}, ErrExecutorNotActive
@@ -152,6 +172,7 @@ func (s *Executor) GetResult(ctx context.Context) ([]byte, error) {
 	return result, nil
 }
 
+// createTempFile creates a uniquely named temporary file for specific subname
 func createTempFile(subname string) (*os.File, error) {
 	configFile, err := os.CreateTemp("", fmt.Sprintf("game-server-%v-*", subname))
 	if err != nil {
@@ -160,6 +181,8 @@ func createTempFile(subname string) (*os.File, error) {
 	return configFile, nil
 }
 
+// generateCommand returns the command with the config and result file paths
+// appended as --match-config and --match-result flags.
 func generateCommand(cmdArgs []string, configFileName string, resultFileName string) []string {
 	return append(slices.Clone(cmdArgs),
 		"--match-config", configFileName,
@@ -167,6 +190,7 @@ func generateCommand(cmdArgs []string, configFileName string, resultFileName str
 	)
 }
 
+// removeFile closes and deletes a file, on each failure it logs a warning.
 func removeFile(file *os.File, name string, logger *slog.Logger) {
 	if err := file.Close(); err != nil {
 		logger.Warn(

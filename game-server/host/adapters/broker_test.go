@@ -176,7 +176,7 @@ func TestNATSConnection_Open(t *testing.T) {
 	t.Run("partial opening", func(t *testing.T) {
 		addr := newNATSServer(t)
 
-		// space in workerID triggers error in subscribeAssign
+		// Space in workerID triggers error in subscribeAssign
 		c := NewConnection(addr, "a b", testLogger)
 		assert.ErrorIs(t, c.Open(150*time.Millisecond), nats.ErrBadSubject)
 

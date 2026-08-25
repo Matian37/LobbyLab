@@ -1,3 +1,7 @@
+// Package config loads the game-server configuration.
+//
+// Configuration comes from two sources: required environment variables
+// and the single command-line argument that holds the game server command.
 package config
 
 import (
@@ -28,6 +32,11 @@ func parseLogLevel(value string) (slog.Level, error) {
 	return level, nil
 }
 
+// Extracts the game server command from the command-line arguments.
+// Exactly one argument is expected: the shell command passed after the binary
+// name.
+//
+// Returns the parsed command arguments or an error.
 func parseArgs(args []string) ([]string, error) {
 	if len(args) != 2 {
 		return []string{}, fmt.Errorf("expected 1 argument, got %v", len(args)-1)

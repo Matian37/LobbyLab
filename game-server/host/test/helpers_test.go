@@ -29,9 +29,10 @@ import (
 	"go.uber.org/goleak"
 )
 
-// gameScript identifies a game server script under testdata.
+// gameScript identifies a game server script in testdata folder.
 type gameScript string
 
+// Scripts used for setting behavior of actual game server.
 const (
 	scriptSuccess                  gameScript = "success.sh"
 	scriptFail                     gameScript = "fail.sh"
@@ -47,6 +48,7 @@ func verifyNoGoroutineLeaks(t *testing.T) {
 	t.Cleanup(func() { goleak.VerifyNone(t, goleak.IgnoreCurrent()) })
 }
 
+// Subjects used for NATS communication.
 const (
 	healthSubject  = "workers.health"
 	assignSubject  = "workers.assign"
@@ -54,8 +56,10 @@ const (
 )
 const resultStreamName = "RESULT"
 
+// ID assigned to the test worker
 const testWorkerID = "e2e-worker"
 
+// Returns the path to a test data file for the given game script.
 func testDataPath(t *testing.T, name gameScript) string {
 	t.Helper()
 	_, filename, _, ok := runtime.Caller(0)
@@ -63,6 +67,8 @@ func testDataPath(t *testing.T, name gameScript) string {
 	return filepath.Join(filepath.Dir(filename), "testdata", string(name))
 }
 
+// Sets the command line arguments for the test
+// and restores them after the test.
 func setArgs(t *testing.T, args []string) {
 	t.Helper()
 	original := os.Args
@@ -123,6 +129,9 @@ func setupResultStream(t *testing.T, addr string) (*nats.Conn, *nats.Subscriptio
 	return nc, sub
 }
 
+// Starts game-server application and setup cleanup for it
+// Returns cancel function which can be used to stop the application
+// Also returns a channel which will receive any errors that occur during shutdown
 func startApp(t *testing.T, script gameScript) (context.CancelFunc, chan error) {
 	t.Helper()
 
@@ -156,6 +165,10 @@ func startApp(t *testing.T, script gameScript) (context.CancelFunc, chan error) 
 	return cancel, res
 }
 
+// Waits for the application to start.
+//
+// Note: It does it by waiting for a response to a repeated ping request.
+// So if there are breaking changes for the health check, this function may need to be updated.
 func waitForAppStart(t *testing.T, nc *nats.Conn) {
 	t.Helper()
 	require.Eventually(t, func() bool {
@@ -164,6 +177,8 @@ func waitForAppStart(t *testing.T, nc *nats.Conn) {
 	}, 10*time.Second, 100*time.Millisecond, "worker should start and anwsers pings")
 }
 
+// Starts a health ping goroutine that sends repeated health check requests to app.
+// Returns a channel that will receive any errors that occur during pinging.
 func startHealthPinger(t *testing.T, nc *nats.Conn) chan error {
 	t.Helper()
 	done := make(chan struct{})
@@ -181,6 +196,9 @@ func startHealthPinger(t *testing.T, nc *nats.Conn) chan error {
 	return errCh
 }
 
+// Sends repeated health check requests to app.
+// errCh is used to receive any errors that occur during pinging.
+// done channel is used for stopping the pinger. Close done to stop the pinger.
 func healthPinger(t *testing.T, done chan struct{}, nc *nats.Conn, errCh chan error) {
 	t.Helper()
 
@@ -207,6 +225,7 @@ func healthPinger(t *testing.T, done chan struct{}, nc *nats.Conn, errCh chan er
 	}
 }
 
+// Checks if pinger did not find any errors.
 func requirePingerOK(t *testing.T, errChan chan error) {
 	t.Helper()
 
@@ -217,6 +236,7 @@ func requirePingerOK(t *testing.T, errChan chan error) {
 	}
 }
 
+// Sends a match assignment request to the NATS server.
 func assignMatch(t *testing.T, nc *nats.Conn, matchID int, config json.RawMessage) {
 	t.Helper()
 
@@ -227,6 +247,8 @@ func assignMatch(t *testing.T, nc *nats.Conn, matchID int, config json.RawMessag
 	require.NoError(t, err, "worker should acknowledge match assignment")
 }
 
+// Waits for a match result from the NATS server.
+// If not found within timeout, fails the test.
 func requireResult(t *testing.T, sub *nats.Subscription) internal.Result {
 	t.Helper()
 	msg, err := sub.NextMsg(15 * time.Second)
@@ -274,6 +296,7 @@ func readPIDsFrom(t *testing.T, pidFile string) []int {
 	return pids
 }
 
+// Waits for the game server to record all of its PIDs in the given file.
 func waitForScriptPIDs(t *testing.T, pidFile string, count int) []int {
 	t.Helper()
 	var pids []int
@@ -293,6 +316,9 @@ func requireProcessesGone(t *testing.T, pids []int) {
 	}
 }
 
+// Sets up a temporary PID file environment variable and returns the filepath to it.
+// The PID environment var is used by the scripts to record their PIDs.
+// Everything is cleaned up automatically.
 func setupPidFile(t *testing.T) string {
 	t.Helper()
 

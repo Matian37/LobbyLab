@@ -57,6 +57,7 @@ func TestRemoveFile(t *testing.T) {
 
 func TestKillProcessGroup(t *testing.T) {
 	t.Run("kills group but leaves different one", func(t *testing.T) {
+		// Waits for cmd to stop with timeout
 		waitWithTimeout := func(cmd *exec.Cmd) {
 			t.Helper()
 			done := make(chan error, 1)
@@ -85,11 +86,12 @@ func TestKillProcessGroup(t *testing.T) {
 		waitWithTimeout(leader)
 		waitWithTimeout(member)
 
+		// Process group should be gone
 		assert.Eventually(t, func() bool {
 			return errors.Is(syscall.Kill(-group, 0), syscall.ESRCH)
 		}, 1*time.Second, 20*time.Millisecond)
 
-		// outsider in a different group is left untouched
+		// Outsider in a different group is left untouched
 		assert.NoError(t, syscall.Kill(-outsider.Process.Pid, 0))
 		_ = outsider.Process.Kill()
 		waitWithTimeout(outsider)
@@ -208,7 +210,7 @@ func TestExecutor_Stop(t *testing.T) {
 
 		pgid := exc.pgid
 
-		// wait for script to send signal to inform that he now ignores SIGTERM
+		// Wait for script to send signal to inform that he now ignores SIGTERM
 		ready := make(chan os.Signal, 1)
 		signal.Notify(ready, syscall.SIGUSR1)
 		<-ready
@@ -229,12 +231,12 @@ func TestExecutor_Stop(t *testing.T) {
 		pgid := exc.cmd.Process.Pid
 		require.NoError(t, exc.cmd.Wait())
 
-		// assert child is alive
+		// Assert that child is alive
 		assert.NoError(t, syscall.Kill(-pgid, 0))
 
 		require.NoError(t, exc.Stop(context.Background()))
 
-		// wait for the process group to be gone
+		// Wait for the process group to be gone
 		assert.Eventually(t, func() bool {
 			err := syscall.Kill(-pgid, 0)
 			return errors.Is(err, syscall.ESRCH)
