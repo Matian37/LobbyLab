@@ -88,25 +88,29 @@ Open `game-server/Dockerfile`. The build uses a two-stage Dockerfile:
 
 The Go wrapper launches your game server as a child process and passes two command-line flags:
 
-- `--match-config <path>` — Path to a JSON file containing the match configuration. By default the `config` field contains the list of matched players with their logins and authorization tokens:
+- `--match-config <path>` — Path to a JSON file containing the match configuration. By default the `players` field contains the list of matched players with their logins and authorization tokens:
   ```json
   {
-    "matchID": 1234,
-    "config": {
-      "players": [
-        {"login": "user1", "matchAuthToken": "a3B2cD1eF4gH5iJ6kL7mN8oP9qR0sT1uV2wX3yZ4="},
-        {"login": "user2", "matchAuthToken": "b4C5dE6fG7hI8jK9lM0nO1pQ2rS3tU4vW5xY6zA7="}
-      ]
-    }
+    "players": [
+      {"login": "user1", "matchAuthToken": "a3B2cD1eF4gH5iJ6kL7mN8oP9qR0sT1uV2wX3yZ4="},
+      {"login": "user2", "matchAuthToken": "b4C5dE6fG7hI8jK9lM0nO1pQ2rS3tU4vW5xY6zA7="}
+    ]
   }
   ```
-  You can extend `config` with additional fields when adding players to the waiting queue.
+  You can add additional fields, but this requires you to modify code which builds the match configuration in server-manager.
+
 - `--match-result <path>` — Path where your game server **must write** the match result as a JSON file before exiting. Example:
   ```json
-  {"winner": "player1", "score": 10}
+  {"winner": "player1", "players": ["player1", "player2"]}
   ```
+  Currently API expects details in above format; to use your own you must modify part of code where the API displays details on page.
 
-Your game server must read `--match-config` at startup, run the match, write results to `--match-result`, and then exit with zero status code.
+Your game server must read `--match-config` at startup, run the match, write results to `--match-result`, and then exit with zero status code. However, on failure, exit with a nonzero status code. The server manager will then mark the match as canceled.
+
+Game server also needs to handle the following responsibilities:
+1. Authenticate each user using the `matchAuthToken` provided in the match configuration.
+2. Handle players attempting to reconnect.
+3. Wait for players, and exit with a nonzero status code if not enough join within a set timeout.
 
 ### 3. Docker Compose (compose.yaml)
 
