@@ -216,6 +216,21 @@ func checkErrChan(t *testing.T, errChan chan error) {
 	}
 }
 
+func newGeneralConfig(workerCount int, natsURI string) *internal.EnvConfig {
+	return &internal.EnvConfig{
+		Image:                  "busybox:latest",
+		Workercount:            workerCount,
+		ExposePorts:            network.PortSet{network.MustParsePort("8080"): {}},
+		ClientPort:             network.MustParsePort("8080"),
+		BrokerURI:              natsURI,
+		BrokerNetworkName:      "bridge", // prevents docker network not found errors
+		PublicHost:             "127.0.0.1",
+		DatabaseURI:            dbConnString,
+		PlayersPerRoom:         2,
+		TestMakeContainerDummy: true,
+	}
+}
+
 func waitForAppStart(t *testing.T, started *atomic.Bool, appResChan chan error) {
 	t.Helper()
 
@@ -265,11 +280,16 @@ func runApp(t *testing.T, ctx context.Context, cfg *internal.EnvConfig) chan err
 // check if all specified users are assigned to the match
 func requireAssigned(t *testing.T, dbConn *pgx.Conn, users []string, matchID int) {
 	var assignedCount int
-	err := dbConn.QueryRow(context.Background(), `
+	err := dbConn.QueryRow(
+		context.Background(),
+		`
 		SELECT COUNT(DISTINCT user_id)
 		FROM user_matches
 		WHERE user_id = ANY($1) AND match_id = $2;
-	`, users, matchID).Scan(&assignedCount)
+		`,
+		users,
+		matchID,
+	).Scan(&assignedCount)
 	require.NoError(t, err)
 	assert.Equal(t, len(users), assignedCount, "all specified users should be assigned to the match")
 }
@@ -285,19 +305,7 @@ func TestE2E_GracefulShutdown(t *testing.T) {
 	workerCount := 2
 	natsURI, started, errChan := setupTestEnvironment(t, workerCount)
 
-	cfg := &internal.EnvConfig{
-		Image:                  "busybox:latest",
-		Workercount:            workerCount,
-		ExposePorts:            network.PortSet{network.MustParsePort("8080"): {}},
-		ClientPort:             network.MustParsePort("8080"),
-		BrokerURI:              natsURI,
-		BrokerNetworkName:      "bridge", // prevents docker network not found errors
-		PublicHost:             "127.0.0.1",
-		DatabaseURI:            dbConnString,
-		PlayersPerRoom:         2,
-		TestMakeContainerDummy: true,
-	}
-
+	cfg := newGeneralConfig(workerCount, natsURI)
 	appResult := runApp(t, ctx, cfg)
 
 	waitForAppStart(t, started, appResult)
@@ -359,22 +367,11 @@ func TestE2E_RemoveZombieWorkers(t *testing.T) {
 	workerCount := 1
 	natsURI, started, errChan := setupTestEnvironment(t, workerCount)
 
-	cfg := &internal.EnvConfig{
-		Image:                  "busybox:latest",
-		Workercount:            workerCount,
-		ExposePorts:            network.PortSet{network.MustParsePort("8080"): {}},
-		ClientPort:             network.MustParsePort("8080"),
-		BrokerURI:              natsURI,
-		BrokerNetworkName:      "bridge", // prevents docker network not found errors
-		PublicHost:             "127.0.0.1",
-		DatabaseURI:            dbConnString,
-		PlayersPerRoom:         2,
-		TestMakeContainerDummy: true,
-	}
-
 	zombieID := runZombieContainer(t, ctx)
 
+	cfg := newGeneralConfig(workerCount, natsURI)
 	appResult := runApp(t, ctx, cfg)
+
 	waitForAppStart(t, started, appResult)
 
 	cli, err := client.New()
@@ -407,19 +404,7 @@ func TestE2E_AppLifecycle(t *testing.T) {
 	workerCount := 1
 	natsURI, started, errChan := setupTestEnvironment(t, workerCount)
 
-	cfg := &internal.EnvConfig{
-		Image:                  "busybox:latest",
-		Workercount:            workerCount,
-		ExposePorts:            network.PortSet{network.MustParsePort("8080"): {}},
-		ClientPort:             network.MustParsePort("8080"),
-		BrokerURI:              natsURI,
-		BrokerNetworkName:      "bridge", // prevents docker network not found errors
-		PublicHost:             "127.0.0.1",
-		DatabaseURI:            dbConnString,
-		PlayersPerRoom:         2,
-		TestMakeContainerDummy: true,
-	}
-
+	cfg := newGeneralConfig(workerCount, natsURI)
 	appResult := runApp(t, ctx, cfg)
 
 	dbConn, err := pgx.Connect(ctx, dbConnString)
@@ -429,16 +414,22 @@ func TestE2E_AppLifecycle(t *testing.T) {
 	waitForAppStart(t, started, appResult)
 
 	_, err = dbConn.Exec(
-		ctx, `
+		ctx,
+		`
 			INSERT INTO users (login, password, queued_until)
-			VALUES ('user1', '', NOW() + INTERVAL '5 hours'), ('user2', '', NOW() + INTERVAL '5 hours')
+			VALUES
+				('user1', '', NOW() + INTERVAL '5 hours'),
+				('user2', '', NOW() + INTERVAL '5 hours')
 		`,
 	)
 	require.NoError(t, err)
 
 	var matchID int
 	require.Eventually(t, func() bool {
-		err := dbConn.QueryRow(ctx, "SELECT id FROM matches LIMIT 1").Scan(&matchID)
+		err := dbConn.QueryRow(
+			ctx,
+			"SELECT id FROM matches LIMIT 1",
+		).Scan(&matchID)
 		return err == nil
 	}, 10*time.Second, 100*time.Millisecond, "should matchmake users and create match")
 
@@ -456,7 +447,15 @@ func TestE2E_AppLifecycle(t *testing.T) {
 	assert.Zero(t, waitingCount)
 
 	var host, port string
-	err = dbConn.QueryRow(ctx, "SELECT host, port FROM matches WHERE id = $1", matchID).Scan(&host, &port)
+	err = dbConn.QueryRow(
+		ctx,
+		`
+		SELECT host, port
+		FROM matches
+		WHERE id = $1
+		`,
+		matchID,
+	).Scan(&host, &port)
 	require.NoError(t, err)
 	assert.Equal(t, cfg.PublicHost, host)
 	assert.NotEmpty(t, port)
@@ -482,7 +481,15 @@ func TestE2E_AppLifecycle(t *testing.T) {
 
 	var results *string
 	require.Eventually(t, func() bool {
-		err := dbConn.QueryRow(ctx, "SELECT results FROM matches WHERE id = $1", matchID).Scan(&results)
+		err := dbConn.QueryRow(
+			ctx,
+			`
+			SELECT results
+			FROM matches
+			WHERE id = $1
+			`,
+			matchID,
+		).Scan(&results)
 		return err == nil && results != nil && len(*results) != 0
 	}, 10*time.Second, 100*time.Millisecond, "should save match results to database")
 
@@ -530,19 +537,7 @@ func TestE2E_WorkersOverloadWithMatches(t *testing.T) {
 	workerCount := 2
 	natsURI, started, errChan := setupTestEnvironment(t, workerCount)
 
-	cfg := &internal.EnvConfig{
-		Image:                  "busybox:latest",
-		Workercount:            workerCount,
-		ExposePorts:            network.PortSet{network.MustParsePort("8080"): {}},
-		ClientPort:             network.MustParsePort("8080"),
-		BrokerURI:              natsURI,
-		BrokerNetworkName:      "bridge", // prevents docker network not found errors
-		PublicHost:             "127.0.0.1",
-		DatabaseURI:            dbConnString,
-		PlayersPerRoom:         2,
-		TestMakeContainerDummy: true,
-	}
-
+	cfg := newGeneralConfig(workerCount, natsURI)
 	appResult := runApp(t, ctx, cfg)
 
 	dbConn, err := pgx.Connect(ctx, dbConnString)
@@ -556,26 +551,30 @@ func TestE2E_WorkersOverloadWithMatches(t *testing.T) {
 		`
 		INSERT INTO users (login, password, queued_until)
 		VALUES
-			('user1', 'pass', NOW() + INTERVAL '5 hours'),
-			('user2', 'pass', NOW() + INTERVAL '5 hours'),
-			('user3', 'pass', NOW() + INTERVAL '5 hours'),
-			('user4', 'pass', NOW() + INTERVAL '5 hours')
+			('user1', '', NOW() + INTERVAL '5 hours'),
+			('user2', '', NOW() + INTERVAL '5 hours'),
+			('user3', '', NOW() + INTERVAL '5 hours'),
+			('user4', '', NOW() + INTERVAL '5 hours')
 		`,
 	)
 	require.NoError(t, err)
 
 	var matchCount int
 	require.Eventually(t, func() bool {
-		err := dbConn.QueryRow(ctx, "SELECT COUNT(*) FROM matches").Scan(&matchCount)
+		err := dbConn.QueryRow(
+			ctx,
+			"SELECT COUNT(*) FROM matches",
+		).Scan(&matchCount)
 		return err == nil && matchCount == 2
 	}, 10*time.Second, 100*time.Millisecond, "should create 2 matches")
 
-	_, err = dbConn.Exec(ctx,
+	_, err = dbConn.Exec(
+		ctx,
 		`
 		INSERT INTO users (login, password, queued_until)
 		VALUES
-			('user5', 'pass', NOW() + INTERVAL '5 hours'),
-			('user6', 'pass', NOW() + INTERVAL '5 hours')
+			('user5', '', NOW() + INTERVAL '5 hours'),
+			('user6', '', NOW() + INTERVAL '5 hours')
 		`,
 	)
 	require.NoError(t, err)
@@ -613,7 +612,10 @@ func TestE2E_WorkersOverloadWithMatches(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Eventually(t, func() bool {
-		err := dbConn.QueryRow(ctx, "SELECT COUNT(*) FROM matches").Scan(&matchCount)
+		err := dbConn.QueryRow(
+			ctx,
+			"SELECT COUNT(*) FROM matches",
+		).Scan(&matchCount)
 		return err == nil && matchCount == 3
 	}, 10*time.Second, 100*time.Millisecond, "should create 3rd match after result frees a worker")
 
@@ -653,19 +655,7 @@ func TestE2E_WorkerFailureAndRestart(t *testing.T) {
 	workerCount := 1
 	natsURI, started, errChan := setupTestEnvironment(t, workerCount)
 
-	cfg := &internal.EnvConfig{
-		Image:                  "busybox:latest",
-		Workercount:            workerCount,
-		ExposePorts:            network.PortSet{network.MustParsePort("8080"): {}},
-		ClientPort:             network.MustParsePort("8080"),
-		BrokerURI:              natsURI,
-		BrokerNetworkName:      "bridge", // prevents docker network not found errors
-		PublicHost:             "127.0.0.1",
-		DatabaseURI:            dbConnString,
-		PlayersPerRoom:         2,
-		TestMakeContainerDummy: true,
-	}
-
+	cfg := newGeneralConfig(workerCount, natsURI)
 	appResult := runApp(t, ctx, cfg)
 
 	dbConn, err := pgx.Connect(ctx, dbConnString)
@@ -687,7 +677,10 @@ func TestE2E_WorkerFailureAndRestart(t *testing.T) {
 
 	var matchID int
 	require.Eventually(t, func() bool {
-		err := dbConn.QueryRow(ctx, "SELECT id FROM matches LIMIT 1").Scan(&matchID)
+		err := dbConn.QueryRow(
+			ctx,
+			"SELECT id FROM matches LIMIT 1",
+		).Scan(&matchID)
 		return err == nil
 	}, 10*time.Second, 100*time.Millisecond, "should create first match")
 
@@ -722,7 +715,11 @@ func TestE2E_WorkerFailureAndRestart(t *testing.T) {
 	var secondMatchID int
 	require.Eventually(t,
 		func() bool {
-			err := dbConn.QueryRow(ctx, "SELECT id FROM matches WHERE id != $1", matchID).Scan(&secondMatchID)
+			err := dbConn.QueryRow(
+				ctx,
+				"SELECT id FROM matches WHERE id != $1",
+				matchID,
+			).Scan(&secondMatchID)
 			return err == nil
 		}, 30*time.Second, 500*time.Millisecond,
 		"should restart worker and create second match (health check runs every 5s, maxPingRetries=3)",
@@ -763,19 +760,7 @@ func TestE2E_NoMatchWithoutEnoughPlayers(t *testing.T) {
 	workerCount := 1
 	natsURI, started, errChan := setupTestEnvironment(t, workerCount)
 
-	cfg := &internal.EnvConfig{
-		Image:                  "busybox:latest",
-		Workercount:            workerCount,
-		ExposePorts:            network.PortSet{network.MustParsePort("8080"): {}},
-		ClientPort:             network.MustParsePort("8080"),
-		BrokerURI:              natsURI,
-		BrokerNetworkName:      "bridge", // prevents docker network not found errors
-		PublicHost:             "127.0.0.1",
-		DatabaseURI:            dbConnString,
-		PlayersPerRoom:         2,
-		TestMakeContainerDummy: true,
-	}
-
+	cfg := newGeneralConfig(workerCount, natsURI)
 	appResult := runApp(t, ctx, cfg)
 
 	dbConn, err := pgx.Connect(ctx, dbConnString)
@@ -796,7 +781,10 @@ func TestE2E_NoMatchWithoutEnoughPlayers(t *testing.T) {
 	time.Sleep(2 * time.Second)
 
 	var matchCount int
-	err = dbConn.QueryRow(ctx, "SELECT COUNT(*) FROM matches").Scan(&matchCount)
+	err = dbConn.QueryRow(
+		ctx,
+		"SELECT COUNT(*) FROM matches",
+	).Scan(&matchCount)
 	require.NoError(t, err)
 	assert.Zero(t, matchCount, "no match should be created; one player waiting")
 
