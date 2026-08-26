@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"log/slog"
+
 	"github.com/Matian37/multiplayer-asset/server-manager/internal"
 )
 

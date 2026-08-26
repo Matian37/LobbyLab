@@ -8,12 +8,13 @@ import (
 	"errors"
 	"fmt"
 	"math/rand"
-	"github.com/Matian37/multiplayer-asset/server-manager/internal"
-	"github.com/Matian37/multiplayer-asset/server-manager/internal/mocks"
 	"strconv"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/Matian37/multiplayer-asset/server-manager/internal"
+	"github.com/Matian37/multiplayer-asset/server-manager/internal/mocks"
 
 	"go.uber.org/goleak"
 	"go.uber.org/mock/gomock"

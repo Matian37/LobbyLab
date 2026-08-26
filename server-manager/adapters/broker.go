@@ -5,9 +5,10 @@ import (
 	"encoding/json"
 	"errors"
 	"math"
-	"github.com/Matian37/multiplayer-asset/server-manager/internal"
 	"sync"
 	"time"
+
+	"github.com/Matian37/multiplayer-asset/server-manager/internal"
 
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"

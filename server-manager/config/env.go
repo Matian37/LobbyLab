@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+
 	"github.com/Matian37/multiplayer-asset/server-manager/internal"
 
 	"github.com/caarlos0/env/v11"

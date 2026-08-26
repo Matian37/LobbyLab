@@ -5,10 +5,11 @@ import (
 	"encoding/json"
 	"errors"
 	"log/slog"
-	"github.com/Matian37/multiplayer-asset/server-manager/adapters"
-	"github.com/Matian37/multiplayer-asset/server-manager/internal"
 	"sync"
 	"time"
+
+	"github.com/Matian37/multiplayer-asset/server-manager/adapters"
+	"github.com/Matian37/multiplayer-asset/server-manager/internal"
 
 	"github.com/cenkalti/backoff/v6"
 )

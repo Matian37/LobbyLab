@@ -5,10 +5,11 @@ import (
 	"errors"
 	"io"
 	"log/slog"
-	"github.com/Matian37/multiplayer-asset/server-manager/internal"
-	"github.com/Matian37/multiplayer-asset/server-manager/internal/mocks"
 	"testing"
 	"time"
+
+	"github.com/Matian37/multiplayer-asset/server-manager/internal"
+	"github.com/Matian37/multiplayer-asset/server-manager/internal/mocks"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

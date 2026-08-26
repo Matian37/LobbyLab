@@ -6,10 +6,11 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
+	"syscall"
+
 	"github.com/Matian37/multiplayer-asset/server-manager/app"
 	"github.com/Matian37/multiplayer-asset/server-manager/config"
 	"github.com/Matian37/multiplayer-asset/server-manager/internal"
-	"syscall"
 )
 
 func main() {

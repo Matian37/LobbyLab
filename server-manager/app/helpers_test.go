@@ -3,9 +3,10 @@ package app
 import (
 	"context"
 	"errors"
-	"github.com/Matian37/multiplayer-asset/server-manager/internal/mocks"
 	"testing"
 	"time"
+
+	"github.com/Matian37/multiplayer-asset/server-manager/internal/mocks"
 
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"

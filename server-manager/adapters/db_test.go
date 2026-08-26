@@ -6,9 +6,10 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"github.com/Matian37/multiplayer-asset/server-manager/internal"
 	"testing"
 	"time"
+
+	"github.com/Matian37/multiplayer-asset/server-manager/internal"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/stretchr/testify/assert"
