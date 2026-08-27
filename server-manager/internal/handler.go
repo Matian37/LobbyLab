@@ -6,6 +6,10 @@ import (
 	"log/slog"
 )
 
+// Wraps slog.Handler and sets log level to DEBUG for all record with
+// "error" attribute being equal to context.Canceled or context.DeadlineExceeded.
+// This gets rid of need to add if statements to
+// avoid logging context errors in production modes.
 type ContextErrorHandler struct {
 	handler slog.Handler
 }

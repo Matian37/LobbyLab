@@ -34,6 +34,13 @@ func genPayload(matchID int) []byte {
 	return payload
 }
 
+// It races ServerManager loops by calling their core function multiple times.
+// It randomizes results of mocked adapter interfaces.
+// Main purpose of this test is to detect any race conditions in those core functions.
+//
+// Note: saveLoop runs full loop here in contrast to others.
+// This is required because loop relies on saveResultChan governed by resultLoop,
+// not on mocked broker or timer like other loops.
 func TestRace_ServerManager_LifeCycle(t *testing.T) {
 	tests := []struct {
 		name             string
@@ -163,7 +170,9 @@ func TestRace_ServerManager_LifeCycle(t *testing.T) {
 	}
 }
 
-// restart is tested here, because data races can easily slip up in lifecycle tests for it
+// Races many concurrent restarts of the same worker against each other to
+// verify the restart state-ID guard prevents corrupted state transitions.
+// Restart is tested here, because data races can easily slip up in lifecycle tests.
 func TestRace_ServerManager_Restart(t *testing.T) {
 	workers := []*Worker{NewWorker("0", "0", 0, -1*time.Second)}
 	docker, _, _, wm := newMockWorkerManagerWithInit(t, workers)
@@ -177,7 +186,7 @@ func TestRace_ServerManager_Restart(t *testing.T) {
 			wm.mu.Lock()
 			worker := *workers[0]
 			wm.mu.Unlock()
-			wm.restartWorker(context.Background(), workers[0], worker.stateID)
+			wm.restartWorker(context.Background(), workers[0], worker.StateID)
 		})
 	}
 

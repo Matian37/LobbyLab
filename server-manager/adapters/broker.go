@@ -14,6 +14,7 @@ import (
 	"github.com/nats-io/nats.go/jetstream"
 )
 
+// NATS broker subjects (see docs/architecture.md for details)
 const (
 	healthSubject    = "workers.health"
 	assignSubject    = "workers.assign"
@@ -29,6 +30,8 @@ var (
 	ErrNATSConnAlreadyClosed    = errors.New("connection already closed")
 )
 
+// Implements internal.BrokerConnection over a NATS server with JetStream, the
+// persistence is used to queue match results.
 type NATSConnection struct {
 	conn *nats.Conn
 	js   *jetstream.JetStream
@@ -49,6 +52,7 @@ func NewNATSConnection() *NATSConnection {
 	}
 }
 
+// Opens connection and creates result stream and its consumer.
 func (nc *NATSConnection) Open(ctx context.Context, config *internal.EnvConfig) error {
 	if nc.closed {
 		return ErrNATSConnCannotBeReopened
@@ -96,6 +100,8 @@ func (nc *NATSConnection) Open(ctx context.Context, config *internal.EnvConfig) 
 	return nil
 }
 
+// Publishes a match config to worker-specific assign channel and waits for him to
+// acknowledge it, on assign job timeout it returns error.
 func (nc *NATSConnection) AssignJob(ctx context.Context, workerID string, config internal.MatchConfig) error {
 	if !nc.opened {
 		return ErrNATSConnNotOpen
@@ -121,6 +127,8 @@ func (nc *NATSConnection) AssignJob(ctx context.Context, workerID string, config
 	return err
 }
 
+// Broadcasts a health ping on associated subject, waits for workers replies subject and
+// returns the set of worker IDs that respond before pong timeout.
 func (nc *NATSConnection) GetWorkersPong(ctx context.Context, pongTimeout time.Duration) (internal.Responders, error) {
 	if !nc.opened {
 		return nil, ErrNATSConnNotOpen
@@ -158,6 +166,8 @@ func (nc *NATSConnection) GetWorkersPong(ctx context.Context, pongTimeout time.D
 	return responders, nil
 }
 
+// Fetches the next undelivered match result from the result stream. It blocks
+// until a message is available or ctx is canceled.
 func (nc *NATSConnection) GetResult(ctx context.Context) (internal.Message, error) {
 	if !nc.opened {
 		return nil, ErrNATSConnNotOpen
@@ -166,10 +176,12 @@ func (nc *NATSConnection) GetResult(ctx context.Context) (internal.Message, erro
 		return nil, ErrNATSConnClosed
 	}
 
-	// HACK: set deadline for timeout to approx 290 years
-	// library enforces expiry time even when context without deadline is provided
-	// the only way for Next to "disable" it, is to set deadline to max duration
-	// possible way to remove this hack is too refactor the codebase to use Consume function instead
+	// HACK: Set deadline for timeout to approx 290 years.
+	// Library for undocumented reason enforces expiry time even when
+	// context without deadline is provided. The only way for Next to "disable" it,
+	// is to set deadline to max duration. Possible way to remove this hack is to
+	// refactor the codebase to use Consume function instead of Next, but this would
+	// require bigger changes to the codebase.
 	ctx, cancel := context.WithTimeout(ctx, math.MaxInt64)
 	defer cancel()
 
@@ -182,8 +194,10 @@ func (nc *NATSConnection) GetResult(ctx context.Context) (internal.Message, erro
 	return msg, nil
 }
 
+// Drains and closes the NATS connection.
+// Partially open connection are allowed to be closed.
 func (nc *NATSConnection) Close() error {
-	// c.conn == nil allows partialy opened NATSConn to be closed
+	// when nc.conn is not nil then it is partially open
 	if !nc.opened && nc.conn == nil {
 		return ErrNATSConnNotOpen
 	}

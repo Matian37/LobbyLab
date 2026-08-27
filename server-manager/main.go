@@ -1,3 +1,6 @@
+// Package main is the entry point of the server-manager service. It reads the
+// configuration, wires logging, and runs the application until it receives a
+// termination signal.
 package main
 
 import (

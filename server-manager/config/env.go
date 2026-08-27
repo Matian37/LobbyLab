@@ -1,3 +1,5 @@
+// Package config reads and validates server-manager's runtime configuration
+// from environment variables.
 package config
 
 import (
@@ -56,6 +58,7 @@ func parseLogLevel(value string) (slog.Level, error) {
 	return level, nil
 }
 
+// Parses configuration from the environment and validates it
 func ReadConfig() (*internal.EnvConfig, error) {
 	config := &parsedConfig{}
 

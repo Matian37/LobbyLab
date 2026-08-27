@@ -20,6 +20,8 @@ var (
 	ErrMatchmakerAlreadyOpen = errors.New("matchmaker already open")
 )
 
+// Handles matchmaking and match creation.
+// Delegates match assignments to workerManager.
 type Matchmaker struct {
 	workerManager internal.WorkerManager
 	db            internal.DatabaseConnection
@@ -32,6 +34,8 @@ type Matchmaker struct {
 
 	logger *slog.Logger
 
+	// TODO: use channel instead of WaitGroup,
+	// for one task it is overkill
 	wg sync.WaitGroup
 }
 
@@ -45,6 +49,7 @@ func NewMatchmaker(workerManager internal.WorkerManager, config *internal.EnvCon
 	}
 }
 
+// Setups matchmaking in database and starts main loop goroutine.
 func (m *Matchmaker) Start(ctx context.Context) error {
 	if m.closed {
 		return ErrMatchmakerClosed
@@ -93,7 +98,6 @@ func (m *Matchmaker) Shutdown() {
 }
 
 func (m *Matchmaker) createMatch(ctx context.Context, matchUsers []internal.User) (int, error) {
-	// TODO: pass universal seceret, which distinguish players from unauthorized users
 	gameConfig, err := json.Marshal(struct {
 		Players []internal.User `json:"players"`
 	}{Players: matchUsers})
@@ -118,9 +122,10 @@ func (m *Matchmaker) createMatch(ctx context.Context, matchUsers []internal.User
 		return 0, err
 	}
 
-	// FIX: if add match fails then send cancel match job to worker
-	// 		this require creating cancel feature in game-server,
-	// 		so responsibility of stopping match is on actual game server side
+	// FIX: If AddMatch fails, the match job remains active. Properly handling this
+	// would require adding cancellation support to the game server or finding another
+	// solution. This is not critical, as the game server should detect the missing user
+	// and handle the situation itself. Leave this as-is for now.
 	return matchID, m.db.AddMatch(ctxTimeout, matchUsers, serverInfo, matchID)
 }
 
@@ -170,6 +175,8 @@ func (m *Matchmaker) matchmakingLoop(ctx context.Context) error {
 	}
 }
 
+// Waits for enough player to be able to create a match.
+// It returns them, but if something fails inside the function it returns error.
 func (m *Matchmaker) waitForEnoughPlayers(ctx context.Context) ([]internal.User, error) {
 	ticker := time.NewTicker(m.dbPoolTimeout)
 	defer ticker.Stop()

@@ -100,6 +100,7 @@ func newHelperConn(t *testing.T) *pgx.Conn {
 	return conn
 }
 
+// Creates a new DatabaseConnection and opens it.
 func newDBConnWithOpen(t *testing.T) *DatabaseConnection {
 	d := NewDatabaseConnection(&internal.EnvConfig{DatabaseURI: dbConnString})
 	require.NoError(t, d.Open(context.Background()))

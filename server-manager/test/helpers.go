@@ -15,13 +15,17 @@ import (
 )
 
 type ForEachConfig struct {
-	client      *client.Client
-	errChan     chan error
+	// Docker client
+	client *client.Client
+	// Error channel to report errors
+	errChan chan error
+	// The number of workers used to validate if worker IDs are correct
 	workerCount int
 }
 
 type MatchingConfig struct {
 	ForEachConfig
+	// Worker ID to match against
 	workerID string
 }
 
