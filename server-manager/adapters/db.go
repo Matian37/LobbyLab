@@ -86,7 +86,8 @@ func (dc *DatabaseConnection) GatherMatchPlayers(ctx context.Context) ([]interna
 		`
 		SELECT login, '' AS matchAuthToken
 		FROM users
-		WHERE queued_until > NOW() AND match_id IS NULL
+		WHERE queued_until > NOW()
+			AND match_id IS NULL
 		LIMIT $1
 		`,
 		dc.config.PlayersPerRoom,
@@ -134,7 +135,10 @@ func (dc *DatabaseConnection) AddMatch(
 
 	_, err = tx.Exec(
 		ctx,
-		"INSERT INTO matches (id, host, port) VALUES ($1, $2, $3)",
+		`
+		INSERT INTO matches (id, host, port)
+		VALUES ($1, $2, $3)
+		`,
 		matchID,
 		serverInfo.Host,
 		serverInfo.Port,
@@ -158,7 +162,12 @@ func (dc *DatabaseConnection) AddMatch(
 
 	_, err = tx.Exec(
 		ctx,
-		"UPDATE users SET match_id = $1, queued_until = NULL WHERE login = ANY($2)",
+		`
+		UPDATE users
+		SET match_id = $1,
+			queued_until = NULL
+		WHERE login = ANY($2)
+		`,
 		matchID,
 		logins,
 	)
@@ -178,7 +187,13 @@ func (dc *DatabaseConnection) SaveMatchResults(ctx context.Context, results inte
 
 	res, err := dc.conn.Exec(
 		ctx,
-		"UPDATE matches SET results = $1, canceled = $2, active = false WHERE id = $3",
+		`
+		UPDATE matches
+		SET results = $1,
+			canceled = $2,
+			active = false
+		WHERE id = $3
+		`,
 		results.Details,
 		!results.Success,
 		results.MatchID,
@@ -263,7 +278,7 @@ func (dc *DatabaseConnection) RemoveMatchStatus(ctx context.Context, matchID int
 		UPDATE users
 		SET
 			match_id = NULL,
-			queued_until = NOW() - INTERVAL '5 seconds',
+			queued_until = NULL,
 			match_auth_token = NULL
 		WHERE match_id = $1
 		`,
@@ -275,6 +290,13 @@ func (dc *DatabaseConnection) RemoveMatchStatus(ctx context.Context, matchID int
 // Resets the database state before matchmaking begins: it removes every user
 // from their match and queue, and cancels all active matches.
 func (dc *DatabaseConnection) SetupMatchmaking(ctx context.Context) error {
+	if !dc.connOpened {
+		return ErrDBConnNotOpen
+	}
+	if dc.closed {
+		return ErrDBConnClosed
+	}
+
 	tx, err := dc.conn.Begin(ctx)
 	if err != nil {
 		return err
@@ -288,7 +310,7 @@ func (dc *DatabaseConnection) SetupMatchmaking(ctx context.Context) error {
 		UPDATE users
 		SET
 			match_id = NULL,
-			queued_until = NOW() - INTERVAL '5 seconds',
+			queued_until = NULL,
 			match_auth_token = NULL
 		`,
 	)
