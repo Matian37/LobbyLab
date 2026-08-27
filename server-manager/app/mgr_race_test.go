@@ -75,9 +75,15 @@ func TestRace_ServerManager_LifeCycle(t *testing.T) {
 			rng := rand.New(rand.NewPCG(test.seed1, test.seed2))
 			mu := &sync.Mutex{}
 
+			// Wraps rng.IntN. It is thread-safe.
+			safeRandomIntN := func(n int) int {
+				mu.Lock()
+				defer mu.Unlock()
+				return rng.IntN(n)
+			}
 			// Randomly pick whether to fail mocked function or not.
 			// It is thread-safe.
-			randomFail := func() bool {
+			safeRandomFail := func() bool {
 				mu.Lock()
 				defer mu.Unlock()
 				return rng.IntN(test.failRate) == 0
@@ -106,7 +112,7 @@ func TestRace_ServerManager_LifeCycle(t *testing.T) {
 			docker.EXPECT().RestartContainer(gomock.Any(), gomock.Any()).
 				AnyTimes().
 				DoAndReturn(func(ctx any, id any) error {
-					if randomFail() {
+					if safeRandomFail() {
 						return errors.New("")
 					}
 					return nil
@@ -115,7 +121,7 @@ func TestRace_ServerManager_LifeCycle(t *testing.T) {
 			broker.EXPECT().AssignJob(gomock.Any(), gomock.Any(), gomock.Any()).
 				AnyTimes().
 				DoAndReturn(func(ctx any, workerID string, config internal.MatchConfig) error {
-					if randomFail() {
+					if safeRandomFail() {
 						return errors.New("")
 					}
 					matchChan <- config.MatchID
@@ -124,7 +130,7 @@ func TestRace_ServerManager_LifeCycle(t *testing.T) {
 			broker.EXPECT().GetWorkersPong(gomock.Any(), gomock.Any()).
 				AnyTimes().
 				DoAndReturn(func(ctx any, pongTimeout any) (map[string]struct{}, error) {
-					if randomFail() {
+					if safeRandomFail() {
 						return nil, errors.New("")
 					}
 					return randomResponders(test.workersCount), nil
@@ -132,14 +138,14 @@ func TestRace_ServerManager_LifeCycle(t *testing.T) {
 			broker.EXPECT().GetResult(gomock.Any()).
 				AnyTimes().
 				DoAndReturn(func(ctx any) (internal.Message, error) {
-					if randomFail() {
+					if safeRandomFail() {
 						return nil, errors.New("")
 					}
 					return msg, nil
 				})
 			msg.EXPECT().Ack().AnyTimes().Return(nil)
 			msg.EXPECT().Data().AnyTimes().DoAndReturn(func() []byte {
-				if randomFail() {
+				if safeRandomFail() {
 					return genPayload(test.goroutinePerFunc)
 				}
 				select {
@@ -164,7 +170,7 @@ func TestRace_ServerManager_LifeCycle(t *testing.T) {
 			}()
 
 			for idx := range test.goroutinePerFunc {
-				switch rng.IntN(3) {
+				switch safeRandomIntN(3) {
 				case 0:
 					wg.Go(func() { wm.AssignMatch(ctx, internal.MatchConfig{MatchID: idx}) })
 				case 1:
