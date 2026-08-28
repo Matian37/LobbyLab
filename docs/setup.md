@@ -136,22 +136,23 @@ server-manager:
 
 Adjust these values according to your game's requirements.
 
-### 4. Start the Stack
+### 4. Control the Platform
 
+1. **Start services**:
 ```sh
 make up
 ```
+You can add `UP_ARGS` to customize the start behavior (e.g., `UP_ARGS="--detach"`).
 
-This builds all Docker images (game-server, api, server-manager) and starts every service defined in `compose.yaml`. To run in detached mode:
-
+2. **Build images**:
 ```sh
-make up UP_ARGS="-d"
+make build
 ```
+You can add `BUILD_ARGS` to customize the build behavior (e.g., `BUILD_ARGS="--no-cache"`).
 
-To rebuild images without cache:
-
+3. **Tear down services**:
 ```sh
-make build BUILD_ARGS="--no-cache"
+make down
 ```
 
 ## Additional Notes
