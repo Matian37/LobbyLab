@@ -1,3 +1,11 @@
+/**
+ * GET `/api/download` — streams the game client archive to the authenticated
+ * user as an attachment. The file is resolved from `DOWNLOADS_DIR` +
+ * `GAME_CLIENT_FILE`; a missing file or unset env var yields a `404`.
+ *
+ * @param {import('./$types.js').RequestEvent} event
+ * @returns {Promise<import('@sveltejs/kit').Response>}
+ */
 import { createReadStream } from 'node:fs';
 import { stat } from 'node:fs/promises';
 import { Readable } from 'node:stream';

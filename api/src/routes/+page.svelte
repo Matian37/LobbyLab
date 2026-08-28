@@ -12,6 +12,9 @@
         #timer = null;
         seconds = $state(0);
 
+        /**
+         * Starts counting seconds from zero.
+         */
         start() {
             this.seconds = 0;
             this.#timer = setInterval(() => {
@@ -19,6 +22,9 @@
             }, 1000);
         }
 
+        /**
+         * Stops counting. Not allowed if already stopped.
+         */
         stop() {
             if (this.#timer === null) return;
             clearInterval(this.#timer);
@@ -26,12 +32,23 @@
         }
     }
 
+    /**
+     * Client-side matchmaking controller. Drives the home-page button through
+     * three states (`NOT_ACTIVE` → `PENDING` → `FOUND`), manages the
+     * `/api/connection` websocket while queued, and launches the game client
+     * once a match is assigned by substituting the `{host}`, `{port}`, and
+     * `{token}` placeholders in `PUBLIC_GAME_LAUNCH_URL`.
+     */
     class Matchmaking {
         timer = new Timer();
         errorMessage = $state('');
         status = $state(WaitingStatus.NOT_ACTIVE);
         socket = null;
 
+        /**
+         * @param {object|null} currentMatch The user's existing active match,
+         *     if any, which transitions straight to `FOUND`.
+         */
         constructor(currentMatch) {
             this.currentMatch = currentMatch;
 
@@ -46,6 +63,9 @@
             );
         }
 
+        /**
+         * Routes a button press to the action for the current status
+         */
         pressButton() {
             switch (this.status) {
                 case WaitingStatus.NOT_ACTIVE:
@@ -60,6 +80,9 @@
             }
         }
 
+        /**
+         * Opens the matchmaking websocket and starts the queued timer.
+         */
         #start() {
             this.status = WaitingStatus.PENDING;
             this.errorMessage = '';
@@ -104,11 +127,18 @@
             };
         }
 
+        /**
+         * Cancels matchmaking by closing the websocket.
+         */
         #cancel() {
             this.status = WaitingStatus.NOT_ACTIVE;
             this.close();
         }
 
+        /**
+         * Redirects the browser to the filled-in `PUBLIC_GAME_LAUNCH_URL` to
+         * launch the game client for the current match.
+         */
         #join() {
             const { host, port, matchAuthToken } = this.currentMatch;
             let url = env.PUBLIC_GAME_LAUNCH_URL;
@@ -118,6 +148,10 @@
                 .replaceAll('{token}', encodeURIComponent(matchAuthToken));
         }
 
+        /**
+         * Stops the timer and closes the websocket if one is open or still
+         * connecting.
+         */
         close() {
             this.timer.stop();
 

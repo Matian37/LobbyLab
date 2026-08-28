@@ -1,3 +1,14 @@
+/**
+ * POST `/api/login` — authenticates credentials and starts a session.
+ *
+ * Body: `{ "login": string, "password": string }`. On success a `session`
+ * cookie is set (`httpOnly`, `secure`, `sameSite: strict`). The password used
+ * is stored in the session, so a deleted user is reported as invalid
+ * credentials.
+ *
+ * @param {import('./$types.js').RequestEvent} event
+ * @returns {Promise<import('@sveltejs/kit').Response>}
+ */
 import { json } from '@sveltejs/kit';
 import { verifyPassword, addSession } from '$lib/db.js';
 import { ERRORS } from '$lib/errors.js';

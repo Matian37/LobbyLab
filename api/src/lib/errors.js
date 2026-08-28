@@ -6,8 +6,27 @@ import {
     LOGIN_MAX_LENGTH,
 } from './constants.js';
 
+/**
+ * Fallback message shown to the user when a request fails unexpectedly and no
+ * more specific error is available.
+ */
 export const UNEXPECTED_ERROR_MSG = 'An unexpected error occurred';
 
+/**
+ * A pre-built SvelteKit JSON response for a given HTTP error. Each factory
+ * returns a fresh `Response` so callers can return it directly from a route
+ * handler.
+ *
+ * @typedef {() => import('@sveltejs/kit').Response} ErrorFactory
+ */
+
+/**
+ * Factories for the standard REST error responses used across the API. Every
+ * factory returns a `{ "msg": string }` JSON body with the corresponding HTTP
+ * status code.
+ *
+ * @type {{ [name: string]: ErrorFactory }}
+ */
 // TODO: use func instead of json syntax
 export const ERRORS = Object.freeze({
     invalidJSON: () => json({ msg: 'Invalid JSON' }, { status: 400 }),
@@ -43,13 +62,26 @@ export const ERRORS = Object.freeze({
     notFound: () => json({ msg: 'Not found' }, { status: 404 }),
 });
 
+/**
+ * Error thrown when a connection or the connection server is used in an
+ * invalid lifecycle state (for example calling `open()` twice).
+ */
 export class ConnectionStateError extends Error {
+    /**
+     * @param {string} message Human-readable description of the invalid state.
+     */
     constructor(message) {
         super(message);
         this.name = 'ConnectionStateError';
     }
 }
 
+/**
+ * Factories for {@link ConnectionStateError} instances raised by the
+ * WebSocket connection/server lifecycle.
+ *
+ * @type {{ [name: string]: (...args: any[]) => ConnectionStateError }}
+ */
 export const CONNECTION_ERRORS = Object.freeze({
     cannotOpenConnection: (state) =>
         new ConnectionStateError(`Cannot open a connection in state ${state}`),

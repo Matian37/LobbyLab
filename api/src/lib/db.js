@@ -4,6 +4,11 @@ import { databaseLogger } from './logger.js';
 
 const DATABASE_URL = process.env.DATABASE_URL;
 
+/**
+ * Shared postgres connection pool. Reads the connection string from
+ * `DATABASE_URL`. Emits structured log records on connect, close, notice, and
+ * every executed query.
+ */
 export const sql = postgres(DATABASE_URL, {
     onnotice: (notice) => databaseLogger.warn('database notice', notice),
     onconnect: (conn) => databaseLogger.debug('database connected', { conn }),
@@ -13,6 +18,27 @@ export const sql = postgres(DATABASE_URL, {
         databaseLogger.debug('database query', { conn, query, params }),
 });
 
+/**
+ * Connection status snapshot used by the WebSocket pull loop to decide the
+ * fate of a queued connection.
+ *
+ * @typedef {Object} ConnectionStatus
+ * @property {number} websocketId The user's current `last_websocket_id`.
+ * @property {number|null} matchId ID of the user's assigned match, or `null`.
+ * @property {string} matchAuthToken Token to join the match, may be old when
+ * the match is not assigned.W
+ * @property {string} host Game server host of the match or empty string.
+ * @property {string} port Game server port of the match or empty string.
+ */
+
+/**
+ * Fetches the current connection-related statuses for the given connections in
+ * a single query, keyed by login.
+ *
+ * @param {{ login: string }[]} connections Active connections to look up.
+ * @returns {Promise<Map<string, ConnectionStatus>>} A map from login to its
+ *     status. Users that no longer exist are absent from the map.
+ */
 export async function getConnectionStatuses(connections) {
     if (connections.length === 0) return new Map();
 
@@ -44,6 +70,15 @@ export async function getConnectionStatuses(connections) {
     );
 }
 
+/**
+ * Creates a new user. The password is hashed with bcrypt (`crypt` /
+ * `gen_salt('bf')`) by the database.
+ *
+ * @param {string} login Desired unique login.
+ * @param {string} password Plain-text password, hashed by the database.
+ * @returns {Promise<boolean>} `true` on success; `false` when the `login` is
+ *     already taken (a `users_pkey` uniqueness violation).
+ */
 export async function addUser(login, password) {
     try {
         await sql`
@@ -60,6 +95,14 @@ export async function addUser(login, password) {
     return true;
 }
 
+/**
+ * Verifies a login/password pair against the stored bcrypt hash.
+ *
+ * @param {string} login The user's login.
+ * @param {string} password Plain-text password to compare.
+ * @returns {Promise<boolean>} `true` when the user exists and the password
+ *     matches, otherwise `false`.
+ */
 export async function verifyPassword(login, password) {
     const q = await sql`
         SELECT password = crypt(${password}, password) AS match 
@@ -69,6 +112,17 @@ export async function verifyPassword(login, password) {
     return q.length > 0 && q[0].match;
 }
 
+/**
+ * Extends the queue deadline (`queued_until`) for connections that are still
+ * queued and match the given websocket ID.
+ *
+ * @param {{ login: string, websocketId: number }[]} connections Connections to
+ *     extend. The update only applies if the stored `last_websocket_id` still
+ *     equals the connection's `websocketId`, the user is not in a match, and
+ *     they are currently queued.
+ * @param {number} ms Milliseconds to add to the current deadline.
+ * @returns {Promise<void>}
+ */
 export async function extendQueueStatuses(connections, ms) {
     if (connections.length === 0) return;
 
@@ -88,6 +142,16 @@ export async function extendQueueStatuses(connections, ms) {
     `;
 }
 
+/**
+ * Marks a user as queued and allocates them a new websocket ID by
+ * incrementing `last_websocket_id`. A fresh ID is what lets newer connections
+ * supersede older ones.
+ *
+ * @param {string} login The user to put into the queue.
+ * @param {number} ms Milliseconds to set the initial queue deadline.
+ * @returns {Promise<number|null>} The newly allocated websocket ID, or `null`
+ *     when the user is already in a match and cannot be queued.
+ */
 export async function setQueueStatus(login, ms) {
     const q = await sql`
         UPDATE users
@@ -99,6 +163,15 @@ export async function setQueueStatus(login, ms) {
     return Number(q[0]?.last_websocket_id) || null;
 }
 
+/**
+ * Clears a user's queue deadline so they are no longer considered queued. The
+ * update is applied only when the stored `last_websocket_id` matches and the
+ * user is not yet in a match, so a stale connection cannot unqueue a newer one.
+ *
+ * @param {string} login The user's login.
+ * @param {number} websocketId Websocket ID the update must match.
+ * @returns {Promise<void>}
+ */
 export async function removeQueueStatus(login, websocketId) {
     await sql`
         UPDATE users
@@ -110,6 +183,13 @@ export async function removeQueueStatus(login, websocketId) {
     `;
 }
 
+/**
+ * Resolves a session token to the owning user's login.
+ *
+ * @param {string} token Session token.
+ * @returns {Promise<string|null>} The login, or `null` when no session matches
+ *     the token.
+ */
 export async function getLoginFromToken(token) {
     const q = await sql`
         SELECT login FROM sessions WHERE token = ${token}
@@ -117,6 +197,13 @@ export async function getLoginFromToken(token) {
     return q[0]?.login ?? null;
 }
 
+/**
+ * Returns the active match assigned to a user, if any.
+ *
+ * @param {string} login The user's login.
+ * @returns {Promise<{ host: string, port: string, matchAuthToken: string }|null>}
+ *     The match connection details, or `null` when the user has no match.
+ */
 export async function getUserMatch(login) {
     const q = await sql`
         SELECT u.match_auth_token, m.host, m.port
@@ -125,6 +212,7 @@ export async function getUserMatch(login) {
         WHERE u.login = ${login} AND u.match_id IS NOT NULL
     `;
     if (q.length === 0) return null;
+
     return {
         host: q[0].host,
         port: q[0].port,
@@ -132,6 +220,16 @@ export async function getUserMatch(login) {
     };
 }
 
+/**
+ * Creates a new session for a user and returns its token. The token is
+ * `SESSION_TOKEN_LENGTH / 2` random bytes encoded as lowercase hex. The login
+ * is stored on the session row via the `sessions_login_fkey` foreign key, which
+ * also protects against creating a session for a nonexistent user.
+ *
+ * @param {string} login The user to create the session for.
+ * @returns {Promise<string|null>} The session token, or `null` when the user no
+ *     longer exists (a `sessions_login_fkey` violation).
+ */
 export async function addSession(login) {
     try {
         const q = await sql`
@@ -151,10 +249,22 @@ export async function addSession(login) {
     }
 }
 
+/**
+ * Deletes a session by token. Does nothing when the token does not exist.
+ *
+ * @param {string} token The session token.
+ * @returns {Promise<void>}
+ */
 export async function deleteSession(token) {
     await sql`DELETE FROM sessions WHERE token = ${token}`;
 }
 
+/**
+ * Checks whether a session token currently exists.
+ *
+ * @param {string} token The session token.
+ * @returns {Promise<boolean>} `true` when the session exists.
+ */
 export async function sessionExist(token) {
     const q = await sql`
         SELECT 1 FROM sessions WHERE token = ${token}
@@ -162,6 +272,18 @@ export async function sessionExist(token) {
     return q.length > 0;
 }
 
+/**
+ * Fetches the historical match results a user has ever participated in.
+ *
+ * @param {string} login The user's login.
+ * @returns {Promise<Array<{
+ *     id: number,
+ *     details: import('postgres').JsonValue|null,
+ *     canceled: boolean,
+ *     active: boolean
+ * }>>} Matches, most recent first.
+ */
+// TODO: implement pagination
 export async function getMatchResults(login) {
     return (
         await sql`

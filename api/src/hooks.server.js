@@ -1,3 +1,11 @@
+/**
+ * Root SvelteKit `handle` hook. Logs every request: a debug line on entry with
+ * the method and path, and a summary on completion with method, path, status,
+ * and duration. At debug level the response body is additionally logged.
+ *
+ * @param {import('@sveltejs/kit').Handle} param0
+ * @returns {Promise<import('@sveltejs/kit').Response>}
+ */
 import { httpLogger } from '$lib/logger.js';
 
 export async function handle({ event, resolve }) {

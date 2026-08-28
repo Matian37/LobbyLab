@@ -1,3 +1,8 @@
+/**
+ * Register page server logic. The `default` action reads `login`/`password`
+ * from the submitted form and forwards them to `POST /api/register`, returning
+ * its response (or failure) unchanged.
+ */
 import { fail } from '@sveltejs/kit';
 import { POST as registerPOST } from '$routes/api/register/+server.js';
 

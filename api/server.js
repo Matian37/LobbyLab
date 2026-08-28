@@ -1,3 +1,8 @@
+/**
+ * Production entrypoint. Builds the HTTP server from the SvelteKit adapter-node
+ * handler, attaches the matchmaking WebSocket server to it, validates required
+ * environment variables, and sets up graceful shutdown on `SIGTERM`/`SIGINT`.
+ */
 import http from 'node:http';
 import { handler } from './build/handler.js';
 import { createWebSocketServer } from './src/lib/server/server.js';
