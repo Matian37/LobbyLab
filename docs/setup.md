@@ -83,7 +83,8 @@ Open `game-server/Dockerfile`. The build uses a two-stage Dockerfile:
 
 1. **Base image** — Replace the runner image with one that supports your game server runtime (e.g., Ubuntu if your game server requires specific system libraries).
 2. **Runtime files** — Place your game server executable and any required assets in the `game-server/runtime/` directory. The Dockerfile copies this folder into the runner image.
-3. **CMD argument** — Set the first argument of CMD to the command that starts your actual game server.
+3. **Runtime setup** — Compile and setup anything you need for your game server runtime.
+4. **CMD argument** — Set the first argument of CMD to the command that starts your actual game server.
 
 #### 2.2 Runtime Contract
 
