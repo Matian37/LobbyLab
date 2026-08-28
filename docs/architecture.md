@@ -109,11 +109,6 @@ leaving dead users in waiting queue.
     - To assign somebody he sets `match_id` value to specific id and `queued_until` to null. 
     - Also server-manager sets all users to inactive state on startup.
 
-## Matchmaking flow
+## Matchmaking Flow
 
-1. User registers, logs in, clicks Play. API adds them to the DB waiting queue and opens a WebSocket connection.
-2. Server manager waits for a free worker.
-3. Server manager polls the DB for enough players, gets a match ID, and looks up the worker's game port via Docker.
-4. Server manager sends the match config to `workers.assign.<container_id>` and saves the match in the DB.
-5. Game server receives the config, starts the game server process, and waits for it to exit.
-6. Game server publishes the result to `workers.results`. Server manager saves to DB, and marks the worker and users free.
+![Flow diagram](flow.mmd.svg)
