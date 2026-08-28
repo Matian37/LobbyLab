@@ -1,5 +1,15 @@
 # Architecture
 
+## Prerequisites
+
+Goal of this project is to run game multiplayer matchmaking for user-provided game server.
+Frontend exposes API for game server client to interact with the server 
+and provide web-based matchmaking functionality.
+Where other parts handle matchmaking logic and game server management.
+
+Due to contributors' time limitations it is targeted for running on a single machine.
+Future versions may modify this to work on multiple machines.
+
 ## Components
 
 ### Frontend + API
