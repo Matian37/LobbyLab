@@ -1,0 +1,12 @@
+Mateusz Pietrowcow (Matian37) <mateuszpietrowcow@gmail.com>
+
+Author and maintainer of both Server-Manager and Game-Server services (written in go).
+Responsible for documentation, CI workflows and architecture.
+Led large refactor of API service and adding new tests to it.
+
+Kacper Wojtkielewicz (PASJANSS) <kacper.wojtkielewiczz@gmail.com>
+
+Primary maintainer of the API service.
+Responsible for original code for API service and its website look.
+Author of initial implementation of server-manager Matchmaker and DatabaseConnection.
+Created project-scoped end-to-end tests in python.
