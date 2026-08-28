@@ -154,6 +154,25 @@ You can add `BUILD_ARGS` to customize the build behavior (e.g., `BUILD_ARGS="--n
 ```sh
 make down
 ```
+You can add `DOWN_ARGS` to customize the tear down behavior (e.g., `DOWN_ARGS="--volumes"`).
+
+### 5. API Integration
+
+Project allows you to implement your own matchmaking client.
+
+Each router is document in the [API Reference](docs/api.md) which provides details on the available endpoints and responses.
+
+
+### 6. Website Setup
+
+Project provides a web interface for users. 
+It covers auth, downloading the game client, matchmaking and viewing match results.
+
+Only thing which you need setting up is protocol for `PUBLIC_GAME_LAUNCH_URL`.
+Protocol allow browsers to open the game client directly from the web interface.
+They require them to be registered on machine beforehand, so your game client should register the protocol during installation.
+In absent of the protocol, user will not be able to join matches using the web interface.
+
 
 ## Additional Notes
 
