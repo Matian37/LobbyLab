@@ -58,7 +58,7 @@ func parseLogLevel(value string) (slog.Level, error) {
 	return level, nil
 }
 
-// Parses configuration from the environment and validates it
+// ReadConfig parses the configuration from the environment and validates it.
 func ReadConfig() (*internal.EnvConfig, error) {
 	config := &parsedConfig{}
 

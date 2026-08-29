@@ -5,7 +5,7 @@ import (
 	"log/slog"
 )
 
-// Configuration for the game-server
+// Config for the game-server.
 type Config struct {
 	BrokerURI string
 	WorkerID  string
@@ -15,7 +15,7 @@ type Config struct {
 	GameServerArgs []string
 }
 
-// Match result published to the results stream.
+// Result is a match result published to the results stream.
 type Result struct {
 	MatchID int `json:"matchID"`
 	// Holds whether the match was completed or canceled
@@ -25,7 +25,7 @@ type Result struct {
 	Details json.RawMessage `json:"details"`
 }
 
-// Match configuration given on assignment
+// MatchConfig is the match configuration given on assignment.
 type MatchConfig struct {
 	MatchID int `json:"matchID"`
 	// Match configuration addressed to the actual game server

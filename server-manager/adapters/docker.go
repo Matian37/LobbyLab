@@ -21,7 +21,8 @@ var (
 	ErrGamePortNoBinding     = errors.New("game port binding not found")
 )
 
-// Implements internal.DockerConnection over the Docker Engine API.
+// DockerConnection implements internal.DockerConnection over the Docker Engine
+// API.
 type DockerConnection struct {
 	client *client.Client
 	config *internal.EnvConfig
@@ -66,8 +67,8 @@ func (dc *DockerConnection) Open(config *internal.EnvConfig) error {
 	return nil
 }
 
-// Creates and starts a new game-server container for workerID and returns its
-// container ID.
+// SpawnContainer creates and starts a new game-server container for workerID
+// and returns its container ID.
 func (dc *DockerConnection) SpawnContainer(ctx context.Context, workerID string) (string, error) {
 	if !dc.initialized {
 		return "", ErrDockerConnNotInit
@@ -120,7 +121,8 @@ func (dc *DockerConnection) RestartContainer(ctx context.Context, containerID st
 	return nil
 }
 
-// Forcefully removes the given container, discarding any volumes it uses.
+// RemoveContainer forcefully removes the given container, discarding any
+// volumes it uses.
 func (dc *DockerConnection) RemoveContainer(ctx context.Context, containerID string) error {
 	if !dc.initialized {
 		return ErrDockerConnNotInit
@@ -143,8 +145,8 @@ func (dc *DockerConnection) RemoveContainer(ctx context.Context, containerID str
 	return nil
 }
 
-// Finds and forcefully removes any leftover worker containers from a previous
-// run, identified by the worker label.
+// RemoveZombieWorkers finds and forcefully removes any leftover worker
+// containers from a previous run, identified by the worker label.
 func (dc *DockerConnection) RemoveZombieWorkers(ctx context.Context) error {
 	if !dc.initialized {
 		return ErrDockerConnNotInit
@@ -181,7 +183,8 @@ func (dc *DockerConnection) RemoveZombieWorkers(ctx context.Context) error {
 	return nil
 }
 
-// Returns the port decides for client to connect to the game server.
+// GetGamePort returns the port assigned for the client to connect to the game
+// server.
 func (dc *DockerConnection) GetGamePort(ctx context.Context, containerID string) (string, error) {
 	if !dc.initialized {
 		return "", ErrDockerConnNotInit
@@ -234,9 +237,10 @@ func (dc *DockerConnection) getPorts(ctx context.Context, containerID string) (n
 	return res.Container.NetworkSettings.Ports, nil
 }
 
-// Create container options for container spawning
-// For game-server to properly use the ports, biding must be unspecified
-// Note: due to container spawning nature, logs cannot be attached to compose logs
+// containerCreateOptions creates container options for container spawning.
+// For the game-server to properly use the ports, the binding must be
+// unspecified. Note: due to container spawning nature, logs cannot be attached
+// to compose logs.
 func (dc *DockerConnection) containerCreateOptions(
 	portMap network.PortMap,
 	workerID string,

@@ -3,8 +3,8 @@
 // End-to-end tests for the game server.
 //
 // Tests use scripts inside the testdata directory for actual game servers.
-// Some of them use SCRIPT_PID_FILE environment var to provide information
-// about his and child process IDs to tests.
+// Some of them use the SCRIPT_PID_FILE environment variable to provide
+// information about its own and child process IDs to the tests.
 package main
 
 import (

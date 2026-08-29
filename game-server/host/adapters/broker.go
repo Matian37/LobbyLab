@@ -50,7 +50,7 @@ func NewConnection(brokerURI string, workerID string, logger *slog.Logger) *NATS
 	}
 }
 
-// Opens the connection to the NATS broker.
+// Open opens the connection to the NATS broker.
 // timeout is used here as argument due to NATS library implementation.
 // Passing context as options to nats.Connect does not work
 func (c *NATSConnection) Open(timeout time.Duration) error {
@@ -92,7 +92,7 @@ func (c *NATSConnection) Open(timeout time.Duration) error {
 	return nil
 }
 
-// Closes the connection. It can also close a partially open connection.
+// Close closes the connection. It can also close a partially open connection.
 func (c *NATSConnection) Close() error {
 	// if c.conn was initialized, then connection is partially opened
 	if !c.opened && c.conn == nil {
@@ -132,7 +132,7 @@ func (c *NATSConnection) GetMatchConfig(ctx context.Context) (internal.MatchConf
 	return matchConfig, nil
 }
 
-// Publishes a cancel result on the results stream.
+// SendCancel publishes a cancel result on the results stream.
 func (c *NATSConnection) SendCancel(ctx context.Context, matchID int) error {
 	if !c.opened {
 		return ErrConnectionNotOpen
@@ -154,7 +154,7 @@ func (c *NATSConnection) SendCancel(ctx context.Context, matchID int) error {
 	return err
 }
 
-// Publishes a success result on the results stream.
+// SendResult publishes a success result on the results stream.
 func (c *NATSConnection) SendResult(ctx context.Context, matchID int, result []byte) error {
 	if !c.opened {
 		return ErrConnectionNotOpen

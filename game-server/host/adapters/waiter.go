@@ -5,7 +5,7 @@ import (
 	"os/exec"
 )
 
-// Used for running non-blocking wait operations on exec.Cmd.
+// CmdWaiter is used for running non-blocking wait operations on exec.Cmd.
 type CmdWaiter struct {
 	Cmd     *exec.Cmd
 	resChan chan error
@@ -20,7 +20,7 @@ func NewCmdWaiter(cmd *exec.Cmd) *CmdWaiter {
 	return &CmdWaiter{Cmd: cmd}
 }
 
-// Waits for cmd to complete and returns its error result.
+// Wait waits for cmd to complete and returns its error result.
 // This is a blocking call. When completed, the same error will be
 // returned every time when called again.
 func (c *CmdWaiter) Wait(ctx context.Context) error {
@@ -35,7 +35,7 @@ func (c *CmdWaiter) Wait(ctx context.Context) error {
 	}
 }
 
-// Starts waiting for the process to complete. Does not block.
+// WaitAsync starts waiting for the process to complete. It does not block.
 func (c *CmdWaiter) WaitAsync() {
 	if c.resChan != nil {
 		return

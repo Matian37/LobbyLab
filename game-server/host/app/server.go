@@ -79,9 +79,9 @@ func (s *Server) Close() error {
 	return s.broker.Close()
 }
 
-// Runs loop handling one match per iteration until the context is canceled.
-// A failed match does not stop the loop; the next iteration is retried with
-// exponential backoff.
+// Run runs the loop handling one match per iteration until the context is
+// canceled. A failed match does not stop the loop; the next iteration is
+// retried with exponential backoff.
 func (s *Server) Run(ctx context.Context) error {
 	if !s.opened {
 		return ErrServerNotOpened

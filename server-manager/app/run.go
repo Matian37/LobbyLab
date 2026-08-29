@@ -7,7 +7,7 @@ import (
 	"github.com/Matian37/multiplayer-asset/server-manager/internal"
 )
 
-// Runs WorkerManager and Matchmaker, closes on when ctx is done.
+// Run runs the WorkerManager and Matchmaker, closing them when ctx is done.
 func Run(ctx context.Context, config *internal.EnvConfig, logger *slog.Logger) error {
 	logger.Debug("starting worker manager")
 

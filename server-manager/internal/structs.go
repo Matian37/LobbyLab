@@ -7,7 +7,7 @@ import (
 	"github.com/moby/moby/api/types/network"
 )
 
-// Runtime configuration for server-manager.
+// EnvConfig is the runtime configuration for server-manager.
 type EnvConfig struct {
 	Image              string
 	Workercount        int
@@ -25,20 +25,20 @@ type EnvConfig struct {
 	TestMakeContainerDummy bool
 }
 
-// Configuration which is sent to worker.
+// MatchConfig is the configuration which is sent to a worker.
 type MatchConfig struct {
 	MatchID int             `json:"matchID"`
 	Config  json.RawMessage `json:"config"`
 }
 
-// Outcome of a finished match reported by a worker.
+// Result is the outcome of a finished match reported by a worker.
 type Result struct {
 	Success bool            `json:"success"`
 	MatchID int             `json:"matchID"`
 	Details json.RawMessage `json:"details"`
 }
 
-// Player participating in matchmaking.
+// User is a player participating in matchmaking.
 type User struct {
 	Login string `json:"login"`
 	// Secret which is used to authenticate the player
@@ -46,7 +46,7 @@ type User struct {
 	MatchAuthToken string `json:"matchAuthToken"`
 }
 
-// Address of a game-server which is running a match.
+// ServerInfo is the address of a game-server which is running a match.
 type ServerInfo struct {
 	Host, Port string
 }

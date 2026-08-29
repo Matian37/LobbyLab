@@ -30,7 +30,7 @@ var (
 	ErrWorkerStateChanged      = errors.New("worker changed state during restart")
 )
 
-// Handles the life cycle of server-manager workers.
+// WorkerManager handles the life cycle of server-manager workers.
 //
 // It runs three loops:
 //  1. Checking worker health (healthLoop)
@@ -104,7 +104,8 @@ func NewWorkerManager(config *internal.EnvConfig, logger *slog.Logger) *WorkerMa
 	}
 }
 
-// Opens connections, removes zombie containers, spawns workers and runs main loops.
+// Start opens connections, removes zombie containers, spawns workers and runs
+// the main loops.
 func (wm *WorkerManager) Start(ctx context.Context) error {
 	if wm.closed {
 		return ErrMgrClosed
@@ -160,7 +161,7 @@ func (wm *WorkerManager) Start(ctx context.Context) error {
 	return nil
 }
 
-// Closes connections, kills containers and stops loops.
+// Shutdown closes connections, kills containers and stops the loops.
 func (wm *WorkerManager) Shutdown() {
 	if wm.closed {
 		wm.logger.Warn("already closed")
@@ -198,8 +199,9 @@ func (wm *WorkerManager) Shutdown() {
 	wm.logger.Debug("shutdown complete")
 }
 
-// Loop which responsibility is receiving match save requests from resultLoop and saving them.
-// It also frees users and allows them to start matchmaking again.
+// saveLoop is the loop whose responsibility is receiving match save requests
+// from resultLoop and saving them. It also frees users and allows them to
+// start matchmaking again.
 func (wm *WorkerManager) saveLoop(ctx context.Context) error {
 	if !wm.initialized {
 		return ErrMgrNoInit
@@ -236,7 +238,8 @@ func (wm *WorkerManager) saveLoop(ctx context.Context) error {
 	}
 }
 
-// Fetches results from workers, frees them and redirects result to saveLoop.
+// resultLoop fetches results from workers, frees them and redirects each
+// result to saveLoop.
 func (wm *WorkerManager) resultLoop(ctx context.Context) error {
 	if !wm.initialized {
 		return ErrMgrNoInit
@@ -263,7 +266,8 @@ func (wm *WorkerManager) resultLoop(ctx context.Context) error {
 	}
 }
 
-// Periodically pings workers and restarts them when they stop responding.
+// healthLoop periodically pings workers and restarts them when they stop
+// responding.
 func (wm *WorkerManager) healthLoop(ctx context.Context) error {
 	if !wm.initialized {
 		return ErrMgrNoInit
@@ -289,7 +293,8 @@ func (wm *WorkerManager) healthLoop(ctx context.Context) error {
 	}
 }
 
-// Blocks until at least one worker becomes free, or until ctx is canceled.
+// WaitForFreeWorker blocks until at least one worker becomes free, or until
+// ctx is canceled.
 func (wm *WorkerManager) WaitForFreeWorker(ctx context.Context) {
 	wm.mu.Lock()
 	defer wm.mu.Unlock()
@@ -316,9 +321,9 @@ func (wm *WorkerManager) WaitForFreeWorker(ctx context.Context) {
 	}
 }
 
-// Selects a free worker and assigns match config to him.
-// Returns externally reachable game address of worker container.
-// If no free worker is found then returns ErrNoFreeWorker.
+// AssignMatch selects a free worker and assigns the match config to it.
+// It returns the externally reachable game address of the worker container.
+// If no free worker is found then it returns ErrNoFreeWorker.
 func (wm *WorkerManager) AssignMatch(ctx context.Context, config internal.MatchConfig) (internal.ServerInfo, error) {
 	if !wm.initialized {
 		return internal.ServerInfo{}, ErrMgrNoInit
@@ -349,7 +354,7 @@ func (wm *WorkerManager) AssignMatch(ctx context.Context, config internal.MatchC
 	return internal.ServerInfo{Host: wm.config.PublicHost, Port: port}, nil
 }
 
-// Core function of resultLoop for handling match results.
+// handleResults is the core function of resultLoop for handling match results.
 func (wm *WorkerManager) handleResults(ctx context.Context) error {
 	msg, err := wm.brokerConn.GetResult(ctx)
 	if err != nil {
@@ -389,7 +394,7 @@ func (wm *WorkerManager) handleResults(ctx context.Context) error {
 	return nil
 }
 
-// Core function of healthLoop for checking worker health.
+// healthCheck is the core function of healthLoop for checking worker health.
 func (wm *WorkerManager) healthCheck(ctx context.Context) error {
 	responders, err := wm.brokerConn.GetWorkersPong(ctx, wm.workerPongTimeout)
 	if err != nil {
@@ -452,7 +457,7 @@ func (wm *WorkerManager) healthCheck(ctx context.Context) error {
 	return nil
 }
 
-// Restarts worker. Function is thread-safe.
+// restartWorker restarts the given worker. The function is thread-safe.
 func (wm *WorkerManager) restartWorker(ctx context.Context, worker *Worker, restartStateID int) error {
 	err := wm.dockerConn.RestartContainer(ctx, worker.ContainerID)
 	if err != nil {

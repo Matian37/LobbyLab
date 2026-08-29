@@ -12,7 +12,7 @@ import (
 	"github.com/Matian37/multiplayer-asset/game-server/internal"
 )
 
-// Runs full application with configuration, logger, and server.
+// Run runs the full application with configuration, logger, and server.
 func Run(ctx context.Context) error {
 	cfg, err := config.ReadConfig()
 	if err != nil {

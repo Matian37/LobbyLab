@@ -20,8 +20,8 @@ var (
 	ErrMatchmakerAlreadyOpen = errors.New("matchmaker already open")
 )
 
-// Handles matchmaking and match creation.
-// Delegates match assignments to workerManager.
+// Matchmaker handles matchmaking and match creation.
+// It delegates match assignments to the workerManager.
 type Matchmaker struct {
 	workerManager internal.WorkerManager
 	db            internal.DatabaseConnection
@@ -49,7 +49,8 @@ func NewMatchmaker(workerManager internal.WorkerManager, config *internal.EnvCon
 	}
 }
 
-// Setups matchmaking in database and starts main loop goroutine.
+// Start sets up matchmaking in the database and starts the main loop
+// goroutine.
 func (m *Matchmaker) Start(ctx context.Context) error {
 	if m.closed {
 		return ErrMatchmakerClosed
@@ -175,8 +176,9 @@ func (m *Matchmaker) matchmakingLoop(ctx context.Context) error {
 	}
 }
 
-// Waits for enough player to be able to create a match.
-// It returns them, but if something fails inside the function it returns error.
+// waitForEnoughPlayers waits for enough players to be able to create a match.
+// It returns them, but if something fails inside the function it returns an
+// error.
 func (m *Matchmaker) waitForEnoughPlayers(ctx context.Context) ([]internal.User, error) {
 	ticker := time.NewTicker(m.dbPoolTimeout)
 	defer ticker.Stop()

@@ -52,8 +52,8 @@ func NewExecutor(cmdArgs []string, logger *slog.Logger) *Executor {
 	}
 }
 
-// Launches the configured game server process with the given configuration.
-// Function returns error when the executor is already active.
+// Start launches the configured game server process with the given
+// configuration. It returns an error when the executor is already active.
 func (s *Executor) Start(config string) error {
 	if s.active {
 		return ErrExecutorAlreadyActive
@@ -93,7 +93,7 @@ func (s *Executor) Start(config string) error {
 	return nil
 }
 
-// Stops the running game server process and cleans up resources.
+// Stop stops the running game server process and cleans up resources.
 func (s *Executor) Stop(ctx context.Context) error {
 	if !s.active {
 		return ErrExecutorNotActive
@@ -151,7 +151,8 @@ func (s *Executor) stopCommand(ctx context.Context) error {
 	}
 }
 
-// Blocks until the process exits, then reads the result file and returns its content.
+// GetResult blocks until the process exits, then reads the result file and
+// returns its content.
 func (s *Executor) GetResult(ctx context.Context) ([]byte, error) {
 	if !s.active {
 		return []byte{}, ErrExecutorNotActive

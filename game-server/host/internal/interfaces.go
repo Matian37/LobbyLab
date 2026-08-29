@@ -7,8 +7,8 @@ import (
 	"time"
 )
 
-// Handles connection and communication with the message broker.
-// Connection must not allow for reopening after closing.
+// BrokerConnection handles connection and communication with the message
+// broker. A connection must not allow reopening after being closed.
 type BrokerConnection interface {
 	// Note: timeout is used here instead of context due to broker's library implementation.
 	Open(timeout time.Duration) error
@@ -18,8 +18,8 @@ type BrokerConnection interface {
 	SendResult(ctx context.Context, matchID int, result []byte) error
 }
 
-// Handles runtime of game server process.
-// Implementation allow executor to start again after stopping.
+// Executor handles the runtime of the game-server process.
+// The implementation must allow the executor to start again after stopping.
 type Executor interface {
 	Start(config string) error
 	Stop(ctx context.Context) error
