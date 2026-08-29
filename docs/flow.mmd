@@ -28,5 +28,4 @@ sequenceDiagram
     Worker->>SM: Publish match outcome to workers.results
     SM->>SM: Mark worker as free
     SM->>DB: Save results, remove players from waiting queue
-    SM-->>User: Ready for next match
     end
