@@ -164,7 +164,7 @@ You can add `DOWN_ARGS` to customize the tear down behavior (e.g., `DOWN_ARGS="-
 
 Project allows you to implement your own matchmaking client.
 
-Each router is document in the [API Reference](docs/api.md) which provides details on the available endpoints and responses.
+Each router is documented in the [API Reference](api.md) which provides details on the available endpoints and responses.
 
 
 ### 6. Website Setup
