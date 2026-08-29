@@ -30,13 +30,14 @@ Future versions may modify this to work on multiple machines.
         - Creates match and assigns user to it in database.
         - Hands over the match execution to ServerManager
     2. ServerManager
-        - Manages the lifecycle of game-server worker containers.
+        - Spawns game-server worker containers and manages their lifecycle.
         - Sends match assignments to workers and handles their results.
         - Saves match results to the DB.
     - Why split?
         - It is done so both parts don't need to communicate with each other across containers,
         which would introduce increased code complexity and potential bugs.
         - The tradeoff is that the two parts are coupled and one can crash another.
+- Exposed to the Docker socket (for reason why see [Docker section](#docker)).
 
 ### Game Server
 - Powered by Go.
