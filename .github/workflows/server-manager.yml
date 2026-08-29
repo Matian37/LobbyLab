@@ -33,7 +33,7 @@ jobs:
           working-directory: server-manager
 
       - name: Add Public Network
-        run: docker network create public-net || true
+        run: docker network create multiplayer-asset_public-net || true
 
       - name: Run Unit Tests
         run: go test -v --timeout 1m ./...
