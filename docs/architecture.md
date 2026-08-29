@@ -47,6 +47,14 @@ Future versions may modify this to work on multiple machines.
 ### NATS
 - Message broker for communication between server manager and game servers.
 
+## Docker
+
+The project uses a Docker-based architecture where all services run as containers.
+
+While most services are managed by Docker Compose, the game-server must be spawned manually by the server-manager. This gives the server-manager direct control over the game-server lifecycle — a key requirement when handling failures. To achieve this, the server-manager has access to the Docker socket, a powerful privilege that is dangerous in general but necessary here: it lets the server-manager inspect and restart any game-server the moment a failure is detected.
+
+The server-manager also needs to know the exact state of every game-server container at all times. This allows it to cancel matches on affected servers properly and, in turn, unblock matchmaking for the users of those matches.
+
 ## NATS
 
 ### Subjects
