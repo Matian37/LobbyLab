@@ -264,10 +264,10 @@ export class Connection extends EventEmitter {
     }
 
     /**
-     * Records that if pong was not received in time it is considered a missed pong.
-     * Miss is counted only for the currently pending sequence number
-     * and it increaments `missedPongs` counter.
-     * Once consecutive misses exceed `maxMissedPongs`, the connection is hard-closed.
+     * Records that if a pong was not received in time it is considered a
+     * missed pong. A miss is counted only for the currently pending sequence
+     * number and it increments the `missedPongs` counter. Once consecutive
+     * misses exceed `maxMissedPongs`, the connection is hard-closed.
      *
      * @param {number} seq The sequence whose pong deadline elapsed.
      */

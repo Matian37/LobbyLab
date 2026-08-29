@@ -26,7 +26,7 @@ export const sql = postgres(DATABASE_URL, {
  * @property {number} websocketId The user's current `last_websocket_id`.
  * @property {number|null} matchId ID of the user's assigned match, or `null`.
  * @property {string} matchAuthToken Token to join the match, may be old when
- * the match is not assigned.W
+ * the match is not assigned.
  * @property {string} host Game server host of the match or empty string.
  * @property {string} port Game server port of the match or empty string.
  */
