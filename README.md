@@ -92,6 +92,8 @@ make logs
 
 You can also specify additional docker compose logs arguments in `LOG_ARGS`.
 
+For the full reference of the available Make targets and their arguments, see [makefile.md](docs/makefile.md).
+
 ## Authors
 
 * Mateusz Pietrowcow ([Matian37](https://github.com/Matian37))

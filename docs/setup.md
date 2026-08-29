@@ -139,6 +139,9 @@ Adjust these values according to your game's requirements.
 
 ### 4. Control the Platform
 
+All commands below are provided by the project `Makefile`. For the full
+reference of every target and its arguments see [makefile.md](makefile.md).
+
 1. **Start services**:
 ```sh
 make up
