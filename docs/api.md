@@ -1,4 +1,4 @@
-# Multiplayer Asset — API Documentation
+# API Documentation
 
 This document describes the public HTTP API and the WebSocket matchmaking
 endpoint exposed by the `api` service. All endpoints are served over the same
