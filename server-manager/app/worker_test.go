@@ -11,27 +11,27 @@ import (
 func newTestWorkerFree(stateID int) Worker {
 	return Worker{
 		State:           WorkerFree,
-		stateID:         stateID,
+		StateID:         stateID,
 		stateValidUntil: time.Time{},
-		matchID:         0,
+		MatchID:         0,
 	}
 }
 
 func newTestWorkerOccupied(stateID int, matchID int) Worker {
 	return Worker{
 		State:           WorkerOccupied,
-		stateID:         stateID,
+		StateID:         stateID,
 		stateValidUntil: time.Time{},
-		matchID:         matchID,
+		MatchID:         matchID,
 	}
 }
 
 func newTestWorkerRestarting(stateID int, now time.Time) Worker {
 	return Worker{
 		State:           WorkerRestarting,
-		stateID:         stateID,
+		StateID:         stateID,
 		stateValidUntil: now.Add(time.Hour),
-		matchID:         0,
+		MatchID:         0,
 	}
 }
 
@@ -66,7 +66,7 @@ func TestWorker_SetFree(t *testing.T) {
 
 			worker := test.worker
 			res := worker.SetFree()
-			assert.Equal(t, worker.stateID, res)
+			assert.Equal(t, worker.StateID, res)
 
 			assert.Equal(t, expected, worker)
 		})
@@ -97,7 +97,7 @@ func TestWorker_SetRestarting(t *testing.T) {
 			res := worker.SetRestarting()
 			nowUpperBound := time.Now()
 
-			assert.Equal(t, worker.stateID, res)
+			assert.Equal(t, worker.StateID, res)
 
 			assert.GreaterOrEqual(t, worker.stateValidUntil, nowLowerBound.Add(worker.restartTimeout))
 			assert.LessOrEqual(t, worker.stateValidUntil, nowUpperBound.Add(worker.restartTimeout))
@@ -130,7 +130,7 @@ func TestWorker_SetOccupied(t *testing.T) {
 			worker := test.worker
 
 			res := worker.SetOccupied(nextMatchID)
-			assert.Equal(t, worker.stateID, res)
+			assert.Equal(t, worker.StateID, res)
 			assert.Equal(t, expected, worker)
 		})
 	}
@@ -213,14 +213,14 @@ func TestWorker_HandlePong(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			worker := &Worker{
 				State:     test.initState,
-				stateID:   test.initStateID,
+				StateID:   test.initStateID,
 				failCount: test.initFails,
 			}
 
 			worker.HandlePong(test.pong)
 
 			assert.Equal(t, test.wantState, worker.State)
-			assert.Equal(t, test.wantStateID, worker.stateID)
+			assert.Equal(t, test.wantStateID, worker.StateID)
 			assert.Equal(t, test.wantFails, worker.failCount)
 		})
 	}
@@ -359,6 +359,6 @@ func TestWorker_LifeCycle(t *testing.T) {
 		require.Equal(t, 4, worker.SetRestarting())
 		require.Equal(t, 5, worker.SetOccupied(2))
 
-		assert.Equal(t, 5, worker.stateID)
+		assert.Equal(t, 5, worker.StateID)
 	})
 }

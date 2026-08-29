@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"server-manager/internal"
+	"github.com/Matian37/multiplayer-asset/server-manager/internal"
 
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/api/types/network"

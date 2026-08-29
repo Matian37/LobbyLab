@@ -1,5 +1,17 @@
 import { vi } from 'vitest';
 
+/**
+ * Builds a SvelteKit `enhance`-style mock for form actions. It installs a
+ * `submit` handler on the given node that intercepts the event, invokes the
+ * provided `submitCallback` with a fake `SubmitFunction` argument object, and
+ * then feeds a default result (produced by `defaultResultFn`) into the returned
+ * `SubmitFunctionResult` handler.
+ *
+ * @param {() => unknown} defaultResultFn Produces the `result` value passed to
+ *     the submit result handler.
+ * @returns {(node: HTMLElement, submitCallback?: Function) => { destroy: () => void }}
+ *     The `enhance` mock.
+ */
 export function enhanceMock(defaultResultFn) {
     return (node, submitCallback) => {
         const handleSubmit = async (event) => {

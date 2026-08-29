@@ -5,20 +5,24 @@ import (
 	"encoding/json"
 	"errors"
 	"log/slog"
-	"server-manager/adapters"
-	"server-manager/internal"
 	"sync"
 	"time"
+
+	"github.com/Matian37/multiplayer-asset/server-manager/adapters"
+	"github.com/Matian37/multiplayer-asset/server-manager/internal"
 
 	"github.com/cenkalti/backoff/v6"
 )
 
+// Errors returned by Matchmaker operations.
 var (
 	ErrNotEnoughUsers        = errors.New("not enough users")
 	ErrMatchmakerClosed      = errors.New("matchmaker closed")
 	ErrMatchmakerAlreadyOpen = errors.New("matchmaker already open")
 )
 
+// Matchmaker handles matchmaking and match creation.
+// It delegates match assignments to the workerManager.
 type Matchmaker struct {
 	workerManager internal.WorkerManager
 	db            internal.DatabaseConnection
@@ -31,9 +35,12 @@ type Matchmaker struct {
 
 	logger *slog.Logger
 
+	// TODO: use channel instead of WaitGroup,
+	// for one task it is overkill
 	wg sync.WaitGroup
 }
 
+// NewMatchmaker builds a Matchmaker wired to the given worker manager.
 func NewMatchmaker(workerManager internal.WorkerManager, config *internal.EnvConfig, logger *slog.Logger) *Matchmaker {
 	return &Matchmaker{
 		workerManager: workerManager,
@@ -44,6 +51,8 @@ func NewMatchmaker(workerManager internal.WorkerManager, config *internal.EnvCon
 	}
 }
 
+// Start sets up matchmaking in the database and starts the main loop
+// goroutine.
 func (m *Matchmaker) Start(ctx context.Context) error {
 	if m.closed {
 		return ErrMatchmakerClosed
@@ -72,6 +81,7 @@ func (m *Matchmaker) Start(ctx context.Context) error {
 	return nil
 }
 
+// Shutdown closes the database connection and waits for the core loop to exit.
 func (m *Matchmaker) Shutdown() {
 	if m.closed {
 		return
@@ -116,9 +126,10 @@ func (m *Matchmaker) createMatch(ctx context.Context, matchUsers []internal.User
 		return 0, err
 	}
 
-	// FIX: if add match fails then send cancel match job to worker
-	// 		this require creating cancel feature in game-server,
-	// 		so responsibility of stopping match is on actual game server side
+	// FIX: If AddMatch fails, the match job remains active. Properly handling this
+	// would require adding cancellation support to the game server or finding another
+	// solution. This is not critical, as the game server should detect the missing user
+	// and handle the situation itself. Leave this as-is for now.
 	return matchID, m.db.AddMatch(ctxTimeout, matchUsers, serverInfo, matchID)
 }
 
@@ -168,6 +179,9 @@ func (m *Matchmaker) matchmakingLoop(ctx context.Context) error {
 	}
 }
 
+// waitForEnoughPlayers waits for enough players to be able to create a match.
+// It returns them, but if something fails inside the function it returns an
+// error.
 func (m *Matchmaker) waitForEnoughPlayers(ctx context.Context) ([]internal.User, error) {
 	ticker := time.NewTicker(m.dbPoolTimeout)
 	defer ticker.Stop()

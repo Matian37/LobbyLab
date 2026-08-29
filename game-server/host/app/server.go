@@ -5,19 +5,26 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"server/adapters"
-	"server/internal"
 	"time"
+
+	"github.com/Matian37/multiplayer-asset/game-server/adapters"
+	"github.com/Matian37/multiplayer-asset/game-server/internal"
 
 	"github.com/cenkalti/backoff/v6"
 )
 
+// Errors returned by Server operations.
 var (
 	ErrServerNotOpened     = errors.New("server not opened")
 	ErrServerAlreadyOpened = errors.New("server already opened")
 	ErrServerAlreadyClosed = errors.New("server already closed")
 )
 
+// Server manages a worker's life cycle. It owns internal.BrokerConnection and
+// internal.Executor instances. It runs in loop, handling one match per iteration,
+// until the context is canceled.
+//
+// Server cannot be reused after it is closed.
 type Server struct {
 	broker   internal.BrokerConnection
 	executor internal.Executor
@@ -32,6 +39,7 @@ type Server struct {
 	sendCancelTimeout time.Duration
 }
 
+// NewServer builds a Server with default timeouts.
 func NewServer(brokerURI string, containerID string, cmdArgs []string, logger *slog.Logger) *Server {
 	return &Server{
 		broker:            adapters.NewConnection(brokerURI, containerID, logger),
@@ -45,6 +53,7 @@ func NewServer(brokerURI string, containerID string, cmdArgs []string, logger *s
 	}
 }
 
+// Open opens the broker connection so the server can start accepting matches.
 func (s *Server) Open() error {
 	if s.closed {
 		return ErrServerAlreadyClosed
@@ -60,6 +69,7 @@ func (s *Server) Open() error {
 	return nil
 }
 
+// Close stops any running game server and closes the broker connection.
 func (s *Server) Close() error {
 	if !s.opened {
 		return ErrServerNotOpened
@@ -73,6 +83,9 @@ func (s *Server) Close() error {
 	return s.broker.Close()
 }
 
+// Run runs the loop handling one match per iteration until the context is
+// canceled. A failed match does not stop the loop; the next iteration is
+// retried with exponential backoff.
 func (s *Server) Run(ctx context.Context) error {
 	if !s.opened {
 		return ErrServerNotOpened
@@ -104,6 +117,7 @@ func (s *Server) Run(ctx context.Context) error {
 	return ctx.Err()
 }
 
+// Fetches a match configuration from the broker, runs the game server, and sends the result back
 func (s *Server) runMatch(ctx context.Context) error {
 	s.logger.Debug("waiting for match config...")
 	config, err := s.broker.GetMatchConfig(ctx)
@@ -130,6 +144,7 @@ func (s *Server) runMatch(ctx context.Context) error {
 	return nil
 }
 
+// Starts executor and waits for the result, after that it stops the executor
 func (s *Server) runServer(ctx context.Context, config string) ([]byte, error) {
 	s.logger.Info("starting server...")
 	if err := s.executor.Start(config); err != nil {
@@ -145,6 +160,8 @@ func (s *Server) runServer(ctx context.Context, config string) ([]byte, error) {
 	return result, nil
 }
 
+// Wraps executor.Stop with logger and timeout
+// If the stop fails, the error is logged but not returned.
 func (s *Server) stopServer(ctx context.Context) {
 	timeoutCtx, cancel := context.WithTimeout(ctx, s.serverStopTimeout)
 	defer cancel()
@@ -155,6 +172,8 @@ func (s *Server) stopServer(ctx context.Context) {
 	}
 }
 
+// Wraps broker.SendCancel with logger and timeout
+// If send fails, the error is logged but not returned.
 func (s *Server) sendCancel(matchID int) {
 	s.logger.Warn("sending match cancel...")
 
@@ -166,6 +185,7 @@ func (s *Server) sendCancel(matchID int) {
 	}
 }
 
+// Wraps broker.SendResult with logger and timeout
 func (s *Server) sendResult(ctx context.Context, matchID int, result []byte) error {
 	s.logger.Info("sending match result...")
 

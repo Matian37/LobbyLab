@@ -1,15 +1,19 @@
+// Package config reads and validates server-manager's runtime configuration
+// from environment variables.
 package config
 
 import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"server-manager/internal"
+
+	"github.com/Matian37/multiplayer-asset/server-manager/internal"
 
 	"github.com/caarlos0/env/v11"
 	"github.com/moby/moby/api/types/network"
 )
 
+// Errors returned when validating the configuration.
 var (
 	ErrWorkerCountNotPositive    = errors.New("worker count not positive")
 	ErrClientPortNotInExposed    = errors.New("client port not in expose ports")
@@ -55,6 +59,7 @@ func parseLogLevel(value string) (slog.Level, error) {
 	return level, nil
 }
 
+// ReadConfig parses the configuration from the environment and validates it.
 func ReadConfig() (*internal.EnvConfig, error) {
 	config := &parsedConfig{}
 

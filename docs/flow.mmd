@@ -1,0 +1,31 @@
+---
+title: Typical Matchmaking Flow
+config:
+  theme: light
+---
+sequenceDiagram
+    autonumber
+    actor User as Player Client
+    participant API as API Gateway
+    participant DB as Database
+    participant SM as Server Manager
+    participant Worker as Game Server Worker
+    rect rgb(150, 190, 230)
+    Note over User, Worker: Phase 1: Matchmaking
+    User->>API: Login & click "Play" (WebSocket)
+    API->>DB: Add user to Waiting Queue
+    end
+    rect rgb(235, 200, 120)
+    Note over User, Worker: Phase 2: Allocation & Setup
+    SM->>DB: Poll for queued players
+    SM->>Worker: Allocate free worker & send match config
+    Worker->>Worker: Spin up Game Server process
+    API-->>User: Send Game Server connection info and disconnect
+    end
+    rect rgb(150, 220, 170)
+    Note over User, Worker: Phase 3: Gameplay & Teardown
+    User->>Worker: Connect directly & play game
+    Worker->>SM: Publish match outcome to workers.results
+    SM->>SM: Mark worker as free
+    SM->>DB: Save results, remove players from waiting queue
+    end

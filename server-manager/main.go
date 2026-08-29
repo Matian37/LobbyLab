@@ -1,3 +1,6 @@
+// Package main is the entry point of the server-manager service. It reads the
+// configuration, wires logging, and runs the application until it receives a
+// termination signal.
 package main
 
 import (
@@ -6,10 +9,11 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
-	"server-manager/app"
-	"server-manager/config"
-	"server-manager/internal"
 	"syscall"
+
+	"github.com/Matian37/multiplayer-asset/server-manager/app"
+	"github.com/Matian37/multiplayer-asset/server-manager/config"
+	"github.com/Matian37/multiplayer-asset/server-manager/internal"
 )
 
 func main() {

@@ -1,4 +1,4 @@
-# Multiplayer Asset — API Documentation
+# API Documentation
 
 This document describes the public HTTP API and the WebSocket matchmaking
 endpoint exposed by the `api` service. All endpoints are served over the same
@@ -294,7 +294,11 @@ or the connection is closed for one of the reasons below.
 
 The client may close the connection at any time (e.g. to leave the queue).
 
-## Close Codes and Reasons
+## Closing Connection
+
+Client **must always** close the connection gracefully, otherwise users **may be matchmaked** 
+though they are no longer waiting. It takes some time for the server to detect closure and 
+react to it (time depends on API configuration, but should be around 10 seconds).
 
 The server may close the connection with the following codes. Application-level
 reasons are sent in the close reason string.

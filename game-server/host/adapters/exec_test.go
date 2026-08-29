@@ -57,6 +57,7 @@ func TestRemoveFile(t *testing.T) {
 
 func TestKillProcessGroup(t *testing.T) {
 	t.Run("kills group but leaves different one", func(t *testing.T) {
+		// Waits for cmd to stop with timeout
 		waitWithTimeout := func(cmd *exec.Cmd) {
 			t.Helper()
 			done := make(chan error, 1)
@@ -82,16 +83,15 @@ func TestKillProcessGroup(t *testing.T) {
 		require.NoError(t, outsider.Start())
 
 		killProcessGroup(group, slog.Default())
-
-		// reap group members so the process group is actually gone
 		waitWithTimeout(leader)
 		waitWithTimeout(member)
 
+		// Process group should be gone
 		assert.Eventually(t, func() bool {
 			return errors.Is(syscall.Kill(-group, 0), syscall.ESRCH)
 		}, 1*time.Second, 20*time.Millisecond)
 
-		// outsider in a different group is left untouched
+		// Outsider in a different group is left untouched
 		assert.NoError(t, syscall.Kill(-outsider.Process.Pid, 0))
 		_ = outsider.Process.Kill()
 		waitWithTimeout(outsider)
@@ -210,7 +210,7 @@ func TestExecutor_Stop(t *testing.T) {
 
 		pgid := exc.pgid
 
-		// wait for script to send signal to inform that he now ignores SIGTERM
+		// Wait for script to send signal to inform that he now ignores SIGTERM
 		ready := make(chan os.Signal, 1)
 		signal.Notify(ready, syscall.SIGUSR1)
 		<-ready
@@ -231,12 +231,12 @@ func TestExecutor_Stop(t *testing.T) {
 		pgid := exc.cmd.Process.Pid
 		require.NoError(t, exc.cmd.Wait())
 
-		// assert child is alive
+		// Assert that child is alive
 		assert.NoError(t, syscall.Kill(-pgid, 0))
 
 		require.NoError(t, exc.Stop(context.Background()))
 
-		// wait for the process group to be gone
+		// Wait for the process group to be gone
 		assert.Eventually(t, func() bool {
 			err := syscall.Kill(-pgid, 0)
 			return errors.Is(err, syscall.ESRCH)
@@ -402,31 +402,30 @@ func TestExecutor_GetResult(t *testing.T) {
 }
 
 func TestExecutor_LifeCycle(t *testing.T) {
-	// sh -c "..." is used to ignore additional args (path to config, result)
 	iterations := []struct {
-		expected       []byte
-		command        []string
-		getResultError error
+		wantConfig []byte
+		command    []string
+		wantErr    error
 	}{
 		{
-			expected:       []byte{1, 2},
-			command:        []string{"sh", "-c", "sleep 0.1"},
-			getResultError: nil,
+			wantConfig: []byte{1, 2},
+			command:    []string{"sh", "-c", "sleep 0.1"},
+			wantErr:    nil,
 		},
 		{
-			expected:       []byte{3},
-			command:        []string{"sh", "-c", "sleep 0.1"},
-			getResultError: nil,
+			wantConfig: []byte{3},
+			command:    []string{"sh", "-c", "sleep 0.1"},
+			wantErr:    nil,
 		},
 		{
-			expected:       []byte{4},
-			command:        []string{"sh", "-c", "sleep inf"},
-			getResultError: context.DeadlineExceeded,
+			wantConfig: []byte{4},
+			command:    []string{"sh", "-c", "sleep inf"},
+			wantErr:    context.DeadlineExceeded,
 		},
 		{
-			expected:       []byte{5, 6, 7},
-			command:        []string{"sh", "-c", "sleep 0.1"},
-			getResultError: nil,
+			wantConfig: []byte{5, 6, 7},
+			command:    []string{"sh", "-c", "sleep 0.1"},
+			wantErr:    nil,
 		},
 	}
 
@@ -438,22 +437,17 @@ func TestExecutor_LifeCycle(t *testing.T) {
 		err := exc.Start("config")
 		require.NoError(t, err)
 
-		n, err := exc.resultFile.Write(iteration.expected)
+		n, err := exc.resultFile.Write(iteration.wantConfig)
 		require.NoError(t, err)
-		assert.Equal(t, len(iteration.expected), n)
+		assert.Equal(t, len(iteration.wantConfig), n)
 
 		ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
 		defer cancel()
 
 		res, err := exc.GetResult(ctx)
-		if iteration.getResultError == nil {
-			require.NoError(t, err)
-		} else {
-			require.ErrorIs(t, err, iteration.getResultError)
-		}
-
+		require.ErrorIs(t, err, iteration.wantErr)
 		if err == nil {
-			assert.Equal(t, iteration.expected, res)
+			assert.Equal(t, iteration.wantConfig, res)
 		}
 
 		err = exc.Stop(context.Background())

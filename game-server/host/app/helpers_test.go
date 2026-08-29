@@ -4,7 +4,7 @@ package app
 
 import (
 	"errors"
-	"server/internal/mocks"
+	"github.com/Matian37/multiplayer-asset/game-server/internal/mocks"
 	"testing"
 	"time"
 

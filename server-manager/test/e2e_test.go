@@ -14,8 +14,8 @@ import (
 	"testing"
 	"time"
 
-	"server-manager/app"
-	"server-manager/internal"
+	"github.com/Matian37/multiplayer-asset/server-manager/app"
+	"github.com/Matian37/multiplayer-asset/server-manager/internal"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/moby/moby/api/types/container"
@@ -67,6 +67,7 @@ func TestMain(m *testing.M) {
 	os.Exit(code)
 }
 
+// Starts NATS server with mocked workers that mimic the behavior of real workers.
 func setupNATS(t *testing.T, workerCount int, started *atomic.Bool) (string, chan error) {
 	t.Helper()
 
@@ -93,6 +94,11 @@ func setupNATS(t *testing.T, workerCount int, started *atomic.Bool) (string, cha
 	return addr, setupNATSMock(t, addr, workerCount, started)
 }
 
+// Sets up a mock which responds on behalf of the running workers for
+// health and job-assignment requests. It depends on current state of docker for
+// knowing which worker should respond.
+//
+// Returns channel which receives errors about wrong behavior of server-manager in NATS.
 func setupNATSMock(t *testing.T, natsURI string, workerCount int, started *atomic.Bool) chan error {
 	t.Helper()
 
@@ -164,7 +170,7 @@ func restartDB(t *testing.T, ctx context.Context) {
 	require.NoError(t, err)
 }
 
-func cleanupContainers(t *testing.T) {
+func cleanupWorkerContainers(t *testing.T) {
 	t.Helper()
 
 	cli, err := client.New()
@@ -185,6 +191,10 @@ func cleanupContainers(t *testing.T) {
 	}
 }
 
+// Resets the database, removes left over containers and sets up NATS.
+//
+// It returns the NATS URI, a flag that becomes true as
+// soon as the app reports activity, and error channel of NATS mock.
 func setupTestEnvironment(t *testing.T, workerCount int) (
 	natsURI string,
 	started *atomic.Bool,
@@ -193,7 +203,7 @@ func setupTestEnvironment(t *testing.T, workerCount int) (
 	t.Helper()
 
 	restartDB(t, context.Background())
-	t.Cleanup(func() { cleanupContainers(t) })
+	t.Cleanup(func() { cleanupWorkerContainers(t) })
 
 	started = &atomic.Bool{}
 	natsURI, errChan = setupNATS(t, workerCount, started)
@@ -201,6 +211,8 @@ func setupTestEnvironment(t *testing.T, workerCount int) (
 	return
 }
 
+// Drains the mock error channel and
+// sets test to failed if any error is retrieved.
 func checkErrChan(t *testing.T, errChan chan error) {
 	t.Helper()
 
@@ -231,6 +243,8 @@ func newGeneralConfig(workerCount int, natsURI string) *internal.EnvConfig {
 	}
 }
 
+// Blocks until the app signals that it is running.
+// It fails when either timeout is reached or app returns error
 func waitForAppStart(t *testing.T, started *atomic.Bool, appResChan chan error) {
 	t.Helper()
 
@@ -260,6 +274,8 @@ func waitForAppStart(t *testing.T, started *atomic.Bool, appResChan chan error) 
 	}
 }
 
+// Launches the app in a separate goroutine and returns a channel
+// that will receive the app's exit error (may be nil if it exited cleanly)
 func runApp(t *testing.T, ctx context.Context, cfg *internal.EnvConfig) chan error {
 	t.Helper()
 
@@ -277,7 +293,7 @@ func runApp(t *testing.T, ctx context.Context, cfg *internal.EnvConfig) chan err
 	return resChan
 }
 
-// check if all specified users are assigned to the match
+// Require all specified users to be assigned to the match
 func requireAssigned(t *testing.T, dbConn *pgx.Conn, users []string, matchID int) {
 	var assignedCount int
 	err := dbConn.QueryRow(
@@ -321,6 +337,8 @@ func TestE2E_GracefulShutdown(t *testing.T) {
 	checkErrChan(t, errChan)
 }
 
+// Creates a running container tagged as a worker,
+// which simulates a left over worker that was not cleaned up by a previous run of the app.
 func runZombieContainer(t *testing.T, ctx context.Context) string {
 	t.Helper()
 
@@ -356,6 +374,8 @@ func runZombieContainer(t *testing.T, ctx context.Context) string {
 	return res.ID
 }
 
+// Verifies that on startup the app removes any leftover worker containers
+// that were not cleaned up by a previous run.
 func TestE2E_RemoveZombieWorkers(t *testing.T) {
 	t.Cleanup(func() {
 		goleak.VerifyNone(t, goleak.IgnoreCurrent())
@@ -393,6 +413,9 @@ func TestE2E_RemoveZombieWorkers(t *testing.T) {
 	checkErrChan(t, errChan)
 }
 
+// Runs the successful application life cycle: users waiting for a match are gathered,
+// match is created with the correct host/port, users are assigned,
+// and when match finishes its results are saved.
 func TestE2E_AppLifecycle(t *testing.T) {
 	t.Cleanup(func() {
 		goleak.VerifyNone(t, goleak.IgnoreCurrent())
@@ -506,8 +529,7 @@ func TestE2E_AppLifecycle(t *testing.T) {
 	checkErrChan(t, errChan)
 }
 
-// killWorkerContainer kills the first running container that belongs to us.
-// Used to simulate a worker crash during tests.
+// Kills one worker running container. Used to simulate a worker crash during tests.
 func killWorkerContainer(t *testing.T, ctx context.Context) {
 	t.Helper()
 	cli, err := client.New()
@@ -526,6 +548,8 @@ func killWorkerContainer(t *testing.T, ctx context.Context) {
 	t.Fatal("no container to kill")
 }
 
+// Verifies that no match is created when all workers are busy,
+// but when enough players are waiting and worker gets freed, it gets created.
 func TestE2E_WorkersOverloadWithMatches(t *testing.T) {
 	t.Cleanup(func() {
 		goleak.VerifyNone(t, goleak.IgnoreCurrent())
@@ -644,6 +668,9 @@ func TestE2E_WorkersOverloadWithMatches(t *testing.T) {
 	checkErrChan(t, errChan)
 }
 
+// Verifies that when a worker's container is killed the running match is canceled.
+// The worker is detected as unhealthy and restarted.
+// And only after that new match is created with the new worker.
 func TestE2E_WorkerFailureAndRestart(t *testing.T) {
 	t.Cleanup(func() {
 		goleak.VerifyNone(t, goleak.IgnoreCurrent())
@@ -749,6 +776,8 @@ func TestE2E_WorkerFailureAndRestart(t *testing.T) {
 	checkErrChan(t, errChan)
 }
 
+// Verifies that a match is not created while fewer players than
+// the room size are queued.
 func TestE2E_NoMatchWithoutEnoughPlayers(t *testing.T) {
 	t.Cleanup(func() {
 		goleak.VerifyNone(t, goleak.IgnoreCurrent())

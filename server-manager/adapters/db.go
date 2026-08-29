@@ -4,11 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"server-manager/internal"
+
+	"github.com/Matian37/multiplayer-asset/server-manager/internal"
 
 	"github.com/jackc/pgx/v5"
 )
 
+// Errors returned by DatabaseConnection operations.
 var (
 	ErrDBConnNotOpen            = errors.New("connection not open")
 	ErrDBConnClosed             = errors.New("connection closed")
@@ -19,6 +21,8 @@ var (
 	ErrDBMatchNotFound          = errors.New("match not found")
 )
 
+// DatabaseConnection implements internal.DatabaseConnection over a single pgx
+// connection to PostgreSQL.
 type DatabaseConnection struct {
 	conn   *pgx.Conn
 	config *internal.EnvConfig
@@ -27,10 +31,12 @@ type DatabaseConnection struct {
 	closed     bool
 }
 
+// NewDatabaseConnection creates a new DatabaseConnection with the given config.
 func NewDatabaseConnection(config *internal.EnvConfig) *DatabaseConnection {
 	return &DatabaseConnection{config: config}
 }
 
+// Open opens the database connection
 func (dc *DatabaseConnection) Open(ctx context.Context) error {
 	if dc.closed {
 		return ErrDBConnClosed
@@ -45,6 +51,7 @@ func (dc *DatabaseConnection) Open(ctx context.Context) error {
 	}
 	dc.conn = conn
 
+	// TODO: redundant, remove
 	if err = conn.Ping(ctx); err != nil {
 		return err
 	}
@@ -53,6 +60,8 @@ func (dc *DatabaseConnection) Open(ctx context.Context) error {
 	return nil
 }
 
+// Close closes the database connection.
+// TODO: make it check if connection is opened and handle partially opened ones
 func (dc *DatabaseConnection) Close() error {
 	if dc.closed {
 		return ErrDBConnAlreadyClosed
@@ -66,6 +75,10 @@ func (dc *DatabaseConnection) Close() error {
 	return nil
 }
 
+// GatherMatchPlayers returns users waiting for a match, with their number
+// equal to PlayersPerRoom. If not enough players are queued, it returns
+// ErrDBNotEnoughPlayers. matchAuthTokens are not generated here, so they are
+// empty in the user structs.
 func (dc *DatabaseConnection) GatherMatchPlayers(ctx context.Context) ([]internal.User, error) {
 	if !dc.connOpened {
 		return nil, ErrDBConnNotOpen
@@ -100,6 +113,8 @@ func (dc *DatabaseConnection) GatherMatchPlayers(ctx context.Context) ([]interna
 	return users, nil
 }
 
+// AddMatch creates a match, assigns the given users to it, and updates their
+// match history and queue status.
 func (dc *DatabaseConnection) AddMatch(
 	ctx context.Context,
 	users []internal.User,
@@ -168,6 +183,8 @@ func (dc *DatabaseConnection) AddMatch(
 	return tx.Commit(ctx)
 }
 
+// SaveMatchResults persists the outcome of a finished match and marks it as no
+// longer active.
 func (dc *DatabaseConnection) SaveMatchResults(ctx context.Context, results internal.Result) error {
 	if !dc.connOpened {
 		return ErrDBConnNotOpen
@@ -198,6 +215,7 @@ func (dc *DatabaseConnection) SaveMatchResults(ctx context.Context, results inte
 	return nil
 }
 
+// GetNextMatchId returns the next match ID to be used for a new match.
 func (dc *DatabaseConnection) GetNextMatchId(ctx context.Context) (int, error) {
 	if !dc.connOpened {
 		return 0, ErrDBConnNotOpen
@@ -214,6 +232,12 @@ func (dc *DatabaseConnection) GetNextMatchId(ctx context.Context) (int, error) {
 	return id, nil
 }
 
+// GenerateAuthTokens generates a random matchAuthToken for each user in the
+// given slice, updates them in the database, and returns the updated slice with
+// tokens.
+//
+// Note: implementing removing users in future can cause issues here.
+// This operation does not check if query produces less users than on input slice.
 func (dc *DatabaseConnection) GenerateAuthTokens(ctx context.Context, users []internal.User) ([]internal.User, error) {
 	if !dc.connOpened {
 		return nil, ErrDBConnNotOpen
@@ -248,7 +272,9 @@ func (dc *DatabaseConnection) GenerateAuthTokens(ctx context.Context, users []in
 	return newUsers, nil
 }
 
-// removes match_id status for all users in the match
+// RemoveMatchStatus clears the match assignment, queued_until and auth token
+// of every user in the given match, so they can join the matchmaking queue
+// again.
 func (dc *DatabaseConnection) RemoveMatchStatus(ctx context.Context, matchID int) error {
 	if !dc.connOpened {
 		return ErrDBConnNotOpen
@@ -272,6 +298,9 @@ func (dc *DatabaseConnection) RemoveMatchStatus(ctx context.Context, matchID int
 	return err
 }
 
+// SetupMatchmaking resets the database state before matchmaking begins: it
+// removes every user from their match and queue, and cancels all active
+// matches.
 func (dc *DatabaseConnection) SetupMatchmaking(ctx context.Context) error {
 	if !dc.connOpened {
 		return ErrDBConnNotOpen
@@ -286,7 +315,7 @@ func (dc *DatabaseConnection) SetupMatchmaking(ctx context.Context) error {
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 
-	// remove users from matches and matchmaking queue
+	// Remove users from matches and matchmaking queue
 	_, err = tx.Exec(
 		ctx,
 		`
@@ -301,7 +330,7 @@ func (dc *DatabaseConnection) SetupMatchmaking(ctx context.Context) error {
 		return err
 	}
 
-	// cancel all active matches
+	// Cancel all active matches
 	_, err = tx.Exec(
 		ctx,
 		`

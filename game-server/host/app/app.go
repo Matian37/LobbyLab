@@ -1,3 +1,4 @@
+// Package app orchestrates the life cycle of the game-server application.
 package app
 
 import (
@@ -6,10 +7,12 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
-	"server/config"
-	"server/internal"
+
+	"github.com/Matian37/multiplayer-asset/game-server/config"
+	"github.com/Matian37/multiplayer-asset/game-server/internal"
 )
 
+// Run runs the full application with configuration, logger, and server.
 func Run(ctx context.Context) error {
 	cfg, err := config.ReadConfig()
 	if err != nil {
@@ -22,10 +25,10 @@ func Run(ctx context.Context) error {
 	serverLogger.Info("starting...")
 
 	server := NewServer(cfg.BrokerURI, cfg.WorkerID, cfg.GameServerArgs, logger)
-	return run(ctx, server, serverLogger)
+	return runServer(ctx, server, serverLogger)
 }
 
-func run(ctx context.Context, server *Server, logger *slog.Logger) error {
+func runServer(ctx context.Context, server *Server, logger *slog.Logger) error {
 	logger.Debug("opening server...")
 
 	if err := server.Open(); err != nil {

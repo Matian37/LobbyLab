@@ -1,3 +1,4 @@
+-- TODO: add missing indexes
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
 CREATE SEQUENCE matches_id_seq;
