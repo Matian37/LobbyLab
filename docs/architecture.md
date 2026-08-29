@@ -108,9 +108,9 @@ Depending on their values they signal different state in waiting queue.
 
 1. `match_id` is not null
     - User is currently in a match.
-2. `match_id` is null and `queued_until` is date a now or in future, 
+2. `match_id` is null and `queued_until` is date now or in the future, 
     - User is waiting in the queue.
-3. `match_id` is null and `queued_until` is not null or is a past date, 
+3. `match_id` is null and `queued_until` is null or is a past date, 
     - User is inactive.
 
 The reason why `queued_until` is used, is to prevent API crashes from 
