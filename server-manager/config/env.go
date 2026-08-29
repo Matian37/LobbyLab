@@ -13,6 +13,7 @@ import (
 	"github.com/moby/moby/api/types/network"
 )
 
+// Errors returned when validating the configuration.
 var (
 	ErrWorkerCountNotPositive    = errors.New("worker count not positive")
 	ErrClientPortNotInExposed    = errors.New("client port not in expose ports")

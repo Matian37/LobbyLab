@@ -14,6 +14,7 @@ import (
 	"github.com/cenkalti/backoff/v6"
 )
 
+// Errors returned by Matchmaker operations.
 var (
 	ErrNotEnoughUsers        = errors.New("not enough users")
 	ErrMatchmakerClosed      = errors.New("matchmaker closed")
@@ -39,6 +40,7 @@ type Matchmaker struct {
 	wg sync.WaitGroup
 }
 
+// NewMatchmaker builds a Matchmaker wired to the given worker manager.
 func NewMatchmaker(workerManager internal.WorkerManager, config *internal.EnvConfig, logger *slog.Logger) *Matchmaker {
 	return &Matchmaker{
 		workerManager: workerManager,
@@ -79,6 +81,7 @@ func (m *Matchmaker) Start(ctx context.Context) error {
 	return nil
 }
 
+// Shutdown closes the database connection and waits for the core loop to exit.
 func (m *Matchmaker) Shutdown() {
 	if m.closed {
 		return

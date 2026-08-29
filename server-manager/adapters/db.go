@@ -10,6 +10,7 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
+// Errors returned by DatabaseConnection operations.
 var (
 	ErrDBConnNotOpen            = errors.New("connection not open")
 	ErrDBConnClosed             = errors.New("connection closed")
@@ -30,10 +31,12 @@ type DatabaseConnection struct {
 	closed     bool
 }
 
+// NewDatabaseConnection creates a new DatabaseConnection with the given config.
 func NewDatabaseConnection(config *internal.EnvConfig) *DatabaseConnection {
 	return &DatabaseConnection{config: config}
 }
 
+// Open opens the database connection
 func (dc *DatabaseConnection) Open(ctx context.Context) error {
 	if dc.closed {
 		return ErrDBConnClosed
@@ -48,6 +51,7 @@ func (dc *DatabaseConnection) Open(ctx context.Context) error {
 	}
 	dc.conn = conn
 
+	// TODO: redundant, remove
 	if err = conn.Ping(ctx); err != nil {
 		return err
 	}
@@ -56,6 +60,7 @@ func (dc *DatabaseConnection) Open(ctx context.Context) error {
 	return nil
 }
 
+// Close closes the database connection.
 // TODO: make it check if connection is opened and handle partially opened ones
 func (dc *DatabaseConnection) Close() error {
 	if dc.closed {
@@ -178,6 +183,8 @@ func (dc *DatabaseConnection) AddMatch(
 	return tx.Commit(ctx)
 }
 
+// SaveMatchResults persists the outcome of a finished match and marks it as no
+// longer active.
 func (dc *DatabaseConnection) SaveMatchResults(ctx context.Context, results internal.Result) error {
 	if !dc.connOpened {
 		return ErrDBConnNotOpen
@@ -208,6 +215,7 @@ func (dc *DatabaseConnection) SaveMatchResults(ctx context.Context, results inte
 	return nil
 }
 
+// GetNextMatchId returns the next match ID to be used for a new match.
 func (dc *DatabaseConnection) GetNextMatchId(ctx context.Context) (int, error) {
 	if !dc.connOpened {
 		return 0, ErrDBConnNotOpen

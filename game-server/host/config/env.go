@@ -16,6 +16,8 @@ import (
 	"github.com/google/shlex"
 )
 
+// ErrInvalidLogLevel is returned when the LOG_LEVEL environment variable
+// cannot be parsed.
 var ErrInvalidLogLevel = errors.New("invalid log level")
 
 type parsedConfig struct {
@@ -49,6 +51,8 @@ func parseArgs(args []string) ([]string, error) {
 	return cmdArgs, nil
 }
 
+// ReadConfig parses the configuration from environment variables and the
+// command line, and validates it.
 func ReadConfig() (internal.Config, error) {
 	parsed := &parsedConfig{}
 	if err := env.Parse(parsed); err != nil {

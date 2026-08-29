@@ -43,6 +43,7 @@ type Worker struct {
 	restartTimeout time.Duration
 }
 
+// NewWorker builds a free Worker with the given identity and health settings.
 func NewWorker(workerID string, containerID string, maxPingRetries int, restartTimeout time.Duration) *Worker {
 	return &Worker{
 		ID:             workerID,

@@ -16,6 +16,7 @@ import (
 	"github.com/cenkalti/backoff/v6"
 )
 
+// Errors returned by WorkerManager operations.
 var (
 	ErrMgrAlreadyInit          = errors.New("manager already initialized")
 	ErrMgrAlreadyClosed        = errors.New("manager already closed")
@@ -88,6 +89,7 @@ type WorkerManager struct {
 	wg sync.WaitGroup
 }
 
+// NewWorkerManager builds a WorkerManager from the given config.
 func NewWorkerManager(config *internal.EnvConfig, logger *slog.Logger) *WorkerManager {
 	return &WorkerManager{
 		dockerConn:           adapters.NewDockerConnection(),

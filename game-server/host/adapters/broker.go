@@ -21,6 +21,7 @@ const (
 	resultSubject = "workers.results"
 )
 
+// Errors returned by NATSConnection operations.
 var (
 	ErrConnectionNotOpen       = errors.New("conection not initialized")
 	ErrConnectionAlreadyOpen   = errors.New("connection already opened")
@@ -42,6 +43,7 @@ type NATSConnection struct {
 	closed bool
 }
 
+// NewConnection builds a NATSConnection for the given broker URI and worker ID.
 func NewConnection(brokerURI string, workerID string, logger *slog.Logger) *NATSConnection {
 	return &NATSConnection{
 		brokerURI: brokerURI,

@@ -22,6 +22,7 @@ const (
 	resultStreamName = "RESULT"
 )
 
+// Errors returned by NATSConnection operations.
 var (
 	ErrNATSConnCannotBeReopened = errors.New("connection cannot be reopened")
 	ErrNATSConnNotOpen          = errors.New("connection not open")
@@ -45,6 +46,7 @@ type NATSConnection struct {
 	closed bool
 }
 
+// NewNATSConnection builds a NATSConnection with default timeouts.
 func NewNATSConnection() *NATSConnection {
 	return &NATSConnection{
 		assignJobTimeout: 5 * time.Second,

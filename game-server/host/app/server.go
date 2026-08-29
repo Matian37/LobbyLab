@@ -13,6 +13,7 @@ import (
 	"github.com/cenkalti/backoff/v6"
 )
 
+// Errors returned by Server operations.
 var (
 	ErrServerNotOpened     = errors.New("server not opened")
 	ErrServerAlreadyOpened = errors.New("server already opened")
@@ -38,6 +39,7 @@ type Server struct {
 	sendCancelTimeout time.Duration
 }
 
+// NewServer builds a Server with default timeouts.
 func NewServer(brokerURI string, containerID string, cmdArgs []string, logger *slog.Logger) *Server {
 	return &Server{
 		broker:            adapters.NewConnection(brokerURI, containerID, logger),
@@ -51,6 +53,7 @@ func NewServer(brokerURI string, containerID string, cmdArgs []string, logger *s
 	}
 }
 
+// Open opens the broker connection so the server can start accepting matches.
 func (s *Server) Open() error {
 	if s.closed {
 		return ErrServerAlreadyClosed
@@ -66,6 +69,7 @@ func (s *Server) Open() error {
 	return nil
 }
 
+// Close stops any running game server and closes the broker connection.
 func (s *Server) Close() error {
 	if !s.opened {
 		return ErrServerNotOpened

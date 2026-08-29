@@ -12,6 +12,7 @@ import (
 	"syscall"
 )
 
+// Errors returned by Executor operations.
 var (
 	ErrFailedToCreateTempFile  = errors.New("failed to create temp file")
 	ErrFailedToWriteConfig     = errors.New("failed to write config")
@@ -45,6 +46,7 @@ type Executor struct {
 	pgid      int
 }
 
+// NewExecutor builds an Executor for the given game-server command arguments.
 func NewExecutor(cmdArgs []string, logger *slog.Logger) *Executor {
 	return &Executor{
 		cmdArgs: slices.Clone(cmdArgs),

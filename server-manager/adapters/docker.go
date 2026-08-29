@@ -13,6 +13,7 @@ import (
 	"github.com/moby/moby/client"
 )
 
+// Errors returned by DockerConnection operations.
 var (
 	ErrImageEnvNotFound      = errors.New("game server image env not found")
 	ErrDockerConnNotInit     = errors.New("connection not initialized")
@@ -37,6 +38,7 @@ type DockerConnection struct {
 	closed      bool
 }
 
+// NewDockerConnection builds a DockerConnection with default timeouts.
 func NewDockerConnection() *DockerConnection {
 	return &DockerConnection{
 		createTimeout:        5 * time.Second,
@@ -47,6 +49,7 @@ func NewDockerConnection() *DockerConnection {
 	}
 }
 
+// Open initializes the connection to the Docker Engine API.
 func (dc *DockerConnection) Open(config *internal.EnvConfig) error {
 	if dc.closed {
 		return ErrDockerConnClosed
@@ -99,6 +102,7 @@ func (dc *DockerConnection) SpawnContainer(ctx context.Context, workerID string)
 	return res.ID, nil
 }
 
+// RestartContainer restarts the given container.
 func (dc *DockerConnection) RestartContainer(ctx context.Context, containerID string) error {
 	if !dc.initialized {
 		return ErrDockerConnNotInit
@@ -205,6 +209,7 @@ func (dc *DockerConnection) GetGamePort(ctx context.Context, containerID string)
 	return bindings[0].HostPort, nil
 }
 
+// Close closes the Docker Engine API client.
 func (dc *DockerConnection) Close() error {
 	if !dc.initialized {
 		return ErrDockerConnNotInit
