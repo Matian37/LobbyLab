@@ -206,7 +206,7 @@ func TestIntegration_DockerConnection_containerCreateOptions(t *testing.T) {
 		assert.True(t, *opts.HostConfig.Init)
 
 		require.NotNil(t, opts.NetworkingConfig)
-		require.Len(t, opts.NetworkingConfig.EndpointsConfig, 1)
+		require.Len(t, opts.NetworkingConfig.EndpointsConfig, 2)
 		require.Contains(t, opts.NetworkingConfig.EndpointsConfig, dc.config.BrokerNetworkName)
 	})
 
