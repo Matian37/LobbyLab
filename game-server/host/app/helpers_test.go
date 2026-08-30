@@ -4,9 +4,10 @@ package app
 
 import (
 	"errors"
-	"github.com/Matian37/multiplayer-asset/game-server/internal/mocks"
 	"testing"
 	"time"
+
+	"github.com/Matian37/LobbyLab/game-server/internal/mocks"
 
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"

@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Matian37/multiplayer-asset/game-server/internal"
-	"github.com/Matian37/multiplayer-asset/game-server/internal/mocks"
+	"github.com/Matian37/LobbyLab/game-server/internal"
+	"github.com/Matian37/LobbyLab/game-server/internal/mocks"
 
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"

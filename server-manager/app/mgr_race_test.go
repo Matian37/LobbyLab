@@ -13,8 +13,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Matian37/multiplayer-asset/server-manager/internal"
-	"github.com/Matian37/multiplayer-asset/server-manager/internal/mocks"
+	"github.com/Matian37/LobbyLab/server-manager/internal"
+	"github.com/Matian37/LobbyLab/server-manager/internal/mocks"
 
 	"go.uber.org/goleak"
 	"go.uber.org/mock/gomock"

@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Matian37/multiplayer-asset/server-manager/internal"
+	"github.com/Matian37/LobbyLab/server-manager/internal"
 
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/api/types/network"
@@ -490,10 +490,10 @@ func TestIntegration_DockerConnection_RemoveZombieWorkers(t *testing.T) {
 		dc := newTestConn(t)
 
 		withLabel := runContainerWithLabels(t, dc, map[string]string{
-			"com.github.multiplayer-asset.worker": "true",
+			"com.github.LobbyLab.worker": "true",
 		})
 		withLabelFalse := runContainerWithLabels(t, dc, map[string]string{
-			"com.github.multiplayer-asset.worker": "false",
+			"com.github.LobbyLab.worker": "false",
 		})
 		noLabel := runContainerWithLabels(t, dc, map[string]string{
 			"some.other.label": "value",

@@ -10,8 +10,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Matian37/multiplayer-asset/server-manager/adapters"
-	"github.com/Matian37/multiplayer-asset/server-manager/internal"
+	"github.com/Matian37/LobbyLab/server-manager/adapters"
+	"github.com/Matian37/LobbyLab/server-manager/internal"
 
 	"github.com/cenkalti/backoff/v6"
 )

@@ -1,4 +1,4 @@
-# multiplayer-asset
+# LobbyLab
 
 Multiplayer game platform used for running matchmaking with dedicated game servers.
 Designed to run any user-provided game server on a single VPS.
@@ -41,8 +41,8 @@ For more details see [architecture.md](docs/architecture.md).
 Clone the repository:
 
 ```bash
-git clone https://github.com/Matian37/multiplayer-asset
-cd ./multiplayer-asset
+git clone https://github.com/Matian37/LobbyLab
+cd ./LobbyLab
 ```
 
 Install required dependencies:

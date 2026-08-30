@@ -182,4 +182,4 @@ In absent of the protocol, user will not be able to join matches using the web i
 
 - Game server containers are managed entirely by the server manager. Do not start or stop them manually while the platform is running.
 - Database data is persisted in `data/db/` and NATS data in `data/nats/`.
-- The `server-manager` uses labels (`com.github.multiplayer-asset.worker: "true"`) to track running worker containers. Avoid manually creating containers with this label.
+- The `server-manager` uses labels (`com.github.LobbyLab.worker: "true"`) to track running worker containers. Avoid manually creating containers with this label.

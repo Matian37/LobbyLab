@@ -6,7 +6,7 @@ INIT_SQL="$(cd "$SCRIPT_DIR/../.." && pwd)/init.sql"
 
 cleanup() {
   docker rm -f postgres-test 2>/dev/null || true
-  rm -rf /tmp/multiplayer-asset-e2e
+  rm -rf /tmp/LobbyLab-e2e
 }
 trap cleanup EXIT TERM INT
 
@@ -24,6 +24,6 @@ until docker exec postgres-test pg_isready -U postgres; do
   sleep 0.5
 done
 
-mkdir -p /tmp/multiplayer-asset-e2e
+mkdir -p /tmp/LobbyLab-e2e
 
 DATABASE_URL='postgresql://postgres:123@localhost:5432/postgres' vite preview

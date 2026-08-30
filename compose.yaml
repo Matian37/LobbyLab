@@ -1,4 +1,4 @@
-name: multiplayer-asset
+name: LobbyLab
 
 services:
   db:
@@ -61,7 +61,7 @@ services:
     environment:
       DATABASE_URI: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
       NATS_URI: ${NATS_URI}
-      NATS_NETWORK_NAME: "multiplayer-asset_nats-net"
+      NATS_NETWORK_NAME: "LobbyLab_nats-net"
       PUBLIC_HOST: ${PUBLIC_HOST}
       GAME_SERVER_IMAGE: "game-server:latest"
       GAME_SERVER_COUNT: 2

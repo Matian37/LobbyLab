@@ -12,7 +12,7 @@ down:
 
 logs:
 	docker ps -aq \
-	    --filter 'label=com.github.multiplayer-asset.worker=true' \
+	    --filter 'label=com.github.LobbyLab.worker=true' \
 	&& docker ps -aq \
-	    --filter 'label=com.docker.compose.project=multiplayer-asset' \
+	    --filter 'label=com.docker.compose.project=LobbyLab' \
 	| xargs -r -n 1 -P 0 docker logs $(LOG_ARGS)

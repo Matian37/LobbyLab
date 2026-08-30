@@ -8,8 +8,8 @@ import (
 	"log/slog"
 	"os"
 
-	"github.com/Matian37/multiplayer-asset/game-server/config"
-	"github.com/Matian37/multiplayer-asset/game-server/internal"
+	"github.com/Matian37/LobbyLab/game-server/config"
+	"github.com/Matian37/LobbyLab/game-server/internal"
 )
 
 // Run runs the full application with configuration, logger, and server.
