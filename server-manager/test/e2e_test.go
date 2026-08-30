@@ -14,8 +14,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Matian37/multiplayer-asset/server-manager/app"
-	"github.com/Matian37/multiplayer-asset/server-manager/internal"
+	"github.com/Matian37/LobbyLab/server-manager/app"
+	"github.com/Matian37/LobbyLab/server-manager/internal"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/moby/moby/api/types/container"
@@ -31,7 +31,7 @@ import (
 )
 
 const dbImage = "postgres:18.4-alpine"
-const projectName = "multiplayer-asset"
+const projectName = "LobbyLab"
 
 var (
 	dbConnString string
@@ -351,7 +351,7 @@ func runZombieContainer(t *testing.T, ctx context.Context) string {
 			Image: "busybox:latest",
 			Cmd:   []string{"sleep", "inf"},
 			Labels: map[string]string{
-				"com.github.multiplayer-asset.worker": "true",
+				"com.github.LobbyLab.worker": "true",
 			},
 		},
 	})

@@ -14,7 +14,7 @@ import (
 	reflect "reflect"
 	time "time"
 
-	internal "github.com/Matian37/multiplayer-asset/server-manager/internal"
+	internal "github.com/Matian37/LobbyLab/server-manager/internal"
 
 	gomock "go.uber.org/mock/gomock"
 )

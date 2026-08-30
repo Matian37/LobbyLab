@@ -8,7 +8,7 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/Matian37/multiplayer-asset/game-server/internal"
+	"github.com/Matian37/LobbyLab/game-server/internal"
 
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"

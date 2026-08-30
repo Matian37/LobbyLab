@@ -1,4 +1,4 @@
-module github.com/Matian37/multiplayer-asset/server-manager
+module github.com/Matian37/LobbyLab/server-manager
 
 go 1.26.4
 

@@ -4,7 +4,7 @@ import (
 	"context"
 	"log/slog"
 
-	"github.com/Matian37/multiplayer-asset/server-manager/internal"
+	"github.com/Matian37/LobbyLab/server-manager/internal"
 )
 
 // Run runs the WorkerManager and Matchmaker, closing them when ctx is done.

@@ -6,7 +6,7 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/Matian37/multiplayer-asset/server-manager/internal"
+	"github.com/Matian37/LobbyLab/server-manager/internal"
 
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/api/types/network"
@@ -164,7 +164,7 @@ func (dc *DockerConnection) RemoveZombieWorkers(ctx context.Context) error {
 
 	containers, err := dc.client.ContainerList(timeoutCtx, client.ContainerListOptions{
 		All:     true,
-		Filters: client.Filters{}.Add("label", "com.github.multiplayer-asset.worker=true"),
+		Filters: client.Filters{}.Add("label", "com.github.LobbyLab.worker=true"),
 	})
 	if err != nil {
 		return err
@@ -255,7 +255,7 @@ func (dc *DockerConnection) containerCreateOptions(
 		Config: &container.Config{
 			ExposedPorts: dc.config.ExposePorts,
 			Labels: map[string]string{
-				"com.github.multiplayer-asset.worker": "true",
+				"com.github.LobbyLab.worker": "true",
 			},
 			Env: []string{
 				"LOG_LEVEL=" + dc.config.GameServerLogLevel.String(),

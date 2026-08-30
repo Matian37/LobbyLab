@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/Matian37/multiplayer-asset/server-manager/internal"
+	"github.com/Matian37/LobbyLab/server-manager/internal"
 
 	"github.com/jackc/pgx/v5"
 )

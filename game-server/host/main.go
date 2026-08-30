@@ -27,7 +27,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/Matian37/multiplayer-asset/game-server/app"
+	"github.com/Matian37/LobbyLab/game-server/app"
 )
 
 func main() {

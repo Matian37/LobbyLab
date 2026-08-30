@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Matian37/multiplayer-asset/server-manager/internal"
+	"github.com/Matian37/LobbyLab/server-manager/internal"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/stretchr/testify/assert"
