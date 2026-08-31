@@ -1,0 +1,42 @@
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/api"
+    schedule:
+      interval: "weekly"
+    groups:
+      api-dependencies:
+        patterns:
+          - "*"
+
+  - package-ecosystem: "gomod"
+    directory: "/server-manager"
+    schedule:
+      interval: "weekly"
+    groups:
+      server-manager-dependencies:
+        patterns:
+          - "*"
+
+  - package-ecosystem: "gomod"
+    directory: "/game-server/host"
+    schedule:
+      interval: "weekly"
+    groups:
+      game-server-dependencies:
+        patterns:
+          - "*"
+
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    groups:
+      github-actions:
+        patterns:
+          - "*"
