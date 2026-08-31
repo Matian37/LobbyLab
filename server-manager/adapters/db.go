@@ -51,10 +51,6 @@ func (dc *DatabaseConnection) Open(ctx context.Context) error {
 	}
 	dc.conn = conn
 
-	// TODO: redundant, remove
-	if err = conn.Ping(ctx); err != nil {
-		return err
-	}
 	dc.connOpened = true
 
 	return nil
