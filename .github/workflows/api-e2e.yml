@@ -8,7 +8,7 @@ on:
 
 defaults:
   run:
-    working-directory: ./api
+    working-directory: api
 
 jobs:
   e2e:
@@ -19,7 +19,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v6
         with:
-          node-version: 26
+          node-version-file: api/package.json
           cache: "npm"
           cache-dependency-path: api/package-lock.json
 
