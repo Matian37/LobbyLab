@@ -35,8 +35,9 @@ type Matchmaker struct {
 
 	logger *slog.Logger
 
-	// TODO: use channel instead of WaitGroup,
-	// for one task it is overkill
+	// wg is WaitGroup used to wait for the core loop to exit
+	// It is used instead of single channel to avoid forever blocking in Shutdown,
+	// when matchmaker is either not open or partially open.
 	wg sync.WaitGroup
 }
 
