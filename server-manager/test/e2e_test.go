@@ -30,7 +30,7 @@ import (
 	"go.uber.org/goleak"
 )
 
-const dbImage = "postgres:18.4-alpine"
+const dbImage = "postgres:18.6-alpine"
 const projectName = "LobbyLab"
 
 var (

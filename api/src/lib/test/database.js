@@ -23,7 +23,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export async function setupDatabase({ port } = {}) {
     console.log('[db] starting container...');
 
-    let setupContainer = await new PostgreSqlContainer('postgres:18.4-alpine')
+    let setupContainer = await new PostgreSqlContainer('postgres:18.6-alpine')
         .withUsername('postgres')
         .withPassword('123')
         .withDatabase('postgres');
