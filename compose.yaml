@@ -3,6 +3,7 @@ name: LobbyLab
 services:
   db:
     image: postgres:18.6-alpine
+    restart: unless-stopped
     environment:
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER}
@@ -21,6 +22,7 @@ services:
 
   nats:
     image: nats:2.14-alpine
+    restart: unless-stopped
     command: ["-js", "-m", "8222", "-sd", "/data"]
     volumes:
       - ./data/nats:/data
@@ -37,6 +39,7 @@ services:
     build:
       context: ./api
       dockerfile: Dockerfile
+    restart: unless-stopped
     environment:
       DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
       PORT: 3000
@@ -58,6 +61,7 @@ services:
     build:
       context: ./server-manager
       dockerfile: Dockerfile
+    restart: unless-stopped
     environment:
       DATABASE_URI: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
       NATS_URI: ${NATS_URI}
