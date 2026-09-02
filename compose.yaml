@@ -35,6 +35,8 @@ services:
       retries: 3
       start_period: 5s
 
+  # TODO: use proxy to allow for running multiple instances of the API
+  #       because multiple instances cannot access the same port
   api:
     build:
       context: ./api
