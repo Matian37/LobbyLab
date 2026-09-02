@@ -68,7 +68,7 @@ Streams the logs of the running containers. It collects containers in two
 groups and streams them all in parallel:
 
 1. **Worker containers** — game server worker containers, matched by the label
-   `com.github.LobbyLab.worker=true`.
+   `com.github.Matian37.LobbyLab.service=game-server`.
 2. **Stack containers** — all containers belonging to the compose project,
    matched by the label `com.docker.compose.project=LobbyLab`.
 

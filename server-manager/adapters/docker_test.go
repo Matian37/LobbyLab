@@ -186,6 +186,7 @@ func TestIntegration_DockerConnection_containerCreateOptions(t *testing.T) {
 
 		opts := dc.containerCreateOptions(portMap, "id")
 
+		assert.Equal(t, "lobbylab-game-server-id", opts.Name)
 		assert.Equal(t, opts.Image, dc.config.Image)
 		require.NotNil(t, opts.Config)
 		assert.Equal(t, dc.config.ExposePorts, opts.Config.ExposedPorts)
@@ -490,10 +491,10 @@ func TestIntegration_DockerConnection_RemoveZombieWorkers(t *testing.T) {
 		dc := newTestConn(t)
 
 		withLabel := runContainerWithLabels(t, dc, map[string]string{
-			"com.github.LobbyLab.worker": "true",
+			"com.github.Matian37.LobbyLab.service": "game-server",
 		})
-		withLabelFalse := runContainerWithLabels(t, dc, map[string]string{
-			"com.github.LobbyLab.worker": "false",
+		withOtherLabel := runContainerWithLabels(t, dc, map[string]string{
+			"com.github.Matian37.LobbyLab.service": "other",
 		})
 		noLabel := runContainerWithLabels(t, dc, map[string]string{
 			"some.other.label": "value",
@@ -503,7 +504,7 @@ func TestIntegration_DockerConnection_RemoveZombieWorkers(t *testing.T) {
 		assert.NoError(t, err)
 
 		assert.False(t, containerExists(t, dc, withLabel))
-		assert.True(t, containerExists(t, dc, withLabelFalse))
+		assert.True(t, containerExists(t, dc, withOtherLabel))
 		assert.True(t, containerExists(t, dc, noLabel))
 	})
 }

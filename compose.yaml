@@ -3,6 +3,7 @@ name: LobbyLab
 services:
   db:
     image: postgres:18.6-alpine
+    restart: unless-stopped
     environment:
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER}
@@ -21,6 +22,7 @@ services:
 
   nats:
     image: nats:2.14-alpine
+    restart: unless-stopped
     command: ["-js", "-m", "8222", "-sd", "/data"]
     volumes:
       - ./data/nats:/data
@@ -33,10 +35,13 @@ services:
       retries: 3
       start_period: 5s
 
+  # TODO: use proxy to allow for running multiple instances of the API
+  #       because multiple instances cannot access the same port
   api:
     build:
       context: ./api
       dockerfile: Dockerfile
+    restart: unless-stopped
     environment:
       DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
       PORT: 3000
@@ -58,10 +63,11 @@ services:
     build:
       context: ./server-manager
       dockerfile: Dockerfile
+    restart: unless-stopped
     environment:
       DATABASE_URI: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
       NATS_URI: ${NATS_URI}
-      NATS_NETWORK_NAME: "LobbyLab_nats-net"
+      NATS_NETWORK_NAME: "lobbylab_nats-net"
       PUBLIC_HOST: ${PUBLIC_HOST}
       GAME_SERVER_IMAGE: "game-server:latest"
       GAME_SERVER_COUNT: 2
@@ -71,7 +77,6 @@ services:
       PLAYERS_PER_ROOM: 2
       LOG_LEVEL: info
     volumes:
-      # TODO: required but dangerous, docker socket proxy would be safer instead
       - /var/run/docker.sock:/var/run/docker.sock
     networks:
       - db-net
