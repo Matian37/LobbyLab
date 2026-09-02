@@ -491,10 +491,10 @@ func TestIntegration_DockerConnection_RemoveZombieWorkers(t *testing.T) {
 		dc := newTestConn(t)
 
 		withLabel := runContainerWithLabels(t, dc, map[string]string{
-			"com.github.LobbyLab.worker": "true",
+			"com.github.Matian37.LobbyLab.service": "game-server",
 		})
-		withLabelFalse := runContainerWithLabels(t, dc, map[string]string{
-			"com.github.LobbyLab.worker": "false",
+		withOtherLabel := runContainerWithLabels(t, dc, map[string]string{
+			"com.github.Matian37.LobbyLab.service": "other",
 		})
 		noLabel := runContainerWithLabels(t, dc, map[string]string{
 			"some.other.label": "value",
@@ -504,7 +504,7 @@ func TestIntegration_DockerConnection_RemoveZombieWorkers(t *testing.T) {
 		assert.NoError(t, err)
 
 		assert.False(t, containerExists(t, dc, withLabel))
-		assert.True(t, containerExists(t, dc, withLabelFalse))
+		assert.True(t, containerExists(t, dc, withOtherLabel))
 		assert.True(t, containerExists(t, dc, noLabel))
 	})
 }

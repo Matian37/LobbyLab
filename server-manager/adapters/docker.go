@@ -164,7 +164,7 @@ func (dc *DockerConnection) RemoveZombieWorkers(ctx context.Context) error {
 
 	containers, err := dc.client.ContainerList(timeoutCtx, client.ContainerListOptions{
 		All:     true,
-		Filters: client.Filters{}.Add("label", "com.github.LobbyLab.worker=true"),
+		Filters: client.Filters{}.Add("label", "com.github.Matian37.LobbyLab.service=game-server"),
 	})
 	if err != nil {
 		return err
@@ -256,7 +256,7 @@ func (dc *DockerConnection) containerCreateOptions(
 		Config: &container.Config{
 			ExposedPorts: dc.config.ExposePorts,
 			Labels: map[string]string{
-				"com.github.LobbyLab.worker": "true",
+				"com.github.Matian37.LobbyLab.service": "game-server",
 			},
 			Env: []string{
 				"LOG_LEVEL=" + dc.config.GameServerLogLevel.String(),
