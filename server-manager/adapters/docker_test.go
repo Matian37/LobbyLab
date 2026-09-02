@@ -186,6 +186,7 @@ func TestIntegration_DockerConnection_containerCreateOptions(t *testing.T) {
 
 		opts := dc.containerCreateOptions(portMap, "id")
 
+		assert.Equal(t, "lobbylab-game-server-id", opts.Name)
 		assert.Equal(t, opts.Image, dc.config.Image)
 		require.NotNil(t, opts.Config)
 		assert.Equal(t, dc.config.ExposePorts, opts.Config.ExposedPorts)

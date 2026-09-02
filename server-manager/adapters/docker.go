@@ -251,6 +251,7 @@ func (dc *DockerConnection) containerCreateOptions(
 	workerID string,
 ) client.ContainerCreateOptions {
 	options := client.ContainerCreateOptions{
+		Name:  "lobbylab-game-server-" + workerID,
 		Image: dc.config.Image,
 		Config: &container.Config{
 			ExposedPorts: dc.config.ExposePorts,
