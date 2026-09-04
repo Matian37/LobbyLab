@@ -27,33 +27,6 @@ updates:
         patterns:
           - "*"
 
-  - package-ecosystem: "docker"
-    directory: "/api"
-    schedule:
-      interval: "weekly"
-    groups:
-      api-docker:
-        patterns:
-          - "*"
-
-  - package-ecosystem: "docker"
-    directory: "/server-manager"
-    schedule:
-      interval: "weekly"
-    groups:
-      server-manager-docker:
-        patterns:
-          - "*"
-
-  - package-ecosystem: "docker"
-    directory: "/game-server"
-    schedule:
-      interval: "weekly"
-    groups:
-      game-server-docker:
-        patterns:
-          - "*"
-
   - package-ecosystem: "docker-compose"
     directory: "/"
     schedule:
