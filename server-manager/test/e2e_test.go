@@ -30,7 +30,7 @@ import (
 	"go.uber.org/goleak"
 )
 
-const dbImage = "postgres:18.4-alpine"
+const dbImage = "postgres:18.6-alpine"
 const projectName = "LobbyLab"
 
 var (
@@ -351,7 +351,7 @@ func runZombieContainer(t *testing.T, ctx context.Context) string {
 			Image: "busybox:latest",
 			Cmd:   []string{"sleep", "inf"},
 			Labels: map[string]string{
-				"com.github.LobbyLab.worker": "true",
+				"com.github.Matian37.LobbyLab.service": "game-server",
 			},
 		},
 	})

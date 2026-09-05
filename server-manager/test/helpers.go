@@ -31,7 +31,7 @@ type MatchingConfig struct {
 
 func isContainerMine(t *testing.T, c *container.Summary) bool {
 	t.Helper()
-	return c.Labels["com.github.LobbyLab.worker"] == "true"
+	return c.Labels["com.github.Matian37.LobbyLab.service"] == "game-server"
 }
 
 func isContainerHealthy(t *testing.T, c *container.Summary) bool {

@@ -18,7 +18,7 @@ docker run --name postgres-test \
   -e POSTGRES_DB=postgres \
   -p 5432:5432 \
   -v "$INIT_SQL:/docker-entrypoint-initdb.d/init.sql" \
-  -d postgres:18.4-alpine
+  -d postgres:18.6-alpine
 
 until docker exec postgres-test pg_isready -U postgres; do
   sleep 0.5

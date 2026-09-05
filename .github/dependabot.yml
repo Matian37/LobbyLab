@@ -27,10 +27,14 @@ updates:
         patterns:
           - "*"
 
-  - package-ecosystem: "docker"
+  - package-ecosystem: "docker-compose"
     directory: "/"
     schedule:
       interval: "weekly"
+    groups:
+      docker-compose:
+        patterns:
+          - "*"
 
   - package-ecosystem: "github-actions"
     directory: "/"

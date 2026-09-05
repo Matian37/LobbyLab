@@ -17,7 +17,7 @@ import (
 	"github.com/testcontainers/testcontainers-go/modules/postgres"
 )
 
-const dbImage = "postgres:18.4-alpine"
+const dbImage = "postgres:18.6-alpine"
 
 var dbConnString, initSQL string
 
