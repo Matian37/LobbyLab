@@ -5,11 +5,11 @@ services:
     image: postgres:18.6-alpine
     restart: unless-stopped
     environment:
-      POSTGRES_DB: ${POSTGRES_DB}
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:?}
+      POSTGRES_USER: ${POSTGRES_USER:?}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?}
     healthcheck:
-      test: ["CMD", "pg_isready", "-U", "${POSTGRES_USER}", "-d", "${POSTGRES_DB}"]
+      test: ["CMD", "pg_isready", "-U", "${POSTGRES_USER:?}", "-d", "${POSTGRES_DB:?}"]
       interval: 5s
       retries: 10
       timeout: 2s
@@ -43,14 +43,14 @@ services:
       dockerfile: Dockerfile
     restart: unless-stopped
     environment:
-      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      DATABASE_URL: postgres://${POSTGRES_USER:?}:${POSTGRES_PASSWORD:?}@db:5432/${POSTGRES_DB:?}
       PORT: 3000
       LOG_LEVEL: info
-      PUBLIC_GAME_LAUNCH_URL: ${PUBLIC_GAME_LAUNCH_URL}
-      GAME_CLIENT_FILE: game-client.zip
+      PUBLIC_GAME_LAUNCH_URL: ${PUBLIC_GAME_LAUNCH_URL:?}
+      GAME_CLIENT_FILE: ${GAME_CLIENT_FILE:?}
       DOWNLOADS_DIR: /api/downloads
     volumes:
-      - ./data/downloads:/api/downloads
+      - ${DOWNLOADS_DIR:?}:/api/downloads
     ports:
       - "3000:3000"
     networks:
@@ -65,16 +65,16 @@ services:
       dockerfile: Dockerfile
     restart: unless-stopped
     environment:
-      DATABASE_URI: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
-      NATS_URI: ${NATS_URI}
+      DATABASE_URI: postgres://${POSTGRES_USER:?}:${POSTGRES_PASSWORD:?}@db:5432/${POSTGRES_DB:?}
+      NATS_URI: ${NATS_URI:?}
       NATS_NETWORK_NAME: "lobbylab_nats-net"
-      PUBLIC_HOST: ${PUBLIC_HOST}
+      PUBLIC_HOST: ${PUBLIC_HOST:?}
       GAME_SERVER_IMAGE: "game-server:latest"
-      GAME_SERVER_COUNT: 2
-      GAME_SERVER_EXPOSE_PORTS: "7777/udp,8080"
-      GAME_SERVER_CLIENT_PORT: "7777/udp"
+      GAME_SERVER_COUNT: ${GAME_SERVER_COUNT:?}
+      GAME_SERVER_EXPOSE_PORTS: ${GAME_SERVER_EXPOSE_PORTS:?}
+      GAME_SERVER_CLIENT_PORT: ${GAME_SERVER_CLIENT_PORT:?}
       GAME_SERVER_LOG_LEVEL: info
-      PLAYERS_PER_ROOM: 2
+      PLAYERS_PER_ROOM: ${PLAYERS_PER_ROOM:?}
       LOG_LEVEL: info
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock

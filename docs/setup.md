@@ -24,8 +24,16 @@ cp .env.example .env
 | `NATS_URI` | NATS connection URI |
 | `PUBLIC_HOST` | Publicly reachable address of the Docker host |
 | `PUBLIC_GAME_LAUNCH_URL` | Template URL used to launch the game client when a match is found |
+| `GAME_SERVER_COUNT` | Number of game server containers to run concurrently |
+| `GAME_SERVER_EXPOSE_PORTS` | Comma-separated ports the game server exposes (protocol suffix required for UDP) |
+| `GAME_SERVER_CLIENT_PORT` | Game server's internal player-facing port, published to a random host port. Must be one of the exposed ports. |
+| `PLAYERS_PER_ROOM` | Number of players required to start a match, two is the minimum value |
+| `DOWNLOADS_DIR` | Host path to the directory holding the downloadable game client archive |
+| `GAME_CLIENT_FILE` | File name of the game client archive in the downloads directory |
 
 The defaults are suitable for local development. In production, set `PUBLIC_HOST` to your server's public IP or domain name so game clients can connect to game server containers.
+
+Values are defined in `.env` and referenced by `compose.yaml`. After changing any value, restart the stack for it to take effect.
 
 #### Game Launch URL
 
@@ -48,28 +56,18 @@ It is expected that a `mygame://` protocol handler is registered on the user's d
 #### Game Client Download
 
 The web frontend shows a "Download client" button to logged-in users that
-downloads the game client archive from `GET /api/download`. For the download
-to work you must make the client file available to the `api` container:
+downloads the game client archive from `GET /api/download` endpoint. 
+For the download to work you must make the client file available in `.env`:
 
-1. **Place the client archive in the mounted downloads directory.**
-   The `api` service mounts `./data/downloads` into the container at
-   `/api/downloads`. Drop your built game client archive there, e.g.:
+1. **Set the download directory.**
+   Set `DOWNLOADS_DIR` to the folder where your game client archive is stored.
 
-   ```
-   data/downloads/game-client.zip
-   ```
+2. **Set the filename.**
+   Set `GAME_CLIENT_FILE` to the name of the archive in that folder. It
+   defaults to `game-client.zip`.
 
-2. **Set the file name.**
-   `compose.yaml` sets `GAME_CLIENT_FILE: game-client.zip` on the `api`
-   service, which must match the file name from step 1. Change it if you name
-   the archive differently.
-
-Both `DOWNLOADS_DIR` and `GAME_CLIENT_FILE` must be set on the `api` service.
-If either is missing, `GET /api/download` always responds with `404`.
-
-If the file is missing, `GET /api/download` responds with `404`, and users see
-a failed download. There is no default file bundled with the stack, so this
-setup step is required before the download link works.
+Both `DOWNLOADS_DIR` and `GAME_CLIENT_FILE` must be set (in `.env`). If either
+is missing, `GET /api/download` always responds with `404`.
 
 ### 2. Game Server
 
@@ -116,26 +114,16 @@ Game server also needs to handle the following responsibilities:
 
 ### 3. Docker Compose (compose.yaml)
 
-Open `compose.yaml`. The `server-manager` service contains several configuration values that control game server orchestration:
-
-```yaml
-server-manager:
-  # ...
-  environment:
-    GAME_SERVER_COUNT: 2
-    GAME_SERVER_EXPOSE_PORTS: "7777/udp,8080"
-    GAME_SERVER_CLIENT_PORT: "7777/udp"
-    PLAYERS_PER_ROOM: 2
-```
+The `server-manager` service reads several values that control game server orchestration from your `.env` file (see the Configuration table in step 1):
 
 | Variable | Description |
 |---|---|
 | `GAME_SERVER_COUNT` | Number of game server containers to run concurrently. Each container hosts a single game at a time. |
 | `GAME_SERVER_EXPOSE_PORTS` | Comma-separated list of ports the game server exposes (protocol suffix required for UDP). |
-| `GAME_SERVER_CLIENT_PORT` | The port clients connect to. Must be one of the exposed ports. |
+| `GAME_SERVER_CLIENT_PORT` | Game server's internal player-facing port, published to a random host port. Must be one of the exposed ports. |
 | `PLAYERS_PER_ROOM` | Number of players required to start a match. |
 
-Adjust these values according to your game's requirements.
+Adjust these values in `.env` according to your game's requirements.
 
 ### 4. Control the Platform
 
