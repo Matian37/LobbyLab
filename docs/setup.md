@@ -27,13 +27,13 @@ cp .env.example .env
 | `GAME_SERVER_COUNT` | Number of game server containers to run concurrently |
 | `GAME_SERVER_EXPOSE_PORTS` | Comma-separated ports the game server exposes (protocol suffix required for UDP) |
 | `GAME_SERVER_CLIENT_PORT` | Game server's internal player-facing port, published to a random host port. Must be one of the exposed ports. |
-| `PLAYERS_PER_ROOM` | Number of players required to start a match |
+| `PLAYERS_PER_ROOM` | Number of players required to start a match, two is the minimum value |
 | `DOWNLOADS_DIR` | Host path to the directory holding the downloadable game client archive |
 | `GAME_CLIENT_FILE` | File name of the game client archive in the downloads directory |
 
 The defaults are suitable for local development. In production, set `PUBLIC_HOST` to your server's public IP or domain name so game clients can connect to game server containers.
 
-Values are defined in `.env` and referenced by `compose.yaml`. After changing any value, restart the stack (`make up`) for it to take effect.
+Values are defined in `.env` and referenced by `compose.yaml`. After changing any value, restart the stack for it to take effect.
 
 #### Game Launch URL
 
@@ -56,30 +56,18 @@ It is expected that a `mygame://` protocol handler is registered on the user's d
 #### Game Client Download
 
 The web frontend shows a "Download client" button to logged-in users that
-downloads the game client archive from `GET /api/download`. For the download
-to work you must make the client file available to the `api` container:
+downloads the game client archive from `GET /api/download` endpoint. 
+For the download to work you must make the client file available in `.env`:
 
-1. **Place the client archive in the downloads directory.**
-   The `api` service mounts the directory referenced by `DOWNLOADS_DIR` into
-   the container at `/api/downloads`. By default `DOWNLOADS_DIR=./data/downloads`,
-   so drop your built game client archive there, e.g.:
+1. **Set the download directory.**
+   Set `DOWNLOADS_DIR` to the folder where your game client archive is stored.
 
-   ```
-   data/downloads/game-client.zip
-   ```
+2. **Set the filename.**
+   Set `GAME_CLIENT_FILE` to the name of the archive in that folder. It
+   defaults to `game-client.zip`.
 
-2. **Set the file name.**
-   `GAME_CLIENT_FILE` (set in `.env`) defaults to `game-client.zip` and must
-   match the file name from step 1. Change it if you name the archive
-   differently.
-
-Both `DOWNLOADS_DIR` and `GAME_CLIENT_FILE` must be set (in `.env`) for the
-`api` service. If either is missing, `GET /api/download` always responds with
-`404`.
-
-If the file is missing, `GET /api/download` responds with `404`, and users see
-a failed download. There is no default file bundled with the stack, so this
-setup step is required before the download link works.
+Both `DOWNLOADS_DIR` and `GAME_CLIENT_FILE` must be set (in `.env`). If either
+is missing, `GET /api/download` always responds with `404`.
 
 ### 2. Game Server
 
