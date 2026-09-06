@@ -10,7 +10,6 @@ from typing import Literal
 
 import pytest
 from playwright.sync_api import Page, expect
-from websocket_helper import queue_user
 
 from e2e.helpers.api import (
     create_users,
@@ -34,6 +33,7 @@ from e2e.helpers.globals import (
     GAME_SERVER_IMAGE,
     PLAYERS_PER_ROOM,
 )
+from e2e.helpers.websocket_helper import queue_user
 
 
 @pytest.fixture(scope="session")
