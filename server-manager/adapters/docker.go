@@ -276,8 +276,8 @@ func (dc *DockerConnection) containerCreateOptions(
 		},
 		NetworkingConfig: &network.NetworkingConfig{
 			EndpointsConfig: map[string]*network.EndpointSettings{
-				dc.config.BrokerNetworkName:    {},
-				"multiplayer-asset_public-net": {},
+				dc.config.BrokerNetworkName: {},
+				"lobbylab_public-net":       {},
 			},
 		},
 	}

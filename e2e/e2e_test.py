@@ -122,7 +122,7 @@ def test_crash_server_manager() -> None:
 
     restart = threading.Thread(
         target=restart_containers,
-        args=(["multiplayer-asset-server-manager-1"],),
+        args=(["lobbylab-server-manager-1"],),
     )
 
     now = datetime.now()  # ruff: ignore[DTZ005]
