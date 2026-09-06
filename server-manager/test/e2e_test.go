@@ -14,8 +14,8 @@ import (
 	"testing"
 	"time"
 
-	"server-manager/app"
-	"server-manager/internal"
+	"github.com/Matian37/LobbyLab/server-manager/app"
+	"github.com/Matian37/LobbyLab/server-manager/internal"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/moby/moby/api/types/container"
@@ -30,8 +30,8 @@ import (
 	"go.uber.org/goleak"
 )
 
-const dbImage = "postgres:18.4-alpine"
-const projectName = "multiplayer-asset"
+const dbImage = "postgres:18.6-alpine"
+const projectName = "LobbyLab"
 
 var (
 	dbConnString string
@@ -67,6 +67,7 @@ func TestMain(m *testing.M) {
 	os.Exit(code)
 }
 
+// Starts NATS server with mocked workers that mimic the behavior of real workers.
 func setupNATS(t *testing.T, workerCount int, started *atomic.Bool) (string, chan error) {
 	t.Helper()
 
@@ -93,6 +94,11 @@ func setupNATS(t *testing.T, workerCount int, started *atomic.Bool) (string, cha
 	return addr, setupNATSMock(t, addr, workerCount, started)
 }
 
+// Sets up a mock which responds on behalf of the running workers for
+// health and job-assignment requests. It depends on current state of docker for
+// knowing which worker should respond.
+//
+// Returns channel which receives errors about wrong behavior of server-manager in NATS.
 func setupNATSMock(t *testing.T, natsURI string, workerCount int, started *atomic.Bool) chan error {
 	t.Helper()
 
@@ -164,7 +170,7 @@ func restartDB(t *testing.T, ctx context.Context) {
 	require.NoError(t, err)
 }
 
-func cleanupContainers(t *testing.T) {
+func cleanupWorkerContainers(t *testing.T) {
 	t.Helper()
 
 	cli, err := client.New()
@@ -185,6 +191,10 @@ func cleanupContainers(t *testing.T) {
 	}
 }
 
+// Resets the database, removes left over containers and sets up NATS.
+//
+// It returns the NATS URI, a flag that becomes true as
+// soon as the app reports activity, and error channel of NATS mock.
 func setupTestEnvironment(t *testing.T, workerCount int) (
 	natsURI string,
 	started *atomic.Bool,
@@ -193,7 +203,7 @@ func setupTestEnvironment(t *testing.T, workerCount int) (
 	t.Helper()
 
 	restartDB(t, context.Background())
-	t.Cleanup(func() { cleanupContainers(t) })
+	t.Cleanup(func() { cleanupWorkerContainers(t) })
 
 	started = &atomic.Bool{}
 	natsURI, errChan = setupNATS(t, workerCount, started)
@@ -201,6 +211,8 @@ func setupTestEnvironment(t *testing.T, workerCount int) (
 	return
 }
 
+// Drains the mock error channel and
+// sets test to failed if any error is retrieved.
 func checkErrChan(t *testing.T, errChan chan error) {
 	t.Helper()
 
@@ -216,6 +228,23 @@ func checkErrChan(t *testing.T, errChan chan error) {
 	}
 }
 
+func newGeneralConfig(workerCount int, natsURI string) *internal.EnvConfig {
+	return &internal.EnvConfig{
+		Image:                  "busybox:latest",
+		Workercount:            workerCount,
+		ExposePorts:            network.PortSet{network.MustParsePort("8080"): {}},
+		ClientPort:             network.MustParsePort("8080"),
+		BrokerURI:              natsURI,
+		BrokerNetworkName:      "bridge", // prevents docker network not found errors
+		PublicHost:             "127.0.0.1",
+		DatabaseURI:            dbConnString,
+		PlayersPerRoom:         2,
+		TestMakeContainerDummy: true,
+	}
+}
+
+// Blocks until the app signals that it is running.
+// It fails when either timeout is reached or app returns error
 func waitForAppStart(t *testing.T, started *atomic.Bool, appResChan chan error) {
 	t.Helper()
 
@@ -245,6 +274,8 @@ func waitForAppStart(t *testing.T, started *atomic.Bool, appResChan chan error) 
 	}
 }
 
+// Launches the app in a separate goroutine and returns a channel
+// that will receive the app's exit error (may be nil if it exited cleanly)
 func runApp(t *testing.T, ctx context.Context, cfg *internal.EnvConfig) chan error {
 	t.Helper()
 
@@ -262,14 +293,19 @@ func runApp(t *testing.T, ctx context.Context, cfg *internal.EnvConfig) chan err
 	return resChan
 }
 
-// check if all specified users are assigned to the match
+// Require all specified users to be assigned to the match
 func requireAssigned(t *testing.T, dbConn *pgx.Conn, users []string, matchID int) {
 	var assignedCount int
-	err := dbConn.QueryRow(context.Background(), `
+	err := dbConn.QueryRow(
+		context.Background(),
+		`
 		SELECT COUNT(DISTINCT user_id)
 		FROM user_matches
 		WHERE user_id = ANY($1) AND match_id = $2;
-	`, users, matchID).Scan(&assignedCount)
+		`,
+		users,
+		matchID,
+	).Scan(&assignedCount)
 	require.NoError(t, err)
 	assert.Equal(t, len(users), assignedCount, "all specified users should be assigned to the match")
 }
@@ -285,19 +321,7 @@ func TestE2E_GracefulShutdown(t *testing.T) {
 	workerCount := 2
 	natsURI, started, errChan := setupTestEnvironment(t, workerCount)
 
-	cfg := &internal.EnvConfig{
-		Image:                  "busybox:latest",
-		Workercount:            workerCount,
-		ExposePorts:            network.PortSet{network.MustParsePort("8080"): {}},
-		ClientPort:             network.MustParsePort("8080"),
-		BrokerURI:              natsURI,
-		BrokerNetworkName:      "bridge", // prevents docker network not found errors
-		PublicHost:             "127.0.0.1",
-		DatabaseURI:            dbConnString,
-		PlayersPerRoom:         2,
-		TestMakeContainerDummy: true,
-	}
-
+	cfg := newGeneralConfig(workerCount, natsURI)
 	appResult := runApp(t, ctx, cfg)
 
 	waitForAppStart(t, started, appResult)
@@ -313,6 +337,8 @@ func TestE2E_GracefulShutdown(t *testing.T) {
 	checkErrChan(t, errChan)
 }
 
+// Creates a running container tagged as a worker,
+// which simulates a left over worker that was not cleaned up by a previous run of the app.
 func runZombieContainer(t *testing.T, ctx context.Context) string {
 	t.Helper()
 
@@ -325,7 +351,7 @@ func runZombieContainer(t *testing.T, ctx context.Context) string {
 			Image: "busybox:latest",
 			Cmd:   []string{"sleep", "inf"},
 			Labels: map[string]string{
-				"com.github.multiplayer-asset.worker": "true",
+				"com.github.Matian37.LobbyLab.service": "game-server",
 			},
 		},
 	})
@@ -348,6 +374,8 @@ func runZombieContainer(t *testing.T, ctx context.Context) string {
 	return res.ID
 }
 
+// Verifies that on startup the app removes any leftover worker containers
+// that were not cleaned up by a previous run.
 func TestE2E_RemoveZombieWorkers(t *testing.T) {
 	t.Cleanup(func() {
 		goleak.VerifyNone(t, goleak.IgnoreCurrent())
@@ -359,22 +387,11 @@ func TestE2E_RemoveZombieWorkers(t *testing.T) {
 	workerCount := 1
 	natsURI, started, errChan := setupTestEnvironment(t, workerCount)
 
-	cfg := &internal.EnvConfig{
-		Image:                  "busybox:latest",
-		Workercount:            workerCount,
-		ExposePorts:            network.PortSet{network.MustParsePort("8080"): {}},
-		ClientPort:             network.MustParsePort("8080"),
-		BrokerURI:              natsURI,
-		BrokerNetworkName:      "bridge", // prevents docker network not found errors
-		PublicHost:             "127.0.0.1",
-		DatabaseURI:            dbConnString,
-		PlayersPerRoom:         2,
-		TestMakeContainerDummy: true,
-	}
-
 	zombieID := runZombieContainer(t, ctx)
 
+	cfg := newGeneralConfig(workerCount, natsURI)
 	appResult := runApp(t, ctx, cfg)
+
 	waitForAppStart(t, started, appResult)
 
 	cli, err := client.New()
@@ -396,6 +413,9 @@ func TestE2E_RemoveZombieWorkers(t *testing.T) {
 	checkErrChan(t, errChan)
 }
 
+// Runs the successful application life cycle: users waiting for a match are gathered,
+// match is created with the correct host/port, users are assigned,
+// and when match finishes its results are saved.
 func TestE2E_AppLifecycle(t *testing.T) {
 	t.Cleanup(func() {
 		goleak.VerifyNone(t, goleak.IgnoreCurrent())
@@ -407,19 +427,7 @@ func TestE2E_AppLifecycle(t *testing.T) {
 	workerCount := 1
 	natsURI, started, errChan := setupTestEnvironment(t, workerCount)
 
-	cfg := &internal.EnvConfig{
-		Image:                  "busybox:latest",
-		Workercount:            workerCount,
-		ExposePorts:            network.PortSet{network.MustParsePort("8080"): {}},
-		ClientPort:             network.MustParsePort("8080"),
-		BrokerURI:              natsURI,
-		BrokerNetworkName:      "bridge", // prevents docker network not found errors
-		PublicHost:             "127.0.0.1",
-		DatabaseURI:            dbConnString,
-		PlayersPerRoom:         2,
-		TestMakeContainerDummy: true,
-	}
-
+	cfg := newGeneralConfig(workerCount, natsURI)
 	appResult := runApp(t, ctx, cfg)
 
 	dbConn, err := pgx.Connect(ctx, dbConnString)
@@ -429,26 +437,48 @@ func TestE2E_AppLifecycle(t *testing.T) {
 	waitForAppStart(t, started, appResult)
 
 	_, err = dbConn.Exec(
-		ctx, `
+		ctx,
+		`
 			INSERT INTO users (login, password, queued_until)
-			VALUES ('user1', '', NOW() + INTERVAL '5 hours'), ('user2', '', NOW() + INTERVAL '5 hours')
+			VALUES
+				('user1', '', NOW() + INTERVAL '5 hours'),
+				('user2', '', NOW() + INTERVAL '5 hours')
 		`,
 	)
 	require.NoError(t, err)
 
 	var matchID int
 	require.Eventually(t, func() bool {
-		err := dbConn.QueryRow(ctx, "SELECT id FROM matches LIMIT 1").Scan(&matchID)
+		err := dbConn.QueryRow(
+			ctx,
+			"SELECT id FROM matches LIMIT 1",
+		).Scan(&matchID)
 		return err == nil
 	}, 10*time.Second, 100*time.Millisecond, "should matchmake users and create match")
 
 	var waitingCount int
-	err = dbConn.QueryRow(ctx, "SELECT COUNT(*) FROM users WHERE queued_until > NOW() AND match_id IS NULL").Scan(&waitingCount)
+	err = dbConn.QueryRow(
+		ctx,
+		`
+		SELECT COUNT(*)
+		FROM users
+		WHERE queued_until > NOW()
+			AND match_id IS NULL
+		`,
+	).Scan(&waitingCount)
 	require.NoError(t, err)
 	assert.Zero(t, waitingCount)
 
 	var host, port string
-	err = dbConn.QueryRow(ctx, "SELECT host, port FROM matches WHERE id = $1", matchID).Scan(&host, &port)
+	err = dbConn.QueryRow(
+		ctx,
+		`
+		SELECT host, port
+		FROM matches
+		WHERE id = $1
+		`,
+		matchID,
+	).Scan(&host, &port)
 	require.NoError(t, err)
 	assert.Equal(t, cfg.PublicHost, host)
 	assert.NotEmpty(t, port)
@@ -474,7 +504,15 @@ func TestE2E_AppLifecycle(t *testing.T) {
 
 	var results *string
 	require.Eventually(t, func() bool {
-		err := dbConn.QueryRow(ctx, "SELECT results FROM matches WHERE id = $1", matchID).Scan(&results)
+		err := dbConn.QueryRow(
+			ctx,
+			`
+			SELECT results
+			FROM matches
+			WHERE id = $1
+			`,
+			matchID,
+		).Scan(&results)
 		return err == nil && results != nil && len(*results) != 0
 	}, 10*time.Second, 100*time.Millisecond, "should save match results to database")
 
@@ -491,8 +529,7 @@ func TestE2E_AppLifecycle(t *testing.T) {
 	checkErrChan(t, errChan)
 }
 
-// killWorkerContainer kills the first running container that belongs to us.
-// Used to simulate a worker crash during tests.
+// Kills one worker running container. Used to simulate a worker crash during tests.
 func killWorkerContainer(t *testing.T, ctx context.Context) {
 	t.Helper()
 	cli, err := client.New()
@@ -511,6 +548,8 @@ func killWorkerContainer(t *testing.T, ctx context.Context) {
 	t.Fatal("no container to kill")
 }
 
+// Verifies that no match is created when all workers are busy,
+// but when enough players are waiting and worker gets freed, it gets created.
 func TestE2E_WorkersOverloadWithMatches(t *testing.T) {
 	t.Cleanup(func() {
 		goleak.VerifyNone(t, goleak.IgnoreCurrent())
@@ -522,19 +561,7 @@ func TestE2E_WorkersOverloadWithMatches(t *testing.T) {
 	workerCount := 2
 	natsURI, started, errChan := setupTestEnvironment(t, workerCount)
 
-	cfg := &internal.EnvConfig{
-		Image:                  "busybox:latest",
-		Workercount:            workerCount,
-		ExposePorts:            network.PortSet{network.MustParsePort("8080"): {}},
-		ClientPort:             network.MustParsePort("8080"),
-		BrokerURI:              natsURI,
-		BrokerNetworkName:      "bridge", // prevents docker network not found errors
-		PublicHost:             "127.0.0.1",
-		DatabaseURI:            dbConnString,
-		PlayersPerRoom:         2,
-		TestMakeContainerDummy: true,
-	}
-
+	cfg := newGeneralConfig(workerCount, natsURI)
 	appResult := runApp(t, ctx, cfg)
 
 	dbConn, err := pgx.Connect(ctx, dbConnString)
@@ -545,36 +572,49 @@ func TestE2E_WorkersOverloadWithMatches(t *testing.T) {
 
 	_, err = dbConn.Exec(
 		ctx,
-		`INSERT INTO users (login, password, queued_until)
+		`
+		INSERT INTO users (login, password, queued_until)
 		VALUES
-		($1,$2,NOW() + INTERVAL '5 hours'),
-		($3,$4,NOW() + INTERVAL '5 hours'),
-		($5,$6,NOW() + INTERVAL '5 hours'),
-		($7,$8,NOW() + INTERVAL '5 hours')`,
-		"user1", "pass",
-		"user2", "pass",
-		"user3", "pass",
-		"user4", "pass",
+			('user1', '', NOW() + INTERVAL '5 hours'),
+			('user2', '', NOW() + INTERVAL '5 hours'),
+			('user3', '', NOW() + INTERVAL '5 hours'),
+			('user4', '', NOW() + INTERVAL '5 hours')
+		`,
 	)
 	require.NoError(t, err)
 
 	var matchCount int
 	require.Eventually(t, func() bool {
-		err := dbConn.QueryRow(ctx, "SELECT COUNT(*) FROM matches").Scan(&matchCount)
+		err := dbConn.QueryRow(
+			ctx,
+			"SELECT COUNT(*) FROM matches",
+		).Scan(&matchCount)
 		return err == nil && matchCount == 2
 	}, 10*time.Second, 100*time.Millisecond, "should create 2 matches")
 
-	_, err = dbConn.Exec(ctx,
-		"INSERT INTO users (login, password, queued_until) VALUES ($1,$2,NOW() + INTERVAL '5 hours'),($3,$4,NOW() + INTERVAL '5 hours')",
-		"user5", "pass",
-		"user6", "pass",
+	_, err = dbConn.Exec(
+		ctx,
+		`
+		INSERT INTO users (login, password, queued_until)
+		VALUES
+			('user5', '', NOW() + INTERVAL '5 hours'),
+			('user6', '', NOW() + INTERVAL '5 hours')
+		`,
 	)
 	require.NoError(t, err)
 
 	time.Sleep(2 * time.Second)
 
 	var waitingCount int
-	err = dbConn.QueryRow(ctx, "SELECT COUNT(*) FROM users WHERE queued_until > NOW() AND match_id IS NULL").Scan(&waitingCount)
+	err = dbConn.QueryRow(
+		ctx,
+		`
+		SELECT COUNT(*)
+		FROM users
+		WHERE queued_until > NOW()
+			AND match_id IS NULL
+		`,
+	).Scan(&waitingCount)
 	require.NoError(t, err)
 	assert.Equal(t, 2, waitingCount, "users 5,6 should still wait when all workers occupied")
 
@@ -596,11 +636,22 @@ func TestE2E_WorkersOverloadWithMatches(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Eventually(t, func() bool {
-		err := dbConn.QueryRow(ctx, "SELECT COUNT(*) FROM matches").Scan(&matchCount)
+		err := dbConn.QueryRow(
+			ctx,
+			"SELECT COUNT(*) FROM matches",
+		).Scan(&matchCount)
 		return err == nil && matchCount == 3
 	}, 10*time.Second, 100*time.Millisecond, "should create 3rd match after result frees a worker")
 
-	err = dbConn.QueryRow(ctx, "SELECT COUNT(*) FROM users WHERE queued_until > NOW() AND match_id IS NULL").Scan(&waitingCount)
+	err = dbConn.QueryRow(
+		ctx,
+		`
+		SELECT COUNT(*)
+		FROM users
+		WHERE queued_until > NOW()
+			AND match_id IS NULL
+		`,
+	).Scan(&waitingCount)
 	require.NoError(t, err)
 	assert.Zero(t, waitingCount, "all users should be matched")
 
@@ -617,6 +668,9 @@ func TestE2E_WorkersOverloadWithMatches(t *testing.T) {
 	checkErrChan(t, errChan)
 }
 
+// Verifies that when a worker's container is killed the running match is canceled.
+// The worker is detected as unhealthy and restarted.
+// And only after that new match is created with the new worker.
 func TestE2E_WorkerFailureAndRestart(t *testing.T) {
 	t.Cleanup(func() {
 		goleak.VerifyNone(t, goleak.IgnoreCurrent())
@@ -628,19 +682,7 @@ func TestE2E_WorkerFailureAndRestart(t *testing.T) {
 	workerCount := 1
 	natsURI, started, errChan := setupTestEnvironment(t, workerCount)
 
-	cfg := &internal.EnvConfig{
-		Image:                  "busybox:latest",
-		Workercount:            workerCount,
-		ExposePorts:            network.PortSet{network.MustParsePort("8080"): {}},
-		ClientPort:             network.MustParsePort("8080"),
-		BrokerURI:              natsURI,
-		BrokerNetworkName:      "bridge", // prevents docker network not found errors
-		PublicHost:             "127.0.0.1",
-		DatabaseURI:            dbConnString,
-		PlayersPerRoom:         2,
-		TestMakeContainerDummy: true,
-	}
-
+	cfg := newGeneralConfig(workerCount, natsURI)
 	appResult := runApp(t, ctx, cfg)
 
 	dbConn, err := pgx.Connect(ctx, dbConnString)
@@ -651,15 +693,21 @@ func TestE2E_WorkerFailureAndRestart(t *testing.T) {
 
 	_, err = dbConn.Exec(
 		ctx,
-		"INSERT INTO users (login, password, queued_until) VALUES ($1,$2,NOW() + INTERVAL '5 hours'),($3,$4,NOW() + INTERVAL '5 hours')",
-		"user1", "pass",
-		"user2", "pass",
+		`
+		INSERT INTO users (login, password, queued_until)
+		VALUES
+			('user1', 'pass', NOW() + INTERVAL '5 hours'),
+			('user2', 'pass', NOW() + INTERVAL '5 hours')
+		`,
 	)
 	require.NoError(t, err)
 
 	var matchID int
 	require.Eventually(t, func() bool {
-		err := dbConn.QueryRow(ctx, "SELECT id FROM matches LIMIT 1").Scan(&matchID)
+		err := dbConn.QueryRow(
+			ctx,
+			"SELECT id FROM matches LIMIT 1",
+		).Scan(&matchID)
 		return err == nil
 	}, 10*time.Second, 100*time.Millisecond, "should create first match")
 
@@ -667,8 +715,12 @@ func TestE2E_WorkerFailureAndRestart(t *testing.T) {
 
 	_, err = dbConn.Exec(
 		ctx,
-		"INSERT INTO users (login, password, queued_until) VALUES ($1,$2,NOW() + INTERVAL '5 hours'),($3,$4,NOW() + INTERVAL '5 hours')",
-		"user3", "pass", "user4", "pass",
+		`
+		INSERT INTO users (login, password, queued_until)
+		VALUES
+			('user3', 'pass', NOW() + INTERVAL '5 hours'),
+			('user4', 'pass', NOW() + INTERVAL '5 hours')
+		`,
 	)
 	require.NoError(t, err)
 
@@ -690,14 +742,26 @@ func TestE2E_WorkerFailureAndRestart(t *testing.T) {
 	var secondMatchID int
 	require.Eventually(t,
 		func() bool {
-			err := dbConn.QueryRow(ctx, "SELECT id FROM matches WHERE id != $1", matchID).Scan(&secondMatchID)
+			err := dbConn.QueryRow(
+				ctx,
+				"SELECT id FROM matches WHERE id != $1",
+				matchID,
+			).Scan(&secondMatchID)
 			return err == nil
 		}, 30*time.Second, 500*time.Millisecond,
 		"should restart worker and create second match (health check runs every 5s, maxPingRetries=3)",
 	)
 
 	var waitingCount int
-	err = dbConn.QueryRow(ctx, "SELECT COUNT(*) FROM users WHERE queued_until > NOW() AND match_id IS NULL").Scan(&waitingCount)
+	err = dbConn.QueryRow(
+		ctx,
+		`
+		SELECT COUNT(*)
+		FROM users
+		WHERE queued_until > NOW()
+			AND match_id IS NULL
+		`,
+	).Scan(&waitingCount)
 	require.NoError(t, err)
 	assert.Zero(t, waitingCount, "all users should be matched")
 
@@ -712,6 +776,8 @@ func TestE2E_WorkerFailureAndRestart(t *testing.T) {
 	checkErrChan(t, errChan)
 }
 
+// Verifies that a match is not created while fewer players than
+// the room size are queued.
 func TestE2E_NoMatchWithoutEnoughPlayers(t *testing.T) {
 	t.Cleanup(func() {
 		goleak.VerifyNone(t, goleak.IgnoreCurrent())
@@ -723,19 +789,7 @@ func TestE2E_NoMatchWithoutEnoughPlayers(t *testing.T) {
 	workerCount := 1
 	natsURI, started, errChan := setupTestEnvironment(t, workerCount)
 
-	cfg := &internal.EnvConfig{
-		Image:                  "busybox:latest",
-		Workercount:            workerCount,
-		ExposePorts:            network.PortSet{network.MustParsePort("8080"): {}},
-		ClientPort:             network.MustParsePort("8080"),
-		BrokerURI:              natsURI,
-		BrokerNetworkName:      "bridge", // prevents docker network not found errors
-		PublicHost:             "127.0.0.1",
-		DatabaseURI:            dbConnString,
-		PlayersPerRoom:         2,
-		TestMakeContainerDummy: true,
-	}
-
+	cfg := newGeneralConfig(workerCount, natsURI)
 	appResult := runApp(t, ctx, cfg)
 
 	dbConn, err := pgx.Connect(ctx, dbConnString)
@@ -744,13 +798,22 @@ func TestE2E_NoMatchWithoutEnoughPlayers(t *testing.T) {
 
 	waitForAppStart(t, started, appResult)
 
-	_, err = dbConn.Exec(ctx, "INSERT INTO users (login, password, queued_until) VALUES ($1,$2,NOW() + INTERVAL '5 hours')", "user1", "pass")
+	_, err = dbConn.Exec(
+		ctx,
+		`
+		INSERT INTO users (login, password, queued_until)
+		VALUES ('user1', 'pass', NOW() + INTERVAL '5 hours')
+		`,
+	)
 	require.NoError(t, err)
 
 	time.Sleep(2 * time.Second)
 
 	var matchCount int
-	err = dbConn.QueryRow(ctx, "SELECT COUNT(*) FROM matches").Scan(&matchCount)
+	err = dbConn.QueryRow(
+		ctx,
+		"SELECT COUNT(*) FROM matches",
+	).Scan(&matchCount)
 	require.NoError(t, err)
 	assert.Zero(t, matchCount, "no match should be created; one player waiting")
 

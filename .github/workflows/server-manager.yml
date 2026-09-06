@@ -12,20 +12,20 @@ on:
 
 defaults:
   run:
-    working-directory: ./server-manager
+    working-directory: server-manager
 
 jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Set up Go
-        uses: actions/setup-go@v6
+        uses: actions/setup-go@v7
         with:
-          go-version: "1.26.4"
+          go-version-file: server-manager/go.mod
           cache: true
-          cache-dependency-path: "server-manager/go.sum"
+          cache-dependency-path: server-manager/go.sum
 
       - name: Lint
         uses: golangci/golangci-lint-action@v9

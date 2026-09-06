@@ -1,3 +1,10 @@
+/**
+ * GET `/api/match` — returns the active match assigned to the authenticated
+ * user, if any, as `{ "match": {...} | null }`.
+ *
+ * @param {import('./$types.js').RequestEvent} event
+ * @returns {Promise<import('@sveltejs/kit').Response>}
+ */
 import { getUserMatch, getLoginFromToken } from '$lib/db.js';
 import { json } from '@sveltejs/kit';
 import { ERRORS } from '$lib/errors.js';

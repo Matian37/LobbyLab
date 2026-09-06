@@ -6,25 +6,29 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"server/internal"
 	"time"
+
+	"github.com/Matian37/LobbyLab/game-server/internal"
 
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
 )
 
+// NATS broker subject (see docs/architecture.md for details)
 const (
 	healthSubject = "workers.health"
 	assignSubject = "workers.assign"
 	resultSubject = "workers.results"
 )
 
+// Errors returned by NATSConnection operations.
 var (
 	ErrConnectionNotOpen       = errors.New("conection not initialized")
 	ErrConnectionAlreadyOpen   = errors.New("connection already opened")
 	ErrConnectionAlreadyClosed = errors.New("connection already closed")
 )
 
+// NATSConnection implements internal.BrokerConnection over a NATS broker.
 type NATSConnection struct {
 	brokerURI string
 	workerID  string
@@ -39,6 +43,7 @@ type NATSConnection struct {
 	closed bool
 }
 
+// NewConnection builds a NATSConnection for the given broker URI and worker ID.
 func NewConnection(brokerURI string, workerID string, logger *slog.Logger) *NATSConnection {
 	return &NATSConnection{
 		brokerURI: brokerURI,
@@ -47,6 +52,9 @@ func NewConnection(brokerURI string, workerID string, logger *slog.Logger) *NATS
 	}
 }
 
+// Open opens the connection to the NATS broker.
+// timeout is used here as argument due to NATS library implementation.
+// Passing context as options to nats.Connect does not work
 func (c *NATSConnection) Open(timeout time.Duration) error {
 	if c.closed {
 		return ErrConnectionAlreadyClosed
@@ -70,7 +78,7 @@ func (c *NATSConnection) Open(timeout time.Duration) error {
 	}
 	c.js = js
 
-	// checks if the result subject stream exists
+	// Ensure that server-manager created the result stream
 	if _, err := c.js.StreamNameBySubject(ctx, resultSubject); err != nil {
 		return err
 	}
@@ -86,8 +94,9 @@ func (c *NATSConnection) Open(timeout time.Duration) error {
 	return nil
 }
 
+// Close closes the connection. It can also close a partially open connection.
 func (c *NATSConnection) Close() error {
-	// c.conn == nil allows partialy opened NATSConn to be closed
+	// if c.conn was initialized, then connection is partially opened
 	if !c.opened && c.conn == nil {
 		return ErrConnectionNotOpen
 	}
@@ -98,6 +107,8 @@ func (c *NATSConnection) Close() error {
 	return c.conn.Drain()
 }
 
+// GetMatchConfig blocks until it fetches an assignment from the worker's assign subject.
+// If payload is valid internal.MatchConfig, then an acknowledgment is sent back to the assigner.
 func (c *NATSConnection) GetMatchConfig(ctx context.Context) (internal.MatchConfig, error) {
 	if !c.opened {
 		return internal.MatchConfig{}, ErrConnectionNotOpen
@@ -123,6 +134,7 @@ func (c *NATSConnection) GetMatchConfig(ctx context.Context) (internal.MatchConf
 	return matchConfig, nil
 }
 
+// SendCancel publishes a cancel result on the results stream.
 func (c *NATSConnection) SendCancel(ctx context.Context, matchID int) error {
 	if !c.opened {
 		return ErrConnectionNotOpen
@@ -144,6 +156,7 @@ func (c *NATSConnection) SendCancel(ctx context.Context, matchID int) error {
 	return err
 }
 
+// SendResult publishes a success result on the results stream.
 func (c *NATSConnection) SendResult(ctx context.Context, matchID int, result []byte) error {
 	if !c.opened {
 		return ErrConnectionNotOpen
@@ -165,6 +178,8 @@ func (c *NATSConnection) SendResult(ctx context.Context, matchID int, result []b
 	return err
 }
 
+// subscribeAssign subscribes to the worker's assignment subject.
+// FIX: game-server always runs the oldest assignment first (on slowdown this may cause issues)
 func (c *NATSConnection) subscribeAssign() error {
 	sub, err := c.conn.SubscribeSync(assignSubject + "." + c.workerID)
 	if err != nil {
@@ -178,6 +193,9 @@ func (c *NATSConnection) subscribeAssign() error {
 	return nil
 }
 
+// subscribeHealth subscribes to the health subject and answers pings with
+// a reply carrying the worker ID.
+// FIX: pending limits may cause some pong drops on slowdown
 func (c *NATSConnection) subscribeHealth() error {
 	sub, err := c.conn.Subscribe(healthSubject, func(msg *nats.Msg) {
 		c.logger.Debug("received ping, sending pong...")

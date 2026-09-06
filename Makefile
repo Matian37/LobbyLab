@@ -11,7 +11,8 @@ down:
 	docker compose down $(DOWN_ARGS)
 
 logs:
-	# limitation: past game-server logs are not sorted with past compose logs
-	@{ docker compose -p multiplayer-asset ps -aq; \
-	   docker ps -aq --filter 'label=com.github.multiplayer-asset.worker=true'; \
-	 } | sort -u | xargs -r -P 0 -I{} docker logs --timestamps $(LOG_ARGS) {}
+	docker ps -aq \
+	    --filter 'label=com.github.Matian37.LobbyLab.service=game-server' \
+	&& docker ps -aq \
+	    --filter 'label=com.docker.compose.project=LobbyLab' \
+	| xargs -r -n 1 -P 0 docker logs $(LOG_ARGS)

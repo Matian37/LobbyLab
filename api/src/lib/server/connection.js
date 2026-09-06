@@ -4,24 +4,58 @@ import { CONNECTION_ERRORS } from './../errors.js';
 import { CONNECTION_DEFAULT_OPTIONS, State } from './../constants.js';
 import { websocketLogger } from '../logger.js';
 
+/**
+ * Sentinel passed to {@link Connection.close} to request a hard close, which
+ * terminates the underlying TCP connection instead of sending a close frame.
+ */
 const HARD_CLOSE = Symbol('hard close');
 
+/**
+ * Wraps a single WebSocket with its own {@link State}.
+ *
+ * Lifecycle: a connection is `INIT` on construction, transitions to `OPEN` via
+ * {@link Connection.open} (which starts the ping/pong watchdog), and to
+ * `CLOSED` via {@link Connection.close}, either soft (close frame) or hard
+ * (`terminate`). Calls that are invalid for the current state are ignored or
+ * throw a {@link ConnectionStateError}.
+ *
+ * While open, a ping control frame carrying an incrementing sequence is sent
+ * every `pingIntervalMs`. A matching pong must arrive within `pongTimeoutMs`,
+ * otherwise the pong counts as missed. After more than `maxMissedPongs`
+ * consecutive misses the connection is hard-closed. When a match is assigned,
+ * {@link Connection.sendMatchAndClose} delivers the payload and closes.
+ *
+ * @emits close when the connection has been closed.
+ */
 export class Connection extends EventEmitter {
     #ws;
     #websocketId;
+
+    #state = State.INIT;
+
     #login;
     #options;
+
     #logger;
-    #state = State.INIT;
-    #missedPongs = 0;
+
     #pingTimer = null;
     #pongTimer = null;
+
     #pingSeq = 0;
+    #missedPongs = 0;
     #waitingForPing = false;
+
     #onPongHandler = null;
     #onCloseHandler = null;
     #onErrorHandler = null;
 
+    /**
+     * @param {import('ws').WebSocket} ws The underlying socket.
+     * @param {string} login The authenticated user's login.
+     * @param {number} websocketId Allocated websocket ID for this connection.
+     * @param {import('../constants.js').ConnectionOptions} [options] Overrides
+     *     for the ping/pong watchdog settings.
+     */
     constructor(ws, login, websocketId, options = CONNECTION_DEFAULT_OPTIONS) {
         super();
         this.#ws = ws;
@@ -35,38 +69,84 @@ export class Connection extends EventEmitter {
         });
     }
 
+    /**
+     * @returns {import('../constants.js').ConnectionOptions} The watchdog options.
+     *
+     * Exposed for testing only.
+     */
     get options() {
         return this.#options;
     }
 
+    /**
+     * @returns {number} The allocated websocket ID for this connection.
+     */
     get websocketId() {
         return this.#websocketId;
     }
 
+    /**
+     * @returns {string} The authenticated user's login.
+     */
     get login() {
         return this.#login;
     }
 
+    /**
+     * @returns {import('../constants.js').State} The current lifecycle state.
+     */
     get state() {
         return this.#state;
     }
 
+    /**
+     * @returns {number} Number of consecutive pongs missed.
+     *
+     * Exposed for testing only.
+     */
     get missedPongs() {
         return this.#missedPongs;
     }
 
+    /**
+     * @returns {NodeJS.Timeout|null} The active ping interval, or `null`.
+     *
+     * Exposed for testing only.
+     */
     get pingTimer() {
         return this.#pingTimer;
     }
 
+    /**
+     * @returns {NodeJS.Timeout|null} The active pong deadline timer, or `null`.
+     *
+     * Exposed for testing only.
+     */
     get pongTimer() {
         return this.#pongTimer;
     }
 
+    /**
+     * @returns {boolean} `true` while a ping is outstanding and a pong has not
+     *     yet been received or missed.
+     *
+     * Exposed for testing only.
+     */
     get waitingForPing() {
         return this.#waitingForPing;
     }
 
+    /**
+     * Opens the connection: attaches socket listeners and starts the periodic
+     * ping watchdog. The state must be `INIT`, otherwise a
+     * {@link ConnectionStateError} is thrown from
+     * {@link CONNECTION_ERRORS.cannotOpenConnection}.
+     *
+     * If the underlying socket is already closed, the connection is closed
+     * immediately instead of being opened.
+     *
+     * @throws {Error} When the connection is not in the `INIT` state.
+     */
     open() {
         this.#logger.debug('opening connection');
 
@@ -100,6 +180,11 @@ export class Connection extends EventEmitter {
         this.#logger.debug('connection opened');
     }
 
+    /**
+     * Sends the next ping control frame and setups the pong deadline. Ping is
+     * skipped when the connection is not open, the socket is closed or
+     * a pong from a previous ping is still pending.
+     */
     sendPing() {
         this.#logger.debug({ pingSeq: this.#pingSeq }, 'sending ping');
 
@@ -140,6 +225,14 @@ export class Connection extends EventEmitter {
         );
     }
 
+    /**
+     * Handles an incoming pong. The pong is accepted only while the connection
+     * is open, ping is still waiting, and the payload matches the expected
+     * sequence. On accept, the missed-pong counter resets and the sequence
+     * advances.
+     *
+     * @param {import('ws').RawData} data Pong payload.
+     */
     onPong(data) {
         if (this.#state !== State.OPEN) {
             this.#logger.debug(
@@ -170,6 +263,14 @@ export class Connection extends EventEmitter {
         this.#pongTimer = null;
     }
 
+    /**
+     * Records that if a pong was not received in time it is considered a
+     * missed pong. A miss is counted only for the currently pending sequence
+     * number and it increments the `missedPongs` counter. Once consecutive
+     * misses exceed `maxMissedPongs`, the connection is hard-closed.
+     *
+     * @param {number} seq The sequence whose pong deadline elapsed.
+     */
     onPongMiss(seq) {
         if (this.#state !== State.OPEN) {
             this.#logger.debug(
@@ -211,6 +312,13 @@ export class Connection extends EventEmitter {
         );
     }
 
+    /**
+     * Sends the match-assignment payload as a JSON text frame and then closes
+     * the connection normally.
+     *
+     * @param {{ login: string, host: string, port: string, matchAuthToken: string }} payload
+     *     Match details to deliver to the client.
+     */
     sendMatchAndClose(payload) {
         this.#logger.debug('sending match and closing connection');
 
@@ -231,7 +339,7 @@ export class Connection extends EventEmitter {
         }
 
         try {
-            // TODO: should wait for send to complete before closing
+            // FIX: should wait for send to complete before closing
             this.#ws.send(JSON.stringify(payload));
             this.#logger.debug(
                 { host: payload.host, port: payload.port },
@@ -244,6 +352,17 @@ export class Connection extends EventEmitter {
         }
     }
 
+    /**
+     * Closes the connection. A soft close sends a WebSocket close frame with
+     * the given code and reason; a hard close (passing {@link HARD_CLOSE})
+     * terminates the underlying TCP connection without a close frame. The
+     * state becomes `CLOSED`, timers and listeners are cleaned up, and a
+     * `close` event is emitted. Repeated calls after closing are ignored.
+     *
+     * @param {number|symbol} [code=1000] Close code, or {@link HARD_CLOSE} to
+     *     terminate.
+     * @param {string} [reason=''] Close reason included in the close frame.
+     */
     close(code = 1000, reason = '') {
         this.#logger.debug({ code, reason }, 'closing connection');
 
@@ -269,6 +388,10 @@ export class Connection extends EventEmitter {
         this.#logger.debug('connection closed');
     }
 
+    /**
+     * Stops timers and detaches socket listeners so the connection no longer
+     * responds to the socket after it is closed.
+     */
     cleanup() {
         clearInterval(this.#pingTimer);
         clearTimeout(this.#pongTimer);

@@ -6,10 +6,24 @@ import postgres from 'postgres';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
+/**
+ * Starts a disposable PostgreSQL test container, initializes the schema from
+ * `init.sql`, and returns handles for the test to manage it. The resulting
+ * `DATABASE_URL` is also exported to `process.env` so the app's shared `sql`
+ * pool connects to it.
+ *
+ * @param {{ port?: number }} [options] If a `port` is given, the container's
+ *     PostgreSQL port is mapped to that host port.
+ * @returns {Promise<{
+ *     container: import('testcontainers').StartedTestContainer,
+ *     databaseUrl: string,
+ *     helperSql: import('postgres').Sql
+ * }>} Handles for teardown and direct queries against the test database.
+ */
 export async function setupDatabase({ port } = {}) {
     console.log('[db] starting container...');
 
-    let setupContainer = await new PostgreSqlContainer('postgres:18.4-alpine')
+    let setupContainer = await new PostgreSqlContainer('postgres:18.6-alpine')
         .withUsername('postgres')
         .withPassword('123')
         .withDatabase('postgres');
@@ -43,11 +57,28 @@ export async function setupDatabase({ port } = {}) {
     return { container, databaseUrl, helperSql };
 }
 
+/**
+ * Drops and recreates the `public` schema, then re-runs `init.sql` so each test
+ * starts from a clean, freshly initialized state.
+ *
+ * @param {import('postgres').Sql} helperSql A connection to the test database.
+ * @returns {Promise<void>}
+ */
 export async function resetSchema(helperSql) {
     await helperSql.unsafe('DROP SCHEMA public CASCADE; CREATE SCHEMA public;');
     await helperSql.unsafe(process.env.DATABASE_INIT_SQL);
 }
 
+/**
+ * Stops the test container and closes any open connections.
+ *
+ * @param {{
+ *     container?: import('testcontainers').StartedTestContainer,
+ *     helperSql?: import('postgres').Sql,
+ *     sqlPool?: import('postgres').Sql
+ * }} handles Handles returned by {@link setupDatabase}.
+ * @returns {Promise<void>}
+ */
 export async function teardownDatabase({ container, helperSql, sqlPool }) {
     if (helperSql) await helperSql.end();
     if (sqlPool) await sqlPool.end();

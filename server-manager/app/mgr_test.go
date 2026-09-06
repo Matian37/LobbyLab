@@ -11,8 +11,8 @@ import (
 	"testing"
 	"time"
 
-	"server-manager/internal"
-	"server-manager/internal/mocks"
+	"github.com/Matian37/LobbyLab/server-manager/internal"
+	"github.com/Matian37/LobbyLab/server-manager/internal/mocks"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -345,7 +345,7 @@ func TestWorkerManager_AssignMatch(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, internal.ServerInfo{Host: wm.config.PublicHost, Port: "30001"}, info)
 		assert.Equal(t, WorkerOccupied, wm.workers[0].State)
-		assert.Equal(t, config.MatchID, wm.workers[0].matchID)
+		assert.Equal(t, config.MatchID, wm.workers[0].MatchID)
 	})
 }
 
@@ -427,7 +427,7 @@ func TestWorkerManager_handleResults(t *testing.T) {
 		require.ErrorIs(t, err, wantErr)
 		// check if state was not modified
 		assert.Equal(t, WorkerOccupied, workers[0].State)
-		assert.Equal(t, 10, workers[0].matchID)
+		assert.Equal(t, 10, workers[0].MatchID)
 	})
 
 	t.Run("success", func(t *testing.T) {
@@ -482,7 +482,7 @@ func TestWorkerManager_handleResults(t *testing.T) {
 		}
 
 		assert.Equal(t, WorkerFree, workers[0].State)
-		assert.Equal(t, 0, workers[0].matchID)
+		assert.Equal(t, 0, workers[0].MatchID)
 
 		select {
 		case <-sentSignal:
@@ -507,7 +507,7 @@ func TestWorkerManager_restartWorker(t *testing.T) {
 
 	t.Run("worker changed state", func(t *testing.T) {
 		ctx := context.Background()
-		docker, _, _, wm := newMockWorkerManagerWithInit(t, []*Worker{&Worker{stateID: 1}})
+		docker, _, _, wm := newMockWorkerManagerWithInit(t, []*Worker{&Worker{StateID: 1}})
 		docker.EXPECT().RestartContainer(ctx, "").Return(nil)
 
 		err := wm.restartWorker(ctx, wm.workers[0], 0)
@@ -546,9 +546,9 @@ func TestWorkerManager_restartWorker(t *testing.T) {
 		require.NoError(t, err)
 
 		assert.Equal(t, WorkerFree, workers[0].State)
-		assert.Equal(t, 0, workers[0].matchID)
+		assert.Equal(t, 0, workers[0].MatchID)
 		assert.Equal(t, 0, workers[0].failCount)
-		assert.Equal(t, 2, workers[0].stateID)
+		assert.Equal(t, 2, workers[0].StateID)
 
 		select {
 		case <-notified:
@@ -587,10 +587,10 @@ func TestWorkerManager_healthCheck(t *testing.T) {
 		err := wm.healthCheck(ctx)
 		require.NoError(t, err)
 
-		assert.Equal(t, 0, wm.workers[0].stateID)
+		assert.Equal(t, 0, wm.workers[0].StateID)
 		assert.Equal(t, WorkerFree, wm.workers[0].State)
 
-		assert.Equal(t, 0, wm.workers[1].stateID)
+		assert.Equal(t, 0, wm.workers[1].StateID)
 		assert.Equal(t, WorkerFree, wm.workers[1].State)
 	})
 
@@ -632,10 +632,10 @@ func TestWorkerManager_healthCheck(t *testing.T) {
 		}
 
 		assert.Equal(t, WorkerRestarting, wm.workers[0].State)
-		assert.Equal(t, 1, wm.workers[0].stateID)
+		assert.Equal(t, 1, wm.workers[0].StateID)
 
 		assert.Equal(t, WorkerRestarting, wm.workers[1].State)
-		assert.Equal(t, 1, wm.workers[1].stateID)
+		assert.Equal(t, 1, wm.workers[1].StateID)
 	})
 
 	t.Run("match cancel on WorkerOccupied state", func(t *testing.T) {

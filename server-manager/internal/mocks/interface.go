@@ -12,8 +12,9 @@ package mocks
 import (
 	context "context"
 	reflect "reflect"
-	internal "server-manager/internal"
 	time "time"
+
+	internal "github.com/Matian37/LobbyLab/server-manager/internal"
 
 	gomock "go.uber.org/mock/gomock"
 )

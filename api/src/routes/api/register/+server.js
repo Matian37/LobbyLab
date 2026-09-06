@@ -1,3 +1,12 @@
+/**
+ * POST `/api/register` — creates a user account and starts a session for them.
+ *
+ * Body: `{ "login": string, "password": string }`. On success a `session`
+ * cookie is set (`httpOnly`, `secure`, `sameSite: strict`).
+ *
+ * @param {import('./$types.js').RequestEvent} event
+ * @returns {Promise<import('@sveltejs/kit').Response>}
+ */
 import { addUser, addSession } from '$lib/db.js';
 import { json } from '@sveltejs/kit';
 import { ERRORS } from '$lib/errors.js';

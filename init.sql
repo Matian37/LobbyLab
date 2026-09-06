@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS matches(
     canceled BOOLEAN NOT NULL DEFAULT false,
     results JSONB
 );
+CREATE INDEX IF NOT EXISTS idx_matches_active ON matches(active);
 
 ALTER SEQUENCE matches_id_seq OWNED BY matches.id;
 
@@ -22,7 +23,7 @@ CREATE TABLE IF NOT EXISTS users(
     last_websocket_id BIGINT NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS idx_users_match_id ON users(match_id);
-CREATE INDEX IF NOT EXISTS idx_users_login_match_id ON users(login, match_id, queued_until);
+CREATE INDEX IF NOT EXISTS idx_users_queued_until_match_id ON users(queued_until, match_id);
 
 -- Stores matches in which users have participated
 CREATE TABLE IF NOT EXISTS user_matches (

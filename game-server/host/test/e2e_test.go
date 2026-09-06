@@ -1,5 +1,10 @@
 //go:build e2e
 
+// End-to-end tests for the game server.
+//
+// Tests use scripts inside the testdata directory for actual game servers.
+// Some of them use the SCRIPT_PID_FILE environment variable to provide
+// information about its own and child process IDs to the tests.
 package main
 
 import (
@@ -9,7 +14,7 @@ import (
 	"testing"
 	"time"
 
-	app "server/app"
+	"github.com/Matian37/LobbyLab/game-server/app"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -90,12 +95,13 @@ func TestE2E_ConfigParsingFailure(t *testing.T) {
 	}
 }
 
+// Verifies that match is processed successfully and result is published.
 func TestE2E_SuccessfulMatch(t *testing.T) {
 	verifyNoGoroutineLeaks(t)
 
 	nc, results := setupNATS(t)
 	_, _ = startApp(t, scriptSuccess)
-	waitForWorkerReady(t, nc)
+	waitForAppStart(t, nc)
 	pingerErrChan := startHealthPinger(t, nc)
 
 	const matchID = 1
@@ -103,47 +109,50 @@ func TestE2E_SuccessfulMatch(t *testing.T) {
 	assignMatch(t, nc, matchID, json.RawMessage(config))
 
 	expectedDetails := fmt.Sprintf(`{"winner":"player1","score":10,"config":%s}`, config)
-	result := expectResult(t, results)
+	result := requireResult(t, results)
 	requireSuccessResult(t, result, matchID, expectedDetails)
 	requirePingerOK(t, pingerErrChan)
 }
 
-func TestE2E_CanceledMatch(t *testing.T) {
+func TestE2E_GameServerFailureCancelsMatch(t *testing.T) {
 	verifyNoGoroutineLeaks(t)
 
 	nc, results := setupNATS(t)
 	_, _ = startApp(t, scriptFail)
-	waitForWorkerReady(t, nc)
+	waitForAppStart(t, nc)
 	pingerErrChan := startHealthPinger(t, nc)
 
 	const matchID = 1
-	assignMatch(t, nc, matchID, json.RawMessage(`{"game":"pong"}`))
+	assignMatch(t, nc, matchID, json.RawMessage(`{"config":"example"}`))
 
-	requireCancelResult(t, expectResult(t, results), matchID)
+	requireCancelResult(t, requireResult(t, results), matchID)
 	requirePingerOK(t, pingerErrChan)
 }
 
+// Verifies that a game server which writes an invalid result
+// causes the match to be canceled and a cancel result to be published.
 func TestE2E_InvalidResultCancelsMatch(t *testing.T) {
 	verifyNoGoroutineLeaks(t)
 
 	nc, results := setupNATS(t)
 	_, _ = startApp(t, scriptInvalidResult)
-	waitForWorkerReady(t, nc)
+	waitForAppStart(t, nc)
 	pingerErrChan := startHealthPinger(t, nc)
 
 	const matchID = 1
 	assignMatch(t, nc, matchID, json.RawMessage(`{"game":"pong"}`))
 
-	requireCancelResult(t, expectResult(t, results), matchID)
+	requireCancelResult(t, requireResult(t, results), matchID)
 	requirePingerOK(t, pingerErrChan)
 }
 
+// Verifies that an assignment with invalid JSON is not acknowledged to broker.
 func TestE2E_InvalidAssignmentCancelsMatch(t *testing.T) {
 	verifyNoGoroutineLeaks(t)
 
 	nc, _ := setupNATS(t)
 	_, _ = startApp(t, scriptSuccess)
-	waitForWorkerReady(t, nc)
+	waitForAppStart(t, nc)
 	pingerErrChan := startHealthPinger(t, nc)
 
 	_, err := nc.Request(assignSubject+"."+testWorkerID, []byte(`not-json`), 2*time.Second)
@@ -182,7 +191,7 @@ func TestE2E_UnresponsiveServerShutsDown(t *testing.T) {
 			nc, results := setupNATS(t)
 			pidFile := setupPidFile(t)
 			cancel, _ := startApp(t, tt.script)
-			waitForWorkerReady(t, nc)
+			waitForAppStart(t, nc)
 			pingerErrChan := startHealthPinger(t, nc)
 
 			const matchID = 1
@@ -190,7 +199,7 @@ func TestE2E_UnresponsiveServerShutsDown(t *testing.T) {
 			pids := waitForScriptPIDs(t, pidFile, tt.pidCount)
 
 			cancel()
-			requireCancelResult(t, expectResult(t, results), matchID)
+			requireCancelResult(t, requireResult(t, results), matchID)
 			requireProcessesGone(t, pids)
 
 			requirePingerOK(t, pingerErrChan)
@@ -203,7 +212,7 @@ func TestE2E_GracefulShutdownWithoutMatch(t *testing.T) {
 
 	nc, _ := setupNATS(t)
 	cancel, appResult := startApp(t, scriptSuccess)
-	waitForWorkerReady(t, nc)
+	waitForAppStart(t, nc)
 	_ = startHealthPinger(t, nc)
 
 	cancel()
@@ -222,7 +231,7 @@ func TestE2E_GracefulShutdownWithHangingMatch(t *testing.T) {
 	pidFile := setupPidFile(t)
 
 	cancel, appResult := startApp(t, scriptUnresponsiveSIGKILL)
-	waitForWorkerReady(t, nc)
+	waitForAppStart(t, nc)
 	pingerErrChan := startHealthPinger(t, nc)
 
 	const matchID = 1
@@ -230,7 +239,7 @@ func TestE2E_GracefulShutdownWithHangingMatch(t *testing.T) {
 	pids := waitForScriptPIDs(t, pidFile, 1)
 
 	cancel()
-	requireCancelResult(t, expectResult(t, results), matchID)
+	requireCancelResult(t, requireResult(t, results), matchID)
 	requireProcessesGone(t, pids)
 
 	select {
@@ -243,6 +252,7 @@ func TestE2E_GracefulShutdownWithHangingMatch(t *testing.T) {
 	requirePingerOK(t, pingerErrChan)
 }
 
+// Runs a sequence of matches with different outcomes to test the application's behavior.
 func TestE2E_MultipleMatchesMixedOutcomes(t *testing.T) {
 	verifyNoGoroutineLeaks(t)
 
@@ -250,7 +260,7 @@ func TestE2E_MultipleMatchesMixedOutcomes(t *testing.T) {
 	pidFile := setupPidFile(t)
 
 	cancel, _ := startApp(t, scriptMultiMode)
-	waitForWorkerReady(t, nc)
+	waitForAppStart(t, nc)
 	pingerErrChan := startHealthPinger(t, nc)
 
 	matchID := 1
@@ -258,23 +268,23 @@ func TestE2E_MultipleMatchesMixedOutcomes(t *testing.T) {
 	assignMatch(t, nc, matchID, json.RawMessage(successConfig))
 
 	expectedDetails := fmt.Sprintf(`{"winner":"player1","score":10,"config":%s}`, successConfig)
-	successResult := expectResult(t, results)
+	successResult := requireResult(t, results)
 	requireSuccessResult(t, successResult, matchID, expectedDetails)
 
 	matchID++
 	assignMatch(t, nc, matchID, json.RawMessage(`{"mode":"fail"}`))
-	requireCancelResult(t, expectResult(t, results), matchID)
+	requireCancelResult(t, requireResult(t, results), matchID)
 
 	matchID++
 	assignMatch(t, nc, matchID, json.RawMessage(`{"mode":"invalid"}`))
-	requireCancelResult(t, expectResult(t, results), matchID)
+	requireCancelResult(t, requireResult(t, results), matchID)
 
 	matchID++
 	assignMatch(t, nc, matchID, json.RawMessage(`{"mode":"hang"}`))
 	pids := waitForScriptPIDs(t, pidFile, 1)
 
 	cancel()
-	requireCancelResult(t, expectResult(t, results), matchID)
+	requireCancelResult(t, requireResult(t, results), matchID)
 	requireProcessesGone(t, pids)
 
 	requirePingerOK(t, pingerErrChan)

@@ -8,20 +8,20 @@ on:
 
 defaults:
   run:
-    working-directory: ./game-server/host/
+    working-directory: game-server/host/
 
 jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Set up Go
-        uses: actions/setup-go@v6
+        uses: actions/setup-go@v7
         with:
-          go-version: "1.26.3"
+          go-version-file: game-server/host/go.mod
           cache: true
-          cache-dependency-path: "game-server/host/go.sum"
+          cache-dependency-path: game-server/host/go.sum
 
       - name: Run E2E Tests
         run: go test -v -tags=e2e -run="^TestE2E" --timeout 3m ./...

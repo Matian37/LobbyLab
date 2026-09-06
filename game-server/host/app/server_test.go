@@ -4,10 +4,11 @@ import (
 	"context"
 	"errors"
 	"log/slog"
-	"server/internal"
-	"server/internal/mocks"
 	"testing"
 	"time"
+
+	"github.com/Matian37/LobbyLab/game-server/internal"
+	"github.com/Matian37/LobbyLab/game-server/internal/mocks"
 
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
@@ -35,15 +36,6 @@ func newMockServerWithOpen(t *testing.T) (*mocks.MockBrokerConnection, *mocks.Mo
 	mockConn, mockSrv, server := newMockServer(t)
 	server.opened = true
 	return mockConn, mockSrv, server
-}
-
-// newUniqueCtx returns a cancellable context distinct from background/todo,
-// useful as a gomock matcher to verify the exact context flows through.
-func newUniqueCtx(t *testing.T) context.Context {
-	t.Helper()
-	ctx, cancel := context.WithCancel(context.Background())
-	t.Cleanup(cancel)
-	return ctx
 }
 
 func TestNewServer(t *testing.T) {
@@ -239,14 +231,13 @@ func TestServer_runServer(t *testing.T) {
 
 	t.Run("success", func(t *testing.T) {
 		_, mockSrv, server := newMockServer(t)
-		ctx := newUniqueCtx(t)
 		result := []byte(`{"result":345}`)
 
 		mockSrv.EXPECT().Start(config).Return(nil)
-		mockSrv.EXPECT().GetResult(ctx).Return(result, nil)
+		mockSrv.EXPECT().GetResult(t.Context()).Return(result, nil)
 		mockSrv.EXPECT().Stop(gomock.Any()).Return(nil)
 
-		res, err := server.runServer(ctx, config)
+		res, err := server.runServer(t.Context(), config)
 		assert.NoError(t, err)
 		assert.Equal(t, result, res)
 	})
@@ -262,13 +253,12 @@ func TestServer_runServer(t *testing.T) {
 
 	t.Run("GetResult error", func(t *testing.T) {
 		_, mockSrv, server := newMockServer(t)
-		ctx := newUniqueCtx(t)
 
 		mockSrv.EXPECT().Start(config).Return(nil)
-		mockSrv.EXPECT().GetResult(ctx).Return(nil, errors.New(""))
+		mockSrv.EXPECT().GetResult(t.Context()).Return(nil, errors.New(""))
 		mockSrv.EXPECT().Stop(gomock.Any()).Return(nil)
 
-		res, err := server.runServer(ctx, config)
+		res, err := server.runServer(t.Context(), config)
 		assert.Error(t, err)
 		assert.Nil(t, res)
 	})
@@ -277,38 +267,36 @@ func TestServer_runServer(t *testing.T) {
 func TestServer_runMatch(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		mockConn, mockSrv, server := newMockServer(t)
-		ctx := newUniqueCtx(t)
 		config := internal.MatchConfig{MatchID: 1, Config: []byte(`{"config":123}`)}
 		result := []byte(`{"result":345}`)
 
-		mockConn.EXPECT().GetMatchConfig(ctx).Return(config, nil)
+		mockConn.EXPECT().GetMatchConfig(t.Context()).Return(config, nil)
 		mockSrv.EXPECT().Start(string(config.Config)).Return(nil)
-		mockSrv.EXPECT().GetResult(ctx).Return(result, nil)
+		mockSrv.EXPECT().GetResult(t.Context()).Return(result, nil)
 		mockSrv.EXPECT().Stop(gomock.Any()).Return(nil)
 		mockConn.EXPECT().SendResult(gomock.Any(), config.MatchID, result).Return(nil)
 
-		err := server.runMatch(ctx)
+		err := server.runMatch(t.Context())
 		assert.NoError(t, err)
 	})
 
 	t.Run("GetMatchConfig failed", func(t *testing.T) {
 		mockConn, _, server := newMockServer(t)
-		ctx := newUniqueCtx(t)
-		mockConn.EXPECT().GetMatchConfig(ctx).Return(internal.MatchConfig{}, errors.New(""))
 
-		err := server.runMatch(ctx)
+		mockConn.EXPECT().GetMatchConfig(t.Context()).Return(internal.MatchConfig{}, errors.New(""))
+
+		err := server.runMatch(t.Context())
 		assert.Error(t, err)
 	})
 
 	t.Run("runServer failed", func(t *testing.T) {
 		mockConn, mockSrv, server := newMockServer(t)
-		ctx := newUniqueCtx(t)
 
-		mockConn.EXPECT().GetMatchConfig(ctx).Return(internal.MatchConfig{}, nil)
+		mockConn.EXPECT().GetMatchConfig(t.Context()).Return(internal.MatchConfig{}, nil)
 		mockSrv.EXPECT().Start(gomock.Any()).Return(errors.New(""))
 		mockConn.EXPECT().SendCancel(gomock.Any(), gomock.Any()).Return(nil)
 
-		err := server.runMatch(ctx)
+		err := server.runMatch(t.Context())
 		assert.Error(t, err)
 	})
 

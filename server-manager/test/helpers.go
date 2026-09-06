@@ -15,19 +15,23 @@ import (
 )
 
 type ForEachConfig struct {
-	client      *client.Client
-	errChan     chan error
+	// Docker client
+	client *client.Client
+	// Error channel to report errors
+	errChan chan error
+	// The number of workers used to validate if worker IDs are correct
 	workerCount int
 }
 
 type MatchingConfig struct {
 	ForEachConfig
+	// Worker ID to match against
 	workerID string
 }
 
 func isContainerMine(t *testing.T, c *container.Summary) bool {
 	t.Helper()
-	return c.Labels["com.github.multiplayer-asset.worker"] == "true"
+	return c.Labels["com.github.Matian37.LobbyLab.service"] == "game-server"
 }
 
 func isContainerHealthy(t *testing.T, c *container.Summary) bool {
