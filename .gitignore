@@ -20,6 +20,3 @@ go.work.sum
 
 # Project data volume
 data/
-__pycache__/
-api/test-results/
-api/playwright-report/
