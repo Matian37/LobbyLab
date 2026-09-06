@@ -1,0 +1,9 @@
+[project]
+name = "LobbyLabE2E_Tests"
+version = "0.1.0"
+dependencies = [
+    "requests",
+    "pytest",
+    "websocket-client",
+    "playwright",
+]
