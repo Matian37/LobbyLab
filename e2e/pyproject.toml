@@ -7,3 +7,8 @@ dependencies = [
     "websocket-client",
     "playwright",
 ]
+
+[tool.pyright]
+typeCheckingMode = "standard"
+reportAny = false
+reportExplicitAny = false
