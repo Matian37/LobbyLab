@@ -60,6 +60,7 @@ def setup_services(downloads_folder: str) -> Generator:
 
     stop_services(fail_on_game_server=True)
 
+
 @pytest.mark.parametrize(
     "n, queue_timeout", [(1, 10.0), (2, 10.0), (5, 20.0), (6, 20.0)]
 )
