@@ -9,6 +9,8 @@ from datetime import datetime
 from typing import Literal
 
 import pytest
+from playwright.sync_api import Page, expect
+
 from api_helper import create_users, get_results, get_user_match, is_in_match
 from docker_helper import (
     get_containers_by_image,
@@ -26,7 +28,6 @@ from globals import (
     GAME_SERVER_IMAGE,
     PLAYERS_PER_ROOM,
 )
-from playwright.sync_api import Page, expect
 from websocket_helper import queue_user
 
 

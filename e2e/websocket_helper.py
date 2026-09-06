@@ -4,10 +4,9 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
-from websocket import WebSocketApp
-
 from e2e.game_server_helper import get_match_config, send_match_stop
 from e2e.globals import logger
+from websocket import WebSocketApp
 
 
 def create_ws(
