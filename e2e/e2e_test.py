@@ -10,9 +10,15 @@ from typing import Literal
 
 import pytest
 from playwright.sync_api import Page, expect
+from websocket_helper import queue_user
 
-from api_helper import create_users, get_results, get_user_match, is_in_match
-from docker_helper import (
+from e2e.helpers.api import (
+    create_users,
+    get_results,
+    get_user_match,
+    is_in_match,
+)
+from e2e.helpers.docker import (
     get_containers_by_image,
     kill_containers,
     restart_containers,
@@ -22,13 +28,12 @@ from docker_helper import (
     wait_for_api,
     wait_for_server_manager,
 )
-from globals import (
+from e2e.helpers.globals import (
     GAME_CLIENT_FILENAME,
     GAME_SERVER_COUNT,
     GAME_SERVER_IMAGE,
     PLAYERS_PER_ROOM,
 )
-from websocket_helper import queue_user
 
 
 @pytest.fixture(scope="session")

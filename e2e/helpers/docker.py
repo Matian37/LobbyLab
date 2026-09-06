@@ -4,7 +4,8 @@ import time
 from datetime import datetime
 
 import pytest
-from e2e.globals import GAME_SERVER_IMAGE, PROJECT_FOLDER, logger
+
+from e2e.helpers.globals import GAME_SERVER_IMAGE, PROJECT_FOLDER, logger
 
 
 def start_services(downloads_folder: str) -> None:
