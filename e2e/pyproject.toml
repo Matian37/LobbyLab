@@ -1,0 +1,27 @@
+[project]
+name = "e2e"
+version="0.0.1"
+requires-python = ">=3.14"
+dependencies = [
+    "requests",
+    "pytest",
+    "websocket-client",
+    "playwright",
+    "pytest-playwright",
+    "pytest-timeout",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.pyright]
+typeCheckingMode = "standard"
+reportAny = false
+reportExplicitAny = false
+
+[tool.hatch.build.targets.wheel]
+packages = ["."]
+
+[tool.pytest.ini_options]
+pythonpath = [".."]

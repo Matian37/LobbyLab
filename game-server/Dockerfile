@@ -19,8 +19,10 @@ COPY runtime ./runtime
 
 # here you can setup your actual game-server
 # runtime folder is meant for holding game-server files
-RUN chmod +x runtime/example.ash
+RUN chmod +x runtime/example.sh
+
+RUN apk add --no-cache bash socat
 
 # first argument in CMD is the command which starts your actual game-server
 # modify it to your needs
-CMD ["game-server", "./runtime/example.ash"]
+CMD ["game-server", "./runtime/example.sh"]
