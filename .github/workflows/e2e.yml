@@ -12,11 +12,11 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
 
-      - name: Build Project
-        run: make build
-
       - name: Create .env File
         run: cp .env.example .env
+
+      - name: Build Project
+        run: make build
 
       - name: Setup Python
         uses: actions/setup-python@v7

@@ -10,8 +10,6 @@ from datetime import datetime
 from typing import Literal
 
 import pytest
-from playwright.sync_api import Page, expect
-
 from helpers.api import create_users, get_results, get_user_match, is_in_match
 from helpers.docker import (
     get_containers_by_image,
@@ -31,6 +29,7 @@ from helpers.globals import (
     PROJECT_TMP_FOLDER,
 )
 from helpers.ws import queue_user
+from playwright.sync_api import Page, expect
 
 
 @pytest.fixture(scope="session")
