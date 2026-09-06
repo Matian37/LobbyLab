@@ -7,6 +7,7 @@
     import { env } from '$env/dynamic/public';
     import { formatButton, matchStatusString } from '$lib/format.js';
     import { WaitingStatus } from '$lib/constants.js';
+    import Icon from '$lib/components/Icon.svelte';
 
     class Timer {
         #timer = null;
@@ -57,10 +58,14 @@
             } else {
                 this.status = WaitingStatus.NOT_ACTIVE;
             }
+        }
 
-            this.buttonText = $derived(
-                formatButton(matchmaking.status, matchmaking.timer.seconds)
-            );
+        /**
+         * Label for the matchmaking button, derived from the live status and the
+         * queue timer.
+         */
+        get buttonText() {
+            return formatButton(this.status, this.timer.seconds);
         }
 
         /**
@@ -174,6 +179,13 @@
     let currentMatch = $page.data?.currentMatch ?? null;
 
     let matchmaking = new Matchmaking(currentMatch);
+    let matchmakingStatusClass = $derived(
+        user && matchmaking.status === WaitingStatus.PENDING
+            ? 'is-pending'
+            : user && matchmaking.status === WaitingStatus.FOUND
+              ? 'is-found'
+              : ''
+    );
 
     const enhanceLogout = () => {
         return async ({ result }) => {
@@ -192,64 +204,127 @@
     });
 </script>
 
-{#if !user}
-    <button onclick={() => goto(resolve('/login'))} data-testid="login-page">
-        Login
-    </button>
-    <button
-        onclick={() => goto(resolve('/register'))}
-        data-testid="register-page"
-    >
-        Register
-    </button>
-{:else}
-    <form
-        method="POST"
-        action="?/logout"
-        use:enhance={enhanceLogout}
-        data-testid="logout-form"
-    >
-        <button type="submit" data-testid="logout"> Log out </button>
-    </form>
-    <button onclick={() => matchmaking.pressButton()} data-testid="play">
-        {matchmaking.buttonText}
-    </button>
-    <button
-        onclick={() => (location.href = resolve('/api/download'))}
-        data-testid="download-client"
-    >
-        Download client
-    </button>
-{/if}
+<header class="topbar">
+    <a class="brand" href={resolve('/')} aria-label="Home">
+        <span class="brand-name {matchmakingStatusClass}">LobbyLab</span>
+    </a>
 
-{#if matchmaking.errorMessage}
-    <p class="error" data-testid="error">{matchmaking.errorMessage}</p>
-{/if}
+    <nav class="menu">
+        {#if !user}
+            <button
+                class="btn"
+                onclick={() => goto(resolve('/login'))}
+                data-testid="login-page"
+            >
+                <Icon name="login" />
+                Log in
+            </button>
+            <button
+                class="btn btn-primary"
+                onclick={() => goto(resolve('/register'))}
+                data-testid="register-page"
+            >
+                <Icon name="register" />
+                Register
+            </button>
+        {:else}
+            <button
+                class="btn"
+                onclick={() => (location.href = resolve('/api/download'))}
+                data-testid="download-client"
+            >
+                <Icon name="download" />
+                Download client
+            </button>
+            <form
+                method="POST"
+                action="?/logout"
+                use:enhance={enhanceLogout}
+                data-testid="logout-form"
+            >
+                <button type="submit" class="btn" data-testid="logout">
+                    <Icon name="logout" />
+                    Log out
+                </button>
+            </form>
+        {/if}
+    </nav>
+</header>
 
-<h1 data-testid="title">{title}</h1>
+<section class="hero">
+    <p class="eyebrow {matchmakingStatusClass}">Competitive matchmaking</p>
+    <h1 class="title" data-testid="title">{title}</h1>
+
+    {#if !user}
+        <p class="subtitle">
+            Log in or create an account to start the matchmaking.
+        </p>
+    {:else}
+        <button
+            class="btn btn-primary btn-lg btn-play {matchmakingStatusClass}"
+            onclick={() => matchmaking.pressButton()}
+            data-testid="play"
+        >
+            {#if matchmaking.status === WaitingStatus.NOT_ACTIVE}
+                <Icon name="play" />
+            {/if}
+            {matchmaking.buttonText}
+        </button>
+
+        {#if matchmaking.status === WaitingStatus.PENDING}
+            <p class="queue-hint" aria-live="polite">
+                <span class="pulse" aria-hidden="true"></span>
+                Searching for opponents…
+            </p>
+        {/if}
+    {/if}
+
+    {#if matchmaking.errorMessage}
+        <p class="alert" data-testid="error" role="alert">
+            <Icon name="alert" />
+            {matchmaking.errorMessage}
+        </p>
+    {/if}
+</section>
 
 {#if user}
-    <h1 data-testid="matches-title">Matches</h1>
-    <table>
-        <thead>
-            <tr>
-                <th>ID</th>
-                <th>STATUS</th>
-                <th>PLAYERS</th>
-                <th>WINNER</th>
-            </tr>
-        </thead>
-        <tbody>
-            {#if matches.length > 0}
-                {#each matches as match (match.id)}
+    <div class="card results">
+        <h2 class="results-title" data-testid="matches-title">Matches</h2>
+        <div class="table-wrap">
+            <table class="table">
+                <thead>
                     <tr>
-                        <td>{match.id}</td>
-                        <td>{matchStatusString(match)}</td>
-                        <td>{match.details?.players?.join(', ') ?? ''}</td>
-                        <td>{match.details?.winner ?? ''}</td>
+                        <th>ID</th>
+                        <th>STATUS</th>
+                        <th>PLAYERS</th>
+                        <th>WINNER</th>
                     </tr>
-                {/each}
-            {/if}
-        </tbody>
-    </table>
+                </thead>
+                <tbody>
+                    {#if matches.length > 0}
+                        {#each matches as match (match.id)}
+                            <tr>
+                                <td class="cell-id">{match.id}</td>
+                                <td>
+                                    <span
+                                        class="status status-{matchStatusString(
+                                            match
+                                        ).toLowerCase()}"
+                                        >{matchStatusString(match)}</span
+                                    >
+                                </td>
+                                <td
+                                    >{match.details?.players?.join(', ') ??
+                                        ''}</td
+                                >
+                                <td class="cell-winner"
+                                    >{match.details?.winner ?? ''}</td
+                                >
+                            </tr>
+                        {/each}
+                    {/if}
+                </tbody>
+            </table>
+        </div>
+    </div>
 {/if}
