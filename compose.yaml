@@ -44,6 +44,7 @@ services:
     restart: unless-stopped
     environment:
       DATABASE_URL: postgres://${POSTGRES_USER:?}:${POSTGRES_PASSWORD:?}@db:5432/${POSTGRES_DB:?}
+      ORIGIN: http://localhost:3000
       PORT: 3000
       LOG_LEVEL: info
       PUBLIC_GAME_LAUNCH_URL: ${PUBLIC_GAME_LAUNCH_URL:?}

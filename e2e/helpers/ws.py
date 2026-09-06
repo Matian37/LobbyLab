@@ -6,8 +6,8 @@ from typing import Any
 
 from websocket import WebSocketApp
 
-from e2e.helpers.game_server import get_match_config, send_match_stop
-from e2e.helpers.globals import logger
+from helpers.game_server import get_match_config, send_match_stop
+from helpers.globals import logger
 
 
 def create_ws(

@@ -3,15 +3,14 @@ name: End-to-End CI
 on:
   workflow_dispatch:
 
-defaults:
-  run:
-    working-directory: ./e2e
-
 jobs:
   test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+
+      - name: Create .env File
+        run: cp .env.example .env
 
       - name: Setup Python
         uses: actions/setup-python@v7
@@ -20,7 +19,10 @@ jobs:
           cache: pip
 
       - name: Install Python Dependencies
-        run: pip install .
+        run: pip install ./e2e
+
+      - name: Install Playwright Browsers
+        run: playwright install --with-deps chromium
 
       - name: Run Tests
-        run: pytest -vv --timeout=120 .
+        run: pytest -s -vv --timeout=120 ./e2e

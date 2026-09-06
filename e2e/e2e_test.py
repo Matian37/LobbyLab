@@ -1,23 +1,19 @@
+import os
 import random
-import shutil
 import tempfile
 import threading
 import time
 from collections.abc import Generator
 from concurrent.futures import ThreadPoolExecutor, wait
+from dataclasses import dataclass
 from datetime import datetime
 from typing import Literal
 
 import pytest
 from playwright.sync_api import Page, expect
 
-from e2e.helpers.api import (
-    create_users,
-    get_results,
-    get_user_match,
-    is_in_match,
-)
-from e2e.helpers.docker import (
+from helpers.api import create_users, get_results, get_user_match, is_in_match
+from helpers.docker import (
     get_containers_by_image,
     kill_containers,
     restart_containers,
@@ -27,13 +23,14 @@ from e2e.helpers.docker import (
     wait_for_api,
     wait_for_server_manager,
 )
-from e2e.helpers.globals import (
+from helpers.globals import (
     GAME_CLIENT_FILENAME,
     GAME_SERVER_COUNT,
     GAME_SERVER_IMAGE,
     PLAYERS_PER_ROOM,
+    PROJECT_TMP_FOLDER,
 )
-from e2e.helpers.websocket_helper import queue_user
+from helpers.ws import queue_user
 
 
 @pytest.fixture(scope="session")
@@ -41,18 +38,30 @@ def base_url() -> str:
     return "http://localhost:3000"
 
 
+@dataclass
+class GameClientFile:
+    dir: str
+    content: str
+
+
 @pytest.fixture
-def downloads_folder() -> Generator[str]:
-    tmp = tempfile.mkdtemp()
-    yield tmp
-    shutil.rmtree(tmp)
+def game_client_file() -> Generator[GameClientFile]:
+    os.makedirs(PROJECT_TMP_FOLDER, exist_ok=True)
+
+    with tempfile.TemporaryDirectory(dir=PROJECT_TMP_FOLDER) as tmp:
+        file_content = random.randbytes(8).hex()
+
+        with open(tmp + "/" + GAME_CLIENT_FILENAME, "w") as f:
+            _ = f.write(file_content)
+
+        yield GameClientFile(dir=tmp, content=file_content)
 
 
 @pytest.fixture(autouse=True)
-def setup_services(downloads_folder: str) -> Generator:
+def setup_services(game_client_file: GameClientFile) -> Generator:
     stop_services(fail_on_game_server=False)
 
-    start_services(downloads_folder)
+    start_services(game_client_file.dir)
 
     wait_for_server_manager()
     log_proc = stream_logs()
@@ -216,7 +225,7 @@ def test_crash_game_server() -> None:
             time.sleep(1)
 
 
-def test_browser(page: Page, downloads_folder: str) -> None:
+def test_browser(page: Page, game_client_file: GameClientFile) -> None:
     resp = page.goto("/")
     assert resp is not None
     assert resp.status == 200
@@ -229,7 +238,7 @@ def test_browser(page: Page, downloads_folder: str) -> None:
     ) -> None:
         page.goto("/" + mode)
 
-        error_text = page.locator("p")
+        error_text = page.get_by_test_id("error-text")
         expect(error_text).to_be_hidden()
 
         loginBox = page.get_by_test_id("login-input")
@@ -260,10 +269,6 @@ def test_browser(page: Page, downloads_folder: str) -> None:
 
     form(mode="login", login="login", password="password", accept=True)
 
-    with open(downloads_folder + "/" + GAME_CLIENT_FILENAME, "w") as f:
-        file_content = random.randbytes(8).hex()
-        _ = f.write(file_content)
-
     with tempfile.NamedTemporaryFile() as tmp:
         with page.expect_download() as download_info:
             page.get_by_test_id("download-client").click()
@@ -271,4 +276,4 @@ def test_browser(page: Page, downloads_folder: str) -> None:
             download.save_as(tmp.name)
 
         tmp.seek(0)
-        assert tmp.read().decode() == file_content
+        assert tmp.read().decode() == game_client_file.content

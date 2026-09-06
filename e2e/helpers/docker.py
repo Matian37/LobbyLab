@@ -1,18 +1,19 @@
 import os
 import subprocess
+import threading
 import time
 from datetime import datetime
 
 import pytest
 
-from e2e.helpers.globals import GAME_SERVER_IMAGE, PROJECT_FOLDER, logger
+from helpers.globals import GAME_SERVER_IMAGE, PROJECT_FOLDER, logger
 
 
 def start_services(downloads_folder: str) -> None:
     _ = subprocess.run(
         ["make", "up", "UP_ARGS=-d"],
         check=True,
-        env={**os.environ, "DOWNLOADS_FOLDER": downloads_folder},
+        env={**os.environ, "DOWNLOADS_DIR": downloads_folder},
         cwd=PROJECT_FOLDER,
     )
 
@@ -57,10 +58,15 @@ def wait_for_log(
 
 
 def stream_logs() -> subprocess.Popen:
-    return subprocess.Popen(
+    proc = subprocess.Popen(
         ["make", "logs", "LOG_ARGS=-f"],
         cwd=PROJECT_FOLDER,
     )
+
+    t = threading.Thread(target=proc.wait, daemon=True)
+    t.start()
+
+    return proc
 
 
 def wait_for_server_manager(since: datetime | None = None) -> None:
