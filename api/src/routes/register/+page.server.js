@@ -1,0 +1,24 @@
+/**
+ * Register page server logic. The `default` action reads `login`/`password`
+ * from the submitted form and forwards them to `POST /api/register`, returning
+ * its response (or failure) unchanged.
+ */
+import { fail } from '@sveltejs/kit';
+import { POST as registerPOST } from '$routes/api/register/+server.js';
+
+export const actions = {
+    default: async ({ request, cookies }) => {
+        const formData = await request.formData();
+        const response = await registerPOST({
+            request: {
+                json: async () => ({
+                    login: formData.get('login'),
+                    password: formData.get('password'),
+                }),
+            },
+            cookies,
+        });
+        if (response.ok) return {};
+        return fail(response.status, await response.json());
+    },
+};

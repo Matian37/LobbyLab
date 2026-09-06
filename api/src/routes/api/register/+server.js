@@ -1,31 +1,32 @@
-import { addUser, setSession } from '$lib/db.js';
-import bcrypt from 'bcryptjs';
+/**
+ * POST `/api/register` — creates a user account and starts a session for them.
+ *
+ * Body: `{ "login": string, "password": string }`. On success a `session`
+ * cookie is set (`httpOnly`, `secure`, `sameSite: strict`).
+ *
+ * @param {import('./$types.js').RequestEvent} event
+ * @returns {Promise<import('@sveltejs/kit').Response>}
+ */
+import { addUser, addSession } from '$lib/db.js';
 import { json } from '@sveltejs/kit';
-import { generateToken } from '$lib/helpers.js';
+import { ERRORS } from '$lib/errors.js';
+import { validateCredentialsSchema } from '$lib/validate.js';
 
-export async function POST({request, cookies})
-{
-    const {login, password} = await request.json();
-    const hashed = await bcrypt.hash(password, 10);
-    const result = await addUser(login, hashed);
-    if(!result){
-        return json({
-            sukces: false,
-            msg: "Podany login jest zajęty"
-        });
+export async function POST({ request, cookies }) {
+    const result = await validateCredentialsSchema(request);
+    if (result.error !== undefined) return result.error;
+
+    if (!(await addUser(result.data.login, result.data.password))) {
+        return ERRORS.loginTaken();
     }
-    else{
-        const token = await generateToken(login);
-        cookies.set('token', token, {
-            path: '/',
-            httpOnly: true,
-            secure: true,
-            sameSite: 'strict'
-        });
-        return json({
-            sukces: true,
-            msg: null
-        });
-    }
+
+    const token = await addSession(result.data.login);
+    cookies.set('session', token, {
+        path: '/',
+        httpOnly: true,
+        secure: true,
+        sameSite: 'strict',
+    });
+
+    return json({});
 }
-

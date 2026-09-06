@@ -1,181 +1,255 @@
 <script>
-    import { goto } from "$app/navigation";
-    import { onMount } from "svelte";
+    import { enhance } from '$app/forms';
+    import { goto, invalidateAll } from '$app/navigation';
+    import { resolve } from '$app/paths';
+    import { onMount, onDestroy } from 'svelte';
     import { page } from '$app/stores';
-    import { invalidateAll } from '$app/navigation';
-    let buttonText = $state('Play');
-    let rows = $state([]);
-    let user = $derived($page.data);
-    let title = $derived(!user.login ? 'Zaloguj sie' : user.login);
-    
-    onMount(async () => {
+    import { env } from '$env/dynamic/public';
+    import { formatButton, matchStatusString } from '$lib/format.js';
+    import { WaitingStatus } from '$lib/constants.js';
+
+    class Timer {
+        #timer = null;
+        seconds = $state(0);
+
+        /**
+         * Starts counting seconds from zero.
+         */
+        start() {
+            this.seconds = 0;
+            this.#timer = setInterval(() => {
+                this.seconds++;
+            }, 1000);
+        }
+
+        /**
+         * Stops counting. Not allowed if already stopped.
+         */
+        stop() {
+            if (this.#timer === null) return;
+            clearInterval(this.#timer);
+            this.#timer = null;
+        }
+    }
+
+    /**
+     * Client-side matchmaking controller. Drives the home-page button through
+     * three states (`NOT_ACTIVE` → `PENDING` → `FOUND`), manages the
+     * `/api/connection` websocket while queued, and launches the game client
+     * once a match is assigned by substituting the `{host}`, `{port}`, and
+     * `{token}` placeholders in `PUBLIC_GAME_LAUNCH_URL`.
+     */
+    class Matchmaking {
+        timer = new Timer();
+        errorMessage = $state('');
+        status = $state(WaitingStatus.NOT_ACTIVE);
+        socket = null;
+
+        /**
+         * @param {object|null} currentMatch The user's existing active match,
+         *     if any, which transitions straight to `FOUND`.
+         */
+        constructor(currentMatch) {
+            this.currentMatch = currentMatch;
+
+            if (this.currentMatch) {
+                this.status = WaitingStatus.FOUND;
+            } else {
+                this.status = WaitingStatus.NOT_ACTIVE;
+            }
+
+            this.buttonText = $derived(
+                formatButton(matchmaking.status, matchmaking.timer.seconds)
+            );
+        }
+
+        /**
+         * Routes a button press to the action for the current status
+         */
+        pressButton() {
+            switch (this.status) {
+                case WaitingStatus.NOT_ACTIVE:
+                    this.#start();
+                    break;
+                case WaitingStatus.PENDING:
+                    this.#cancel();
+                    break;
+                case WaitingStatus.FOUND:
+                    this.#join();
+                    break;
+            }
+        }
+
+        /**
+         * Opens the matchmaking websocket and starts the queued timer.
+         */
+        #start() {
+            this.status = WaitingStatus.PENDING;
+            this.errorMessage = '';
+            this.timer.start();
+
+            const wsProtocol = location.protocol === 'https:' ? 'wss' : 'ws';
+            this.socket = new WebSocket(
+                `${wsProtocol}://${location.host}/api/connection`
+            );
+
+            this.socket.onmessage = (event) => {
+                if (this.status !== WaitingStatus.PENDING) return;
+
+                const payload = JSON.parse(event.data);
+                this.status = WaitingStatus.FOUND;
+                this.currentMatch = payload;
+
+                this.#join();
+            };
+
+            this.socket.onclose = (event) => {
+                if (this.status !== WaitingStatus.PENDING) return;
+
+                this.status = WaitingStatus.NOT_ACTIVE;
+
+                // if is 'already in match' error code
+                if (event.code === 4000) {
+                    this.close();
+                    location.reload();
+                } else {
+                    this.errorMessage = 'Connection issue, try again later';
+                    this.close();
+                }
+            };
+
+            this.socket.onerror = () => {
+                if (this.status !== WaitingStatus.PENDING) return;
+
+                this.status = WaitingStatus.NOT_ACTIVE;
+                this.errorMessage = 'Connection issue, try again later';
+                this.close();
+            };
+        }
+
+        /**
+         * Cancels matchmaking by closing the websocket.
+         */
+        #cancel() {
+            this.status = WaitingStatus.NOT_ACTIVE;
+            this.close();
+        }
+
+        /**
+         * Redirects the browser to the filled-in `PUBLIC_GAME_LAUNCH_URL` to
+         * launch the game client for the current match.
+         */
+        #join() {
+            const { host, port, matchAuthToken } = this.currentMatch;
+            let url = env.PUBLIC_GAME_LAUNCH_URL;
+            location.href = url
+                .replaceAll('{host}', encodeURIComponent(host))
+                .replaceAll('{port}', encodeURIComponent(port))
+                .replaceAll('{token}', encodeURIComponent(matchAuthToken));
+        }
+
+        /**
+         * Stops the timer and closes the websocket if one is open or still
+         * connecting.
+         */
+        close() {
+            this.timer.stop();
+
+            if (!this.socket) return;
+
+            if (this.socket.readyState === WebSocket.CONNECTING) {
+                const socket = this.socket;
+                socket.onopen = () => socket.close();
+            } else {
+                this.socket.close();
+            }
+
+            this.socket = null;
+        }
+    }
+
+    let user = $derived($page.data?.login);
+    let title = $derived(user ?? 'Log in');
+    let matches = $derived($page.data?.matches ?? []);
+    let currentMatch = $page.data?.currentMatch ?? null;
+
+    let matchmaking = new Matchmaking(currentMatch);
+
+    const enhanceLogout = () => {
+        return async ({ result }) => {
+            if (result.type === 'success') {
+                await invalidateAll();
+            }
+        };
+    };
+
+    onMount(() => {
         invalidateAll();
-        LoadMatches();
     });
 
-    async function LoadMatches(){
-        if(!user)
-            return;
-        const query = await fetch(`/api/results`, {
-            method: 'GET'
-        });
-        const response = await query.json();
-
-        if(!response.sukces)
-            return;
-
-        rows = response.matches;
-        console.log(response.matches);
-    }
-
-    export function changePage(path) {
-        goto(path);
-    }
-
-    async function logout(){
-        if(!user) return;
-        const response = await fetch('/api/login', {
-            method: 'DELETE'
-        });
-        user = null;
-
-        title = "Zaloguj sie";
-    }
-
-    async function play(){
-        if(!user) 
-        {
-            console.debug('zaloguj sie~!!');
-            return;
-        }
-        if(await isInWaitingList()){
-            console.debug('jestes juz w kolejce');
-            return;
-        }
-        
-    }
-
-    async function isInWaitingList()
-    {
-        let response = await fetch(`/api/waiting`, {
-            method: 'GET',
-        }
-        );
-        let wynik = await response.json();
-        return wynik.sukces;
-    }
+    onDestroy(() => {
+        matchmaking.close();
+    });
 </script>
 
-<button onclick={() => changePage("/login")} data-testid="login-page">
-    Login
-</button>
-<button onclick={() => changePage("/register")}>
-    Register
-</button>
-<button onclick={() => logout()} data-testid='logout'>
-    Log out
-</button>
-<button onclick={()=> play()}>
-    {buttonText}
-</button>
+{#if !user}
+    <button onclick={() => goto(resolve('/login'))} data-testid="login-page">
+        Login
+    </button>
+    <button
+        onclick={() => goto(resolve('/register'))}
+        data-testid="register-page"
+    >
+        Register
+    </button>
+{:else}
+    <form
+        method="POST"
+        action="?/logout"
+        use:enhance={enhanceLogout}
+        data-testid="logout-form"
+    >
+        <button type="submit" data-testid="logout"> Log out </button>
+    </form>
+    <button onclick={() => matchmaking.pressButton()} data-testid="play">
+        {matchmaking.buttonText}
+    </button>
+    <button
+        onclick={() => (location.href = resolve('/api/download'))}
+        data-testid="download-client"
+    >
+        Download client
+    </button>
+{/if}
 
-<h1 data-testid='title'>{title}</h1>
+{#if matchmaking.errorMessage}
+    <p class="error" data-testid="error">{matchmaking.errorMessage}</p>
+{/if}
 
-<table>
-    <thead>
-      <tr>
-        {#if rows.length > 0}
-            {#each Array(rows[0].details.players.length) as _, i}
-                <th>Player {i + 1}</th>
-            {/each}
-            <th>Winner</th>
-        {/if}
-      </tr>
-    </thead>
-    <tbody>
-        {#if rows.length > 0}
-            {#each rows as row}
-                <tr>
-                    {#each row.details.players as player}
-                        <td>{player}</td>
-                    {/each}
-                    <td>{row.details.winner}</td>
-                </tr>
-            {/each}
-        {/if}
-    </tbody>
-  </table>
-  <style>
-    /* Wyśrodkowanie przycisków */
-    button {
-      display: inline-block;
-      margin: 0.5rem 0.25rem;
-      padding: 0.6rem 1.2rem;
-      font-size: 0.95rem;
-      font-weight: 500;
-      color: #f8fafc;
-      background-color: #1e293b;
-      border: 1px solid #334155;
-      border-radius: 8px;
-      cursor: pointer;
-      transition: all 0.2s ease;
-    }
-  
-    button:hover {
-      background-color: #334155;
-      border-color: #475569;
-    }
-  
-    /* Styl dla ostatniego przycisku (Play) */
-    button:last-of-type {
-      background-color: #2563eb;
-      border-color: #3b82f6;
-      font-weight: 600;
-    }
-  
-    button:last-of-type:hover {
-      background-color: #1d4ed8;
-    }
-  
-    /* Wyśrodkowanie całości tekstu i nagłówka */
-    :global(body) {
-      text-align: center;
-      font-family: system-ui, -apple-system, sans-serif;
-      background-color: #0f172a;
-      color: #f8fafc;
-      padding: 2rem;
-    }
-  
-    h1 {
-      margin: 1.5rem 0;
-      color: #38bdf8;
-    }
-  
-    /* Wyśrodkowanie tabeli na stronie */
-    table {
-      margin: 1.5rem auto;
-      border-collapse: collapse;
-      background-color: #1e293b;
-      border-radius: 8px;
-      overflow: hidden;
-      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
-    }
-  
-    th, td {
-      padding: 0.75rem 1.25rem;
-      text-align: center;
-      border-bottom: 1px solid #334155;
-    }
-  
-    th {
-      background-color: #334155;
-      color: #94a3b8;
-      font-size: 0.85rem;
-      text-transform: uppercase;
-    }
-  
-    td:last-child {
-      color: #4ade80;
-      font-weight: 600;
-    }
-  </style>
+<h1 data-testid="title">{title}</h1>
+
+{#if user}
+    <h1 data-testid="matches-title">Matches</h1>
+    <table>
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>STATUS</th>
+                <th>PLAYERS</th>
+                <th>WINNER</th>
+            </tr>
+        </thead>
+        <tbody>
+            {#if matches.length > 0}
+                {#each matches as match (match.id)}
+                    <tr>
+                        <td>{match.id}</td>
+                        <td>{matchStatusString(match)}</td>
+                        <td>{match.details?.players?.join(', ') ?? ''}</td>
+                        <td>{match.details?.winner ?? ''}</td>
+                    </tr>
+                {/each}
+            {/if}
+        </tbody>
+    </table>
+{/if}

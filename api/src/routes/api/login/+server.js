@@ -1,53 +1,43 @@
-import { findUserByLogin, setSession, deleteSession, getLoginFromToken, tokenExists } from '$lib/db.js';
-import bcrypt from 'bcryptjs';
+/**
+ * POST `/api/login` — authenticates credentials and starts a session.
+ *
+ * Body: `{ "login": string, "password": string }`. On success a `session`
+ * cookie is set (`httpOnly`, `secure`, `sameSite: strict`). The password used
+ * is stored in the session, so a deleted user is reported as invalid
+ * credentials.
+ *
+ * @param {import('./$types.js').RequestEvent} event
+ * @returns {Promise<import('@sveltejs/kit').Response>}
+ */
 import { json } from '@sveltejs/kit';
-import { handleError } from '$lib/error_handler.js';
-import { generateToken } from '$lib/helpers.js';
+import { verifyPassword, addSession } from '$lib/db.js';
+import { ERRORS } from '$lib/errors.js';
+import { validateCredentialsSchema } from '$lib/validate.js';
+import { httpLogger } from '$lib/logger.js';
 
-export async function POST({request, cookies})
-{
-    const {login, password} = await request.json();
-    const result = await findUserByLogin(login);
-    if(result.length == 0) {
-        return json({sukces: false, msg: "Podany login nie istnieje"});
+export async function POST({ request, cookies }) {
+    const result = await validateCredentialsSchema(request);
+    if (result.error !== undefined) return result.error;
+
+    if (!(await verifyPassword(result.data.login, result.data.password))) {
+        return ERRORS.invalidCredentials();
     }
-    
-    if(await bcrypt.compare(password, result[0].password)){
-        const token = await generateToken(login);
-        cookies.set('token', token, {
-            path: '/',
-            httpOnly: true,
-            secure: true,
-            sameSite: 'strict'
-        });
-        return json({
-            sukces: true,
-            msg: null
-        });
+
+    const token = await addSession(result.data.login);
+    if (token === null) {
+        // user gone, so credentials are no longer valid from user perspective
+        httpLogger.warn(
+            { login: result.data.login },
+            'login failed, user no longer exists'
+        );
+        return ERRORS.invalidCredentials();
     }
-    else{
-        return json({
-            sukces: false,
-            msg: "Podane hasło jest błędne"
-        });
-    }
-}
 
-export async function DELETE({cookies}){
-    const token = cookies.get('token');
-    if(token == undefined)
-        return json({sukces: false});
-
-    await deleteSession(token);
-    cookies.delete('token', { path: '/' });
-    return json({sukces: true});
-}
-
-export async function GET({cookies}){
-    const token = cookies.get('token');
-    if(token == undefined)
-        return json({sukces: false});
-    
-    if((await tokenExists(token)).length == 0) return json({sukces: false});
-    return json({sukces: true});
+    cookies.set('session', token, {
+        path: '/',
+        httpOnly: true,
+        secure: true,
+        sameSite: 'strict',
+    });
+    return json({});
 }

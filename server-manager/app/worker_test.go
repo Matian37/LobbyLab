@@ -10,39 +10,37 @@ import (
 
 func newTestWorkerFree(stateID int) Worker {
 	return Worker{
-		ID:              "test",
 		State:           WorkerFree,
-		stateID:         stateID,
+		StateID:         stateID,
 		stateValidUntil: time.Time{},
-		matchID:         0,
+		MatchID:         0,
 	}
 }
 
 func newTestWorkerOccupied(stateID int, matchID int) Worker {
 	return Worker{
-		ID:              "test",
 		State:           WorkerOccupied,
-		stateID:         stateID,
+		StateID:         stateID,
 		stateValidUntil: time.Time{},
-		matchID:         matchID,
+		MatchID:         matchID,
 	}
 }
 
 func newTestWorkerRestarting(stateID int, now time.Time) Worker {
 	return Worker{
-		ID:              "test",
 		State:           WorkerRestarting,
-		stateID:         stateID,
+		StateID:         stateID,
 		stateValidUntil: now.Add(time.Hour),
-		matchID:         0,
+		MatchID:         0,
 	}
 }
 
 func TestNewWorker(t *testing.T) {
-	worker := NewWorker("test-id", 3, 30*time.Second)
+	worker := NewWorker("wid", "cid", 3, 30*time.Second)
 	require.NotNil(t, worker)
 
-	assert.Equal(t, "test-id", worker.ID)
+	assert.Equal(t, "wid", worker.ID)
+	assert.Equal(t, "cid", worker.ContainerID)
 	assert.Equal(t, WorkerFree, worker.State)
 	assert.Equal(t, 3, worker.maxPingRetries)
 	assert.Equal(t, 30*time.Second, worker.restartTimeout)
@@ -68,7 +66,7 @@ func TestWorker_SetFree(t *testing.T) {
 
 			worker := test.worker
 			res := worker.SetFree()
-			assert.Equal(t, worker.stateID, res)
+			assert.Equal(t, worker.StateID, res)
 
 			assert.Equal(t, expected, worker)
 		})
@@ -99,7 +97,7 @@ func TestWorker_SetRestarting(t *testing.T) {
 			res := worker.SetRestarting()
 			nowUpperBound := time.Now()
 
-			assert.Equal(t, worker.stateID, res)
+			assert.Equal(t, worker.StateID, res)
 
 			assert.GreaterOrEqual(t, worker.stateValidUntil, nowLowerBound.Add(worker.restartTimeout))
 			assert.LessOrEqual(t, worker.stateValidUntil, nowUpperBound.Add(worker.restartTimeout))
@@ -132,7 +130,7 @@ func TestWorker_SetOccupied(t *testing.T) {
 			worker := test.worker
 
 			res := worker.SetOccupied(nextMatchID)
-			assert.Equal(t, worker.stateID, res)
+			assert.Equal(t, worker.StateID, res)
 			assert.Equal(t, expected, worker)
 		})
 	}
@@ -215,14 +213,14 @@ func TestWorker_HandlePong(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			worker := &Worker{
 				State:     test.initState,
-				stateID:   test.initStateID,
+				StateID:   test.initStateID,
 				failCount: test.initFails,
 			}
 
 			worker.HandlePong(test.pong)
 
 			assert.Equal(t, test.wantState, worker.State)
-			assert.Equal(t, test.wantStateID, worker.stateID)
+			assert.Equal(t, test.wantStateID, worker.StateID)
 			assert.Equal(t, test.wantFails, worker.failCount)
 		})
 	}
@@ -325,7 +323,7 @@ func TestWorker_IsHealthy(t *testing.T) {
 
 func TestWorker_LifeCycle(t *testing.T) {
 	t.Run("worker fail limit exceeded", func(t *testing.T) {
-		worker := NewWorker("test", 1, 30*time.Second)
+		worker := NewWorker("wid", "cid", 1, 30*time.Second)
 
 		worker.HandlePong(false)
 		require.True(t, worker.IsHealthy())
@@ -335,14 +333,14 @@ func TestWorker_LifeCycle(t *testing.T) {
 	})
 
 	t.Run("worker no fail limit for restarting", func(t *testing.T) {
-		worker := NewWorker("test", 0, 30*time.Second)
+		worker := NewWorker("wid", "cid", 0, 30*time.Second)
 		worker.SetRestarting()
 		worker.HandlePong(false)
 		assert.True(t, worker.IsHealthy())
 	})
 
 	t.Run("worker fail flow", func(t *testing.T) {
-		worker := NewWorker("test", 0, 1000*time.Hour)
+		worker := NewWorker("wid", "cid", 0, 1000*time.Hour)
 		require.True(t, worker.IsHealthy())
 
 		worker.HandlePong(false)
@@ -353,7 +351,7 @@ func TestWorker_LifeCycle(t *testing.T) {
 	})
 
 	t.Run("stateID increments monotonically", func(t *testing.T) {
-		worker := NewWorker("test", 3, 30*time.Second)
+		worker := NewWorker("wid", "cid", 3, 30*time.Second)
 
 		require.Equal(t, 1, worker.SetOccupied(1))
 		require.Equal(t, 2, worker.SetFree())
@@ -361,6 +359,6 @@ func TestWorker_LifeCycle(t *testing.T) {
 		require.Equal(t, 4, worker.SetRestarting())
 		require.Equal(t, 5, worker.SetOccupied(2))
 
-		assert.Equal(t, 5, worker.stateID)
+		assert.Equal(t, 5, worker.StateID)
 	})
 }

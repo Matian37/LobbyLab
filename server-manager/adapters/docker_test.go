@@ -4,10 +4,13 @@ package adapters
 
 import (
 	"context"
+	"fmt"
+	"log/slog"
+	"strings"
 	"testing"
 	"time"
 
-	"server-manager/internal"
+	"github.com/Matian37/LobbyLab/server-manager/internal"
 
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/api/types/network"
@@ -35,6 +38,7 @@ func newTestConnWithPorts(t *testing.T, exposePorts []string, clientPort string)
 		Image:                  containerImage,
 		ExposePorts:            exposeSet,
 		ClientPort:             network.MustParsePort(clientPort),
+		BrokerNetworkName:      "bridge", // prevents docker network not found errors
 		TestMakeContainerDummy: true,
 	})
 	require.NoError(t, err)
@@ -52,12 +56,15 @@ func newTestConn(t *testing.T) *DockerConnection {
 func createContainer(t *testing.T, dc *DockerConnection) string {
 	t.Helper()
 
+	// prevents docker network not found errors
+	dc.config.BrokerNetworkName = "bridge"
+
 	portMap := network.PortMap{}
 	for port, _ := range dc.config.ExposePorts {
 		portMap[port] = []network.PortBinding{{}}
 	}
 
-	options := dc.containerCreateOptions(portMap)
+	options := dc.containerCreateOptions(portMap, "id")
 	if options.Config == nil {
 		options.Config = &container.Config{}
 	}
@@ -91,6 +98,18 @@ func inspectContainer(t *testing.T, dc *DockerConnection, id string) client.Cont
 	res, err := dc.client.ContainerInspect(context.Background(), id, client.ContainerInspectOptions{})
 	require.NoError(t, err)
 	return res
+}
+
+func containerExists(t *testing.T, dc *DockerConnection, id string) bool {
+	t.Helper()
+	_, err := dc.client.ContainerInspect(context.Background(), id, client.ContainerInspectOptions{})
+	if err == nil {
+		return true
+	}
+	if !strings.Contains(err.Error(), "No such container") {
+		panic(fmt.Sprintf("container returns error different from not found: %v", err))
+	}
+	return false
 }
 
 func TestDockerConnection_New(t *testing.T) {
@@ -159,19 +178,37 @@ func TestIntegration_DockerConnection_containerCreateOptions(t *testing.T) {
 				ExposePorts: network.PortSet{
 					network.MustParsePort("1234"): {},
 				},
+				BrokerURI:          "nats://localhost:4222",
+				GameServerLogLevel: slog.LevelDebug,
 			},
 		}
 		portMap := network.PortMap{network.MustParsePort("1234"): {}}
 
-		opts := dc.containerCreateOptions(portMap)
+		opts := dc.containerCreateOptions(portMap, "id")
 
+		assert.Equal(t, "lobbylab-game-server-id", opts.Name)
 		assert.Equal(t, opts.Image, dc.config.Image)
 		require.NotNil(t, opts.Config)
 		assert.Equal(t, dc.config.ExposePorts, opts.Config.ExposedPorts)
+		assert.Equal(
+			t,
+			[]string{
+				"LOG_LEVEL=DEBUG",
+				"NATS_URI=" + dc.config.BrokerURI,
+				"WORKER_ID=id",
+			},
+			opts.Config.Env,
+		)
 
 		require.NotNil(t, opts.HostConfig)
 		assert.Equal(t, opts.HostConfig.PortBindings, portMap)
-		assert.Nil(t, opts.HostConfig.Init)
+
+		require.NotNil(t, opts.HostConfig.Init)
+		assert.True(t, *opts.HostConfig.Init)
+
+		require.NotNil(t, opts.NetworkingConfig)
+		require.Len(t, opts.NetworkingConfig.EndpointsConfig, 1)
+		require.Contains(t, opts.NetworkingConfig.EndpointsConfig, dc.config.BrokerNetworkName)
 	})
 
 	t.Run("TestContainerDummy env", func(t *testing.T) {
@@ -180,7 +217,7 @@ func TestIntegration_DockerConnection_containerCreateOptions(t *testing.T) {
 
 		dc := newTestConnWithPorts(t, exposePorts, "8080")
 
-		opts := dc.containerCreateOptions(portMap)
+		opts := dc.containerCreateOptions(portMap, "id")
 		require.NotNil(t, opts.Config)
 		assert.Equal(t, dc.config.ExposePorts, opts.Config.ExposedPorts)
 		assert.NotEmpty(t, opts.Config.Cmd)
@@ -192,13 +229,13 @@ func TestIntegration_DockerConnection_containerCreateOptions(t *testing.T) {
 func TestIntegration_DockerConnection_SpawnContainer(t *testing.T) {
 	t.Run("not init", func(t *testing.T) {
 		dc := DockerConnection{}
-		_, err := dc.SpawnContainer(context.Background())
+		_, err := dc.SpawnContainer(context.Background(), "id")
 		assert.ErrorIs(t, err, ErrDockerConnNotInit)
 	})
 
 	t.Run("closed", func(t *testing.T) {
 		dc := DockerConnection{initialized: true, closed: true}
-		_, err := dc.SpawnContainer(context.Background())
+		_, err := dc.SpawnContainer(context.Background(), "id")
 		assert.ErrorIs(t, err, ErrDockerConnClosed)
 	})
 
@@ -207,7 +244,7 @@ func TestIntegration_DockerConnection_SpawnContainer(t *testing.T) {
 		dc.createTimeout = 0
 
 		start := time.Now()
-		_, err := dc.SpawnContainer(context.Background())
+		_, err := dc.SpawnContainer(context.Background(), "id")
 		elapsed := time.Since(start)
 
 		assert.ErrorIs(t, err, context.DeadlineExceeded)
@@ -220,14 +257,14 @@ func TestIntegration_DockerConnection_SpawnContainer(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		cancel()
 
-		_, err := dc.SpawnContainer(ctx)
+		_, err := dc.SpawnContainer(ctx, "id")
 		assert.ErrorIs(t, err, context.Canceled)
 	})
 
 	t.Run("success", func(t *testing.T) {
 		dc := newTestConn(t)
 
-		id, err := dc.SpawnContainer(context.Background())
+		id, err := dc.SpawnContainer(context.Background(), "id")
 		require.NoError(t, err)
 		assert.NotEmpty(t, id)
 
@@ -301,16 +338,16 @@ func TestIntegration_DockerConnection_RestartContainer(t *testing.T) {
 	})
 }
 
-func TestIntegration_DockerConnection_KillContainer(t *testing.T) {
+func TestIntegration_DockerConnection_RemoveContainer(t *testing.T) {
 	t.Run("not init", func(t *testing.T) {
 		dc := DockerConnection{}
-		err := dc.KillContainer(context.Background(), "id")
+		err := dc.RemoveContainer(context.Background(), "id")
 		assert.ErrorIs(t, err, ErrDockerConnNotInit)
 	})
 
 	t.Run("closed", func(t *testing.T) {
 		dc := DockerConnection{initialized: true, closed: true}
-		err := dc.KillContainer(context.Background(), "id")
+		err := dc.RemoveContainer(context.Background(), "id")
 		assert.ErrorIs(t, err, ErrDockerConnClosed)
 	})
 
@@ -319,7 +356,7 @@ func TestIntegration_DockerConnection_KillContainer(t *testing.T) {
 		dc.killTimeout = 0
 
 		start := time.Now()
-		err := dc.KillContainer(context.Background(), "id")
+		err := dc.RemoveContainer(context.Background(), "id")
 		elapsed := time.Since(start)
 
 		assert.ErrorIs(t, err, context.DeadlineExceeded)
@@ -332,7 +369,7 @@ func TestIntegration_DockerConnection_KillContainer(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		cancel()
 
-		err := dc.KillContainer(ctx, "id")
+		err := dc.RemoveContainer(ctx, "id")
 		assert.ErrorIs(t, err, context.Canceled)
 	})
 
@@ -341,11 +378,9 @@ func TestIntegration_DockerConnection_KillContainer(t *testing.T) {
 		id := createContainer(t, dc)
 		startContainer(t, dc, id)
 
-		err := dc.KillContainer(context.Background(), id)
-		assert.NoError(t, err)
-
-		info := inspectContainer(t, dc, id)
-		assert.Equal(t, container.StateExited, info.Container.State.Status)
+		err := dc.RemoveContainer(context.Background(), id)
+		require.NoError(t, err)
+		assert.False(t, containerExists(t, dc, id))
 	})
 }
 
@@ -389,6 +424,88 @@ func TestIntegration_DockerConnection_getPorts(t *testing.T) {
 			_, ok := res[network.MustParsePort(port)]
 			assert.True(t, ok, "missing port %s", port)
 		}
+	})
+}
+
+func runContainerWithLabels(t *testing.T, dc *DockerConnection, labels map[string]string) string {
+	t.Helper()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	res, err := dc.client.ContainerCreate(ctx, client.ContainerCreateOptions{
+		Config: &container.Config{
+			Image:  containerImage,
+			Cmd:    []string{"sleep", "inf"},
+			Labels: labels,
+		},
+	})
+	require.NoError(t, err)
+
+	t.Cleanup(func() {
+		cleanupCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		dc.client.ContainerRemove(cleanupCtx, res.ID, client.ContainerRemoveOptions{Force: true})
+	})
+
+	_, err = dc.client.ContainerStart(ctx, res.ID, client.ContainerStartOptions{})
+	require.NoError(t, err)
+
+	return res.ID
+}
+
+func TestIntegration_DockerConnection_RemoveZombieWorkers(t *testing.T) {
+	t.Run("not init", func(t *testing.T) {
+		dc := DockerConnection{}
+		err := dc.RemoveZombieWorkers(context.Background())
+		assert.ErrorIs(t, err, ErrDockerConnNotInit)
+	})
+
+	t.Run("closed", func(t *testing.T) {
+		dc := DockerConnection{initialized: true, closed: true}
+		err := dc.RemoveZombieWorkers(context.Background())
+		assert.ErrorIs(t, err, ErrDockerConnClosed)
+	})
+
+	t.Run("timeout", func(t *testing.T) {
+		dc := newTestConn(t)
+		dc.killTimeout = 0
+
+		start := time.Now()
+		err := dc.RemoveZombieWorkers(context.Background())
+		elapsed := time.Since(start)
+
+		assert.ErrorIs(t, err, context.DeadlineExceeded)
+		assert.Less(t, elapsed, 200*time.Millisecond)
+	})
+
+	t.Run("canceled", func(t *testing.T) {
+		dc := newTestConn(t)
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+		err := dc.RemoveZombieWorkers(ctx)
+		assert.ErrorIs(t, err, context.Canceled)
+	})
+
+	t.Run("success", func(t *testing.T) {
+		dc := newTestConn(t)
+
+		withLabel := runContainerWithLabels(t, dc, map[string]string{
+			"com.github.Matian37.LobbyLab.service": "game-server",
+		})
+		withOtherLabel := runContainerWithLabels(t, dc, map[string]string{
+			"com.github.Matian37.LobbyLab.service": "other",
+		})
+		noLabel := runContainerWithLabels(t, dc, map[string]string{
+			"some.other.label": "value",
+		})
+
+		err := dc.RemoveZombieWorkers(context.Background())
+		assert.NoError(t, err)
+
+		assert.False(t, containerExists(t, dc, withLabel))
+		assert.True(t, containerExists(t, dc, withOtherLabel))
+		assert.True(t, containerExists(t, dc, noLabel))
 	})
 }
 

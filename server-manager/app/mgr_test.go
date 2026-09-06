@@ -11,8 +11,8 @@ import (
 	"testing"
 	"time"
 
-	"server-manager/internal"
-	"server-manager/internal/mocks"
+	"github.com/Matian37/LobbyLab/server-manager/internal"
+	"github.com/Matian37/LobbyLab/server-manager/internal/mocks"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -133,6 +133,25 @@ func TestWorkerManager_Start(t *testing.T) {
 		assert.False(t, wm.closed)
 	})
 
+	t.Run("remove zombie workers error", func(t *testing.T) {
+		ctx := context.Background()
+
+		docker, broker, db, wm := newMockWorkerManager(t, 1)
+		wantErr := errors.New("zombie removal failed")
+
+		gomock.InOrder(
+			docker.EXPECT().Open(wm.config).Return(nil),
+			broker.EXPECT().Open(ctx, wm.config).Return(nil),
+			db.EXPECT().Open(ctx).Return(nil),
+			docker.EXPECT().RemoveZombieWorkers(ctx).Return(wantErr),
+		)
+
+		err := wm.Start(ctx)
+		require.ErrorIs(t, err, wantErr)
+		assert.False(t, wm.initialized)
+		assert.False(t, wm.closed)
+	})
+
 	t.Run("worker spawn error", func(t *testing.T) {
 		ctx := context.Background()
 
@@ -144,8 +163,9 @@ func TestWorkerManager_Start(t *testing.T) {
 			docker.EXPECT().Open(wm.config).Return(nil),
 			broker.EXPECT().Open(ctx, wm.config).Return(nil),
 			db.EXPECT().Open(ctx).Return(nil),
-			docker.EXPECT().SpawnContainer(ctx).Return("worker-1", nil),
-			docker.EXPECT().SpawnContainer(ctx).Return("", wantErr),
+			docker.EXPECT().RemoveZombieWorkers(ctx).Return(nil),
+			docker.EXPECT().SpawnContainer(ctx, "0").Return("container-0", nil),
+			docker.EXPECT().SpawnContainer(ctx, "1").Return("", wantErr),
 		)
 
 		err := wm.Start(ctx)
@@ -156,7 +176,8 @@ func TestWorkerManager_Start(t *testing.T) {
 		assert.False(t, wm.closed)
 
 		require.Len(t, wm.workers, 1)
-		assert.Equal(t, "worker-1", wm.workers[0].ID)
+		assert.Equal(t, "0", wm.workers[0].ID)
+		assert.Equal(t, "container-0", wm.workers[0].ContainerID)
 	})
 
 	t.Run("success", func(t *testing.T) {
@@ -169,8 +190,9 @@ func TestWorkerManager_Start(t *testing.T) {
 			docker.EXPECT().Open(wm.config).Return(nil),
 			broker.EXPECT().Open(ctx, wm.config).Return(nil),
 			db.EXPECT().Open(ctx).Return(nil),
-			docker.EXPECT().SpawnContainer(ctx).Return("worker-1", nil),
-			docker.EXPECT().SpawnContainer(ctx).Return("worker-2", nil),
+			docker.EXPECT().RemoveZombieWorkers(ctx).Return(nil),
+			docker.EXPECT().SpawnContainer(ctx, "0").Return("container-0", nil),
+			docker.EXPECT().SpawnContainer(ctx, "1").Return("container-1", nil),
 		)
 
 		err := wm.Start(ctx)
@@ -180,8 +202,11 @@ func TestWorkerManager_Start(t *testing.T) {
 		assert.False(t, wm.closed)
 
 		require.Len(t, wm.workers, 2)
-		assert.Equal(t, "worker-1", wm.workers[0].ID)
-		assert.Equal(t, "worker-2", wm.workers[1].ID)
+		assert.Equal(t, "0", wm.workers[0].ID)
+		assert.Equal(t, "container-0", wm.workers[0].ContainerID)
+		assert.Equal(t, "1", wm.workers[1].ID)
+		assert.Equal(t, "container-1", wm.workers[1].ContainerID)
+
 		for _, worker := range wm.workers {
 			assert.Equal(t, WorkerFree, worker.State)
 			assert.Equal(t, wm.workerMaxPingRetries, worker.maxPingRetries)
@@ -204,11 +229,14 @@ func TestWorkerManager_Shutdown(t *testing.T) {
 	})
 
 	t.Run("success", func(t *testing.T) {
-		docker, broker, db, wm := newMockWorkerManagerWithInit(t, []*Worker{{ID: "worker-1"}, {ID: "worker-2"}})
+		docker, broker, db, wm := newMockWorkerManagerWithInit(t, []*Worker{
+			{ContainerID: "container-0"},
+			{ContainerID: "container-1"},
+		})
 
 		gomock.InOrder(
-			docker.EXPECT().KillContainer(context.Background(), "worker-1").Return(nil),
-			docker.EXPECT().KillContainer(context.Background(), "worker-2").Return(nil),
+			docker.EXPECT().RemoveContainer(context.Background(), "container-0").Return(nil),
+			docker.EXPECT().RemoveContainer(context.Background(), "container-1").Return(nil),
 			docker.EXPECT().Close().Return(nil),
 			broker.EXPECT().Close().Return(nil),
 			db.EXPECT().Close().Return(nil),
@@ -221,7 +249,10 @@ func TestWorkerManager_Shutdown(t *testing.T) {
 
 func TestWorkerManager_getFreeWorker(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
-		workers := []*Worker{NewWorker("worker-1", 3, 30*time.Second), NewWorker("worker-2", 3, 30*time.Second)}
+		workers := []*Worker{
+			NewWorker("worker-0", "container-0", 3, 30*time.Second),
+			NewWorker("worker-1", "container-1", 3, 30*time.Second),
+		}
 		workers[0].SetOccupied(1)
 		wm := WorkerManager{workers: workers}
 
@@ -231,7 +262,10 @@ func TestWorkerManager_getFreeWorker(t *testing.T) {
 	})
 
 	t.Run("no free worker", func(t *testing.T) {
-		workers := []*Worker{NewWorker("worker-1", 3, 30*time.Second), NewWorker("worker-2", 3, 30*time.Second)}
+		workers := []*Worker{
+			NewWorker("worker-0", "container-0", 3, 30*time.Second),
+			NewWorker("worker-1", "container-1", 3, 30*time.Second),
+		}
 		workers[0].SetOccupied(1)
 		workers[1].SetOccupied(2)
 
@@ -254,7 +288,7 @@ func TestWorkerManager_AssignMatch(t *testing.T) {
 	})
 
 	t.Run("no free worker", func(t *testing.T) {
-		workers := []*Worker{NewWorker("worker-1", 3, 30*time.Second)}
+		workers := []*Worker{NewWorker("worker-0", "container-0", 3, 30*time.Second)}
 		workers[0].SetOccupied(1)
 		_, _, _, wm := newMockWorkerManagerWithInit(t, workers)
 
@@ -265,11 +299,11 @@ func TestWorkerManager_AssignMatch(t *testing.T) {
 	t.Run("get game port error", func(t *testing.T) {
 		ctx := context.Background()
 
-		workers := []*Worker{NewWorker("worker-1", 3, 30*time.Second)}
+		workers := []*Worker{NewWorker("worker-0", "container-0", 3, 30*time.Second)}
 		docker, _, _, wm := newMockWorkerManagerWithInit(t, workers)
 		wantErr := errors.New("port failed")
 
-		docker.EXPECT().GetGamePort(ctx, "worker-1").Return("", wantErr)
+		docker.EXPECT().GetGamePort(ctx, "container-0").Return("", wantErr)
 
 		_, err := wm.AssignMatch(ctx, internal.MatchConfig{})
 		require.ErrorIs(t, err, wantErr)
@@ -279,15 +313,15 @@ func TestWorkerManager_AssignMatch(t *testing.T) {
 	t.Run("assign job error", func(t *testing.T) {
 		ctx := context.Background()
 
-		workers := []*Worker{NewWorker("worker-1", 3, 30*time.Second)}
+		workers := []*Worker{NewWorker("worker-0", "container-0", 3, 30*time.Second)}
 		docker, broker, _, wm := newMockWorkerManagerWithInit(t, workers)
 		wantErr := errors.New("assign failed")
 
 		config := internal.MatchConfig{MatchID: 43}
 
 		gomock.InOrder(
-			docker.EXPECT().GetGamePort(ctx, "worker-1").Return("30001", nil),
-			broker.EXPECT().AssignJob(ctx, "worker-1", config).Return(wantErr),
+			docker.EXPECT().GetGamePort(ctx, "container-0").Return("30001", nil),
+			broker.EXPECT().AssignJob(ctx, "worker-0", config).Return(wantErr),
 		)
 
 		_, err := wm.AssignMatch(ctx, config)
@@ -299,29 +333,29 @@ func TestWorkerManager_AssignMatch(t *testing.T) {
 		ctx := context.Background()
 
 		config := internal.MatchConfig{MatchID: 42, Config: []byte("{}")}
-		workers := []*Worker{NewWorker("worker-1", 3, 30*time.Second)}
+		workers := []*Worker{NewWorker("worker-0", "container-0", 3, 30*time.Second)}
 		docker, broker, _, wm := newMockWorkerManagerWithInit(t, workers)
 
 		gomock.InOrder(
-			docker.EXPECT().GetGamePort(ctx, "worker-1").Return("30001", nil),
-			broker.EXPECT().AssignJob(ctx, "worker-1", config).Return(nil),
+			docker.EXPECT().GetGamePort(ctx, "container-0").Return("30001", nil),
+			broker.EXPECT().AssignJob(ctx, "worker-0", config).Return(nil),
 		)
 
 		info, err := wm.AssignMatch(ctx, config)
 		require.NoError(t, err)
 		assert.Equal(t, internal.ServerInfo{Host: wm.config.PublicHost, Port: "30001"}, info)
 		assert.Equal(t, WorkerOccupied, wm.workers[0].State)
-		assert.Equal(t, config.MatchID, wm.workers[0].matchID)
+		assert.Equal(t, config.MatchID, wm.workers[0].MatchID)
 	})
 }
 
 func TestWorkerManager_getWorkerByMatchID(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		workers := []*Worker{
-			NewWorker("worker-1", 3, 30*time.Second),
-			NewWorker("worker-2", 3, 30*time.Second),
-			NewWorker("worker-3", 3, 30*time.Second),
-			NewWorker("worker-4", 3, 30*time.Second),
+			NewWorker("worker-0", "container-0", 3, 30*time.Second),
+			NewWorker("worker-1", "container-1", 3, 30*time.Second),
+			NewWorker("worker-2", "container-2", 3, 30*time.Second),
+			NewWorker("worker-3", "container-3", 3, 30*time.Second),
 		}
 		workers[0].SetOccupied(5)
 		workers[1].SetRestarting()
@@ -335,7 +369,7 @@ func TestWorkerManager_getWorkerByMatchID(t *testing.T) {
 	})
 
 	t.Run("no worker found", func(t *testing.T) {
-		workers := []*Worker{NewWorker("worker-1", 3, 30*time.Second)}
+		workers := []*Worker{NewWorker("worker-0", "container-0", 3, 30*time.Second)}
 
 		_, _, _, wm := newMockWorkerManagerWithInit(t, workers)
 
@@ -371,7 +405,7 @@ func TestWorkerManager_handleResults(t *testing.T) {
 	t.Run("ack error", func(t *testing.T) {
 		ctx := context.Background()
 
-		workers := []*Worker{NewWorker("worker-1", 3, 30*time.Second)}
+		workers := []*Worker{NewWorker("worker-0", "container-0", 3, 30*time.Second)}
 		workers[0].SetOccupied(10)
 
 		_, broker, _, wm := newMockWorkerManagerWithInit(t, workers)
@@ -393,13 +427,13 @@ func TestWorkerManager_handleResults(t *testing.T) {
 		require.ErrorIs(t, err, wantErr)
 		// check if state was not modified
 		assert.Equal(t, WorkerOccupied, workers[0].State)
-		assert.Equal(t, 10, workers[0].matchID)
+		assert.Equal(t, 10, workers[0].MatchID)
 	})
 
 	t.Run("success", func(t *testing.T) {
 		ctx := context.Background()
 
-		workers := []*Worker{NewWorker("worker-1", 3, 30*time.Second)}
+		workers := []*Worker{NewWorker("worker-0", "container-0", 3, 30*time.Second)}
 		workers[0].SetOccupied(99)
 
 		_, broker, _, wm := newMockWorkerManagerWithInit(t, workers)
@@ -448,7 +482,7 @@ func TestWorkerManager_handleResults(t *testing.T) {
 		}
 
 		assert.Equal(t, WorkerFree, workers[0].State)
-		assert.Equal(t, 0, workers[0].matchID)
+		assert.Equal(t, 0, workers[0].MatchID)
 
 		select {
 		case <-sentSignal:
@@ -462,32 +496,33 @@ func TestWorkerManager_restartWorker(t *testing.T) {
 	t.Run("container restart failed", func(t *testing.T) {
 		ctx := context.Background()
 
-		docker, _, _, wm := newMockWorkerManagerWithInit(t, []*Worker{})
+		workers := []*Worker{NewWorker("worker-0", "container-0", 3, 30*time.Second)}
+		docker, _, _, wm := newMockWorkerManagerWithInit(t, workers)
 		wantErr := errors.New("restart failed")
 
-		docker.EXPECT().RestartContainer(ctx, "").Return(wantErr)
+		docker.EXPECT().RestartContainer(ctx, "container-0").Return(wantErr)
 
-		assert.ErrorIs(t, wm.restartWorker(ctx, nil, 0, ""), wantErr)
+		assert.ErrorIs(t, wm.restartWorker(ctx, workers[0], 0), wantErr)
 	})
 
 	t.Run("worker changed state", func(t *testing.T) {
 		ctx := context.Background()
-		docker, _, _, wm := newMockWorkerManagerWithInit(t, []*Worker{&Worker{stateID: 1}})
+		docker, _, _, wm := newMockWorkerManagerWithInit(t, []*Worker{&Worker{StateID: 1}})
 		docker.EXPECT().RestartContainer(ctx, "").Return(nil)
 
-		err := wm.restartWorker(ctx, wm.workers[0], 0, "")
+		err := wm.restartWorker(ctx, wm.workers[0], 0)
 		assert.ErrorIs(t, err, ErrWorkerStateChanged)
 	})
 
 	t.Run("success", func(t *testing.T) {
 		ctx := context.Background()
 
-		workers := []*Worker{NewWorker("worker-1", 0, 30*time.Second)}
+		workers := []*Worker{NewWorker("worker-0", "container-0", 0, 30*time.Second)}
 		stateID := workers[0].SetRestarting()
 
 		docker, _, _, wm := newMockWorkerManagerWithInit(t, workers)
 
-		docker.EXPECT().RestartContainer(ctx, "worker-1").Return(nil)
+		docker.EXPECT().RestartContainer(ctx, "container-0").Return(nil)
 
 		ready := make(chan struct{})
 		notified := make(chan struct{})
@@ -507,13 +542,13 @@ func TestWorkerManager_restartWorker(t *testing.T) {
 
 		<-ready
 
-		err := wm.restartWorker(ctx, workers[0], stateID, workers[0].ID)
+		err := wm.restartWorker(ctx, workers[0], stateID)
 		require.NoError(t, err)
 
 		assert.Equal(t, WorkerFree, workers[0].State)
-		assert.Equal(t, 0, workers[0].matchID)
+		assert.Equal(t, 0, workers[0].MatchID)
 		assert.Equal(t, 0, workers[0].failCount)
-		assert.Equal(t, 2, workers[0].stateID)
+		assert.Equal(t, 2, workers[0].StateID)
 
 		select {
 		case <-notified:
@@ -539,8 +574,11 @@ func TestWorkerManager_healthCheck(t *testing.T) {
 	t.Run("healthy workers skipped", func(t *testing.T) {
 		ctx := context.Background()
 
-		responders := internal.Responders{"worker-1": {}}
-		workers := []*Worker{NewWorker("worker-1", 1, 10*time.Second), NewWorker("worker-2", 1, 10*time.Second)}
+		responders := internal.Responders{"worker-0": {}}
+		workers := []*Worker{
+			NewWorker("worker-0", "container-0", 1, 10*time.Second),
+			NewWorker("worker-1", "container-1", 1, 10*time.Second),
+		}
 		workers[0].failCount = 1
 
 		_, broker, _, wm := newMockWorkerManagerWithInit(t, workers)
@@ -549,10 +587,10 @@ func TestWorkerManager_healthCheck(t *testing.T) {
 		err := wm.healthCheck(ctx)
 		require.NoError(t, err)
 
-		assert.Equal(t, 0, wm.workers[0].stateID)
+		assert.Equal(t, 0, wm.workers[0].StateID)
 		assert.Equal(t, WorkerFree, wm.workers[0].State)
 
-		assert.Equal(t, 0, wm.workers[1].stateID)
+		assert.Equal(t, 0, wm.workers[1].StateID)
 		assert.Equal(t, WorkerFree, wm.workers[1].State)
 	})
 
@@ -561,8 +599,8 @@ func TestWorkerManager_healthCheck(t *testing.T) {
 
 		responders := internal.Responders{}
 		workers := []*Worker{
-			NewWorker("worker-1", 1, 10*time.Second), // healthy into unhealthy
-			NewWorker("worker-2", 1, -1*time.Second), // restart expired
+			NewWorker("worker-0", "container-0", 1, 10*time.Second), // healthy into unhealthy
+			NewWorker("worker-1", "container-1", 1, -1*time.Second), // restart expired
 		}
 		workers[0].failCount = 1
 		workers[1].failCount = 2
@@ -575,8 +613,8 @@ func TestWorkerManager_healthCheck(t *testing.T) {
 		wantErr := errors.New("test force error")
 
 		broker.EXPECT().GetWorkersPong(ctx, wm.workerPongTimeout).Return(responders, nil)
-		docker.EXPECT().RestartContainer(ctx, "worker-1").Do(doneFunc).Return(wantErr)
-		docker.EXPECT().RestartContainer(ctx, "worker-2").Do(doneFunc).Return(wantErr)
+		docker.EXPECT().RestartContainer(ctx, "container-0").Do(doneFunc).Return(wantErr)
+		docker.EXPECT().RestartContainer(ctx, "container-1").Do(doneFunc).Return(wantErr)
 
 		err := wm.healthCheck(ctx)
 		require.NoError(t, err)
@@ -594,18 +632,18 @@ func TestWorkerManager_healthCheck(t *testing.T) {
 		}
 
 		assert.Equal(t, WorkerRestarting, wm.workers[0].State)
-		assert.Equal(t, 1, wm.workers[0].stateID)
+		assert.Equal(t, 1, wm.workers[0].StateID)
 
 		assert.Equal(t, WorkerRestarting, wm.workers[1].State)
-		assert.Equal(t, 1, wm.workers[1].stateID)
+		assert.Equal(t, 1, wm.workers[1].StateID)
 	})
 
 	t.Run("match cancel on WorkerOccupied state", func(t *testing.T) {
 		ctx := context.Background()
 
 		workers := []*Worker{
-			NewWorker("worker-1", 1, 10*time.Second),
-			NewWorker("worker-2", 1, -1*time.Second),
+			NewWorker("worker-0", "container-0", 1, 10*time.Second),
+			NewWorker("worker-1", "container-1", 1, -1*time.Second),
 		}
 		workers[0].SetOccupied(123)
 		workers[0].failCount = 2
@@ -619,8 +657,8 @@ func TestWorkerManager_healthCheck(t *testing.T) {
 		wantErr := errors.New("test force error")
 
 		broker.EXPECT().GetWorkersPong(ctx, wm.workerPongTimeout).Return(internal.Responders{}, nil)
-		docker.EXPECT().RestartContainer(ctx, "worker-1").Do(doneFunc).Return(wantErr)
-		docker.EXPECT().RestartContainer(ctx, "worker-2").Do(doneFunc).Return(wantErr)
+		docker.EXPECT().RestartContainer(ctx, "container-0").Do(doneFunc).Return(wantErr)
+		docker.EXPECT().RestartContainer(ctx, "container-1").Do(doneFunc).Return(wantErr)
 
 		err := wm.healthCheck(ctx)
 		require.NoError(t, err)
@@ -653,7 +691,7 @@ func TestWorkerManager_healthCheck(t *testing.T) {
 
 func TestWorkerManager_WaitForFreeWorker(t *testing.T) {
 	t.Run("context canceled", func(t *testing.T) {
-		workers := []*Worker{NewWorker("worker-1", 3, 30*time.Second)}
+		workers := []*Worker{NewWorker("worker-0", "container-0", 3, 30*time.Second)}
 		workers[0].SetOccupied(1)
 
 		_, _, _, wm := newMockWorkerManagerWithInit(t, workers)
@@ -682,7 +720,7 @@ func TestWorkerManager_WaitForFreeWorker(t *testing.T) {
 	})
 
 	t.Run("success", func(t *testing.T) {
-		workers := []*Worker{NewWorker("worker-1", 3, 30*time.Second)}
+		workers := []*Worker{NewWorker("worker-0", "container-0", 3, 30*time.Second)}
 		workers[0].SetOccupied(1)
 		_, _, _, wm := newMockWorkerManagerWithInit(t, workers)
 
@@ -740,6 +778,7 @@ func TestWorkerManager_SaveLoop(t *testing.T) {
 		_, _, db, wm := newMockWorkerManagerWithInit(t, []*Worker{})
 		res := internal.Result{Success: true, MatchID: 42}
 
+		db.EXPECT().RemoveMatchStatus(ctx, 42).Return(nil)
 		db.EXPECT().SaveMatchResults(ctx, res).DoAndReturn(
 			func(any, any) error {
 				cancel()
@@ -793,7 +832,9 @@ func TestWorkerManager_ResultLoop(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
-		_, broker, _, wm := newMockWorkerManagerWithInit(t, []*Worker{NewWorker("worker-1", 3, 30*time.Second)})
+		_, broker, _, wm := newMockWorkerManagerWithInit(t, []*Worker{
+			NewWorker("worker-0", "container-0", 3, 30*time.Second),
+		})
 
 		msg := mocks.NewMockMessage(gomock.NewController(t))
 		payload, err := json.Marshal(internal.Result{})
@@ -848,7 +889,9 @@ func TestWorkerManager_HealthLoop(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
-		_, broker, _, wm := newMockWorkerManagerWithInit(t, []*Worker{NewWorker("worker-1", 3, 30*time.Second)})
+		_, broker, _, wm := newMockWorkerManagerWithInit(t, []*Worker{
+			NewWorker("worker-0", "container-0", 3, 30*time.Second),
+		})
 		wm.healthCheckTick = 20 * time.Millisecond
 
 		broker.EXPECT().GetWorkersPong(ctx, wm.workerPongTimeout).
@@ -875,15 +918,18 @@ func TestWorkerManager_LifeCycle(t *testing.T) {
 	t.Run("worker assign match", func(t *testing.T) {
 		ctx := context.Background()
 
-		workers := []*Worker{NewWorker("worker-1", 1, 1*time.Hour), NewWorker("worker-2", 1, 1*time.Hour)}
+		workers := []*Worker{
+			NewWorker("worker-0", "container-0", 1, 1*time.Hour),
+			NewWorker("worker-1", "container-1", 1, 1*time.Hour),
+		}
 		workers[0].SetOccupied(2)
 
 		config := internal.MatchConfig{MatchID: 41}
 
 		docker, broker, _, wm := newMockWorkerManagerWithInit(t, workers)
-		broker.EXPECT().GetWorkersPong(ctx, wm.workerPongTimeout).Return(internal.Responders{"worker-2": {}}, nil)
-		docker.EXPECT().GetGamePort(ctx, "worker-2").Return("8080/udp", nil)
-		broker.EXPECT().AssignJob(ctx, "worker-2", config).Return(nil)
+		broker.EXPECT().GetWorkersPong(ctx, wm.workerPongTimeout).Return(internal.Responders{"worker-1": {}}, nil)
+		docker.EXPECT().GetGamePort(ctx, "container-1").Return("8080/udp", nil)
+		broker.EXPECT().AssignJob(ctx, "worker-1", config).Return(nil)
 
 		type Result struct {
 			serverInfo internal.ServerInfo
@@ -913,9 +959,9 @@ func TestWorkerManager_LifeCycle(t *testing.T) {
 		defer cancel()
 
 		workers := []*Worker{
-			NewWorker("worker-1", 0, 1*time.Hour),
-			NewWorker("worker-2", 0, 1*time.Hour),
-			NewWorker("worker-3", 0, -1*time.Hour),
+			NewWorker("worker-0", "container-0", 0, 1*time.Hour),
+			NewWorker("worker-1", "container-1", 0, 1*time.Hour),
+			NewWorker("worker-3", "container-2", 0, -1*time.Hour),
 		}
 		workers[1].SetOccupied(1)
 
@@ -928,9 +974,9 @@ func TestWorkerManager_LifeCycle(t *testing.T) {
 			<-blockRestart
 			wg.Done()
 		}
-		broker.EXPECT().GetWorkersPong(ctx, wm.workerPongTimeout).Return(internal.Responders{"worker-1": {}}, nil)
-		docker.EXPECT().RestartContainer(ctx, "worker-2").Do(block).Return(nil)
-		docker.EXPECT().RestartContainer(ctx, "worker-3").Do(block).Return(errors.New(""))
+		broker.EXPECT().GetWorkersPong(ctx, wm.workerPongTimeout).Return(internal.Responders{"worker-0": {}}, nil)
+		docker.EXPECT().RestartContainer(ctx, "container-1").Do(block).Return(nil)
+		docker.EXPECT().RestartContainer(ctx, "container-2").Do(block).Return(errors.New(""))
 
 		wg.Add(2)
 		require.NoError(t, wm.healthCheck(ctx))
@@ -950,7 +996,7 @@ func TestWorkerManager_LifeCycle(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
-		workers := []*Worker{NewWorker("worker-1", 0, 1*time.Hour)}
+		workers := []*Worker{NewWorker("worker-0", "container-0", 0, 1*time.Hour)}
 		workers[0].SetOccupied(1)
 
 		_, broker, db, wm := newMockWorkerManagerWithInit(t, workers)
@@ -962,6 +1008,7 @@ func TestWorkerManager_LifeCycle(t *testing.T) {
 		broker.EXPECT().GetResult(ctx).Return(msg, nil)
 		msg.EXPECT().Data().Times(2).Return(payload)
 		msg.EXPECT().Ack().Return(nil)
+		db.EXPECT().RemoveMatchStatus(ctx, 1).Return(nil)
 		db.EXPECT().SaveMatchResults(ctx, res).
 			DoAndReturn(func(ctx any, result any) error {
 				cancel()

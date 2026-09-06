@@ -12,23 +12,32 @@ on:
 
 defaults:
   run:
-    working-directory: ./api
+    working-directory: api
 
 jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Setup Node
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
-          node-version: 26
+          node-version-file: api/package.json
           cache: "npm"
           cache-dependency-path: api/package-lock.json
 
       - name: Install dependencies
         run: npm ci
 
-      - name: Run Tests
-        run: NODE_OPTIONS='--no-webstorage' npm test
+      - name: Run Linter
+        run: npm run lint
+
+      - name: Check Formatting
+        run: npx prettier --check .
+
+      - name: Run Unit Tests
+        run: npm run test:unit
+
+      - name: Run Integration Tests
+        run: npm run test:integration

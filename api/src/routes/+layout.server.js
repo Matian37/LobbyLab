@@ -1,18 +1,18 @@
-import { getLoginFromToken } from '$lib/db';
-import { handleError } from '$lib/error_handler';
+/**
+ * Root layout loader. Determines the current session's login by delegating to
+ * the `GET /api/session` handler, and returns `{ login }` only when the session
+ * is valid.
+ *
+ * @param {import('./$types.js').LayoutServerLoadEvent} event
+ * @returns {Promise<{ login: string } | null>}
+ */
+import { GET } from '$routes/api/session/+server.js';
 
-export async function load ({cookies}){
-    const token = cookies.get('token');
-    if(token === undefined)
-        return null;
-    const dbLogin = await getLoginFromToken(token);
-    if(dbLogin.length == 0) 
-    {
-        handleError(0);
-        cookies.delete('token', { path: '/' });
-        return null;
-    }
-    const login = dbLogin[0].login;
+export async function load({ cookies }) {
+    const response = await GET({ cookies });
+    if (!response.ok) return null;
 
-    return {login: login};
+    const { login } = await response.json();
+    if (login === null) return null;
+    return { login };
 }

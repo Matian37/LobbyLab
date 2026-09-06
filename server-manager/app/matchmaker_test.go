@@ -5,10 +5,11 @@ import (
 	"errors"
 	"io"
 	"log/slog"
-	"server-manager/internal"
-	"server-manager/internal/mocks"
 	"testing"
 	"time"
+
+	"github.com/Matian37/LobbyLab/server-manager/internal"
+	"github.com/Matian37/LobbyLab/server-manager/internal/mocks"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -27,7 +28,8 @@ func newMockMatchmaker(t *testing.T) (*mocks.MockWorkerManager, *mocks.MockDatab
 	return wm, db, m
 }
 
-func newMockMatchmakerWithStart(t *testing.T) (*mocks.MockWorkerManager, *mocks.MockDatabaseConnection, *Matchmaker) {
+// Matchmaker mock with opened field set to true
+func newMockMatchmakerWithOpen(t *testing.T) (*mocks.MockWorkerManager, *mocks.MockDatabaseConnection, *Matchmaker) {
 	wm, db, m := newMockMatchmaker(t)
 	m.opened = true
 	return wm, db, m
@@ -66,6 +68,7 @@ func TestMatchmaker_Start(t *testing.T) {
 		cancel()
 
 		db.EXPECT().Open(ctx).Return(nil)
+		db.EXPECT().SetupMatchmaking(ctx).Return(nil)
 		wm.EXPECT().WaitForFreeWorker(gomock.Any()).MaxTimes(1)
 
 		assert.NoError(t, m.Start(ctx))
@@ -77,14 +80,14 @@ func TestMatchmaker_Start(t *testing.T) {
 
 func TestMatchmaker_createMatch(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
-		wm, db, m := newMockMatchmakerWithStart(t)
+		wm, db, m := newMockMatchmakerWithOpen(t)
 
 		m.config.PlayersPerRoom = 1
 		serverInfo := internal.ServerInfo{Host: "localhost", Port: "1234/udp"}
 		users := []internal.User{{Login: "1"}}
 		wantMatchConfig := internal.MatchConfig{
 			MatchID: 1,
-			Config:  []byte(`{"players":[{"login":"1"}]}`),
+			Config:  []byte(`{"players":[{"login":"1","matchAuthToken":""}]}`),
 		}
 
 		gomock.InOrder(
@@ -104,8 +107,8 @@ func TestMatchmaker_waitForEnoughPlayers(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		cancel()
 
-		_, _, m := newMockMatchmakerWithStart(t)
-		// ensures ctx.Err() case will be done first instead of ticker
+		_, _, m := newMockMatchmakerWithOpen(t)
+		// Ensures that ctx cancel will be detected rather than ticker event
 		m.dbPoolTimeout = 1 * time.Hour
 
 		_, err := m.waitForEnoughPlayers(ctx)
@@ -116,7 +119,7 @@ func TestMatchmaker_waitForEnoughPlayers(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
-		_, db, m := newMockMatchmakerWithStart(t)
+		_, db, m := newMockMatchmakerWithOpen(t)
 
 		gomock.InOrder(
 			db.EXPECT().GatherMatchPlayers(ctx).Return(nil, internal.ErrDBNotEnoughPlayers),
@@ -141,7 +144,7 @@ func TestMatchmaker_waitForEnoughPlayers(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
-		_, db, m := newMockMatchmakerWithStart(t)
+		_, db, m := newMockMatchmakerWithOpen(t)
 
 		wantErr := errors.New("")
 		db.EXPECT().GatherMatchPlayers(ctx).Return(nil, wantErr)
@@ -164,7 +167,7 @@ func TestMatchmaker_waitForEnoughPlayers(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
-		_, db, m := newMockMatchmakerWithStart(t)
+		_, db, m := newMockMatchmakerWithOpen(t)
 
 		wantUsers := []internal.User{{Login: "1"}, {Login: "2"}}
 
@@ -199,7 +202,7 @@ func TestMatchmaker_matchmakingLoop(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
-		wm, _, m := newMockMatchmakerWithStart(t)
+		wm, _, m := newMockMatchmakerWithOpen(t)
 
 		wm.EXPECT().WaitForFreeWorker(ctx).Do(func(ctx context.Context) { cancel() })
 
@@ -222,12 +225,12 @@ func TestMatchmaker_matchmakingLoop(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
-		wm, db, m := newMockMatchmakerWithStart(t)
+		wm, db, m := newMockMatchmakerWithOpen(t)
 		m.config.PlayersPerRoom = 2
 
 		matchUsers := []internal.User{{Login: "1"}, {Login: "2"}}
 		matchConfig := internal.MatchConfig{
-			Config:  []byte(`{"players":[{"login":"1"},{"login":"2"}]}`),
+			Config:  []byte(`{"players":[{"login":"1","matchAuthToken":""},{"login":"2","matchAuthToken":""}]}`),
 			MatchID: 1,
 		}
 
@@ -235,6 +238,7 @@ func TestMatchmaker_matchmakingLoop(t *testing.T) {
 			wm.EXPECT().WaitForFreeWorker(ctx),
 			db.EXPECT().GatherMatchPlayers(ctx).Return(nil, internal.ErrDBNotEnoughPlayers),
 			db.EXPECT().GatherMatchPlayers(ctx).Return(matchUsers, nil),
+			db.EXPECT().GenerateAuthTokens(ctx, matchUsers).Return(matchUsers, nil),
 			db.EXPECT().GetNextMatchId(gomock.Any()).Return(matchConfig.MatchID, nil),
 			wm.EXPECT().AssignMatch(gomock.Any(), matchConfig).Return(internal.ServerInfo{}, nil),
 			db.EXPECT().AddMatch(gomock.Any(), matchUsers, internal.ServerInfo{}, matchConfig.MatchID).Return(nil),

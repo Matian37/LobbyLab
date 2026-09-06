@@ -1,29 +1,33 @@
+// Package main is the entry point of the server-manager service. It reads the
+// configuration, wires logging, and runs the application until it receives a
+// termination signal.
 package main
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"os"
 	"os/signal"
-	"server-manager/app"
-	"server-manager/config"
-	"server-manager/internal"
 	"syscall"
+
+	"github.com/Matian37/LobbyLab/server-manager/app"
+	"github.com/Matian37/LobbyLab/server-manager/config"
+	"github.com/Matian37/LobbyLab/server-manager/internal"
 )
 
 func main() {
+	config, err := config.ReadConfig()
+	if err != nil {
+		panic(fmt.Errorf("failed to read config: %w", err))
+	}
+
 	baseHandler := slog.NewJSONHandler(
 		os.Stdout,
-		&slog.HandlerOptions{Level: slog.LevelInfo},
+		&slog.HandlerOptions{Level: config.LogLevel},
 	)
 	handler := internal.NewContextErrorHandler(baseHandler)
 	logger := slog.New(handler)
-
-	config, err := config.ReadConfig()
-	if err != nil {
-		logger.Error("failed to read config", "error", err)
-		os.Exit(1)
-	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()

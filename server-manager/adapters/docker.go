@@ -4,14 +4,16 @@ import (
 	"context"
 	"errors"
 	"log/slog"
-	"server-manager/internal"
 	"time"
+
+	"github.com/Matian37/LobbyLab/server-manager/internal"
 
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/api/types/network"
 	"github.com/moby/moby/client"
 )
 
+// Errors returned by DockerConnection operations.
 var (
 	ErrImageEnvNotFound      = errors.New("game server image env not found")
 	ErrDockerConnNotInit     = errors.New("connection not initialized")
@@ -20,6 +22,8 @@ var (
 	ErrGamePortNoBinding     = errors.New("game port binding not found")
 )
 
+// DockerConnection implements internal.DockerConnection over the Docker Engine
+// API.
 type DockerConnection struct {
 	client *client.Client
 	config *internal.EnvConfig
@@ -34,6 +38,7 @@ type DockerConnection struct {
 	closed      bool
 }
 
+// NewDockerConnection builds a DockerConnection with default timeouts.
 func NewDockerConnection() *DockerConnection {
 	return &DockerConnection{
 		createTimeout:        5 * time.Second,
@@ -44,6 +49,7 @@ func NewDockerConnection() *DockerConnection {
 	}
 }
 
+// Open initializes the connection to the Docker Engine API.
 func (dc *DockerConnection) Open(config *internal.EnvConfig) error {
 	if dc.closed {
 		return ErrDockerConnClosed
@@ -64,7 +70,9 @@ func (dc *DockerConnection) Open(config *internal.EnvConfig) error {
 	return nil
 }
 
-func (dc *DockerConnection) SpawnContainer(ctx context.Context) (string, error) {
+// SpawnContainer creates and starts a new game-server container for workerID
+// and returns its container ID.
+func (dc *DockerConnection) SpawnContainer(ctx context.Context, workerID string) (string, error) {
 	if !dc.initialized {
 		return "", ErrDockerConnNotInit
 	}
@@ -77,7 +85,7 @@ func (dc *DockerConnection) SpawnContainer(ctx context.Context) (string, error) 
 	timeoutCtx, cancel := context.WithTimeout(ctx, dc.createTimeout)
 	defer cancel()
 
-	res, err := dc.client.ContainerCreate(timeoutCtx, dc.containerCreateOptions(portMap))
+	res, err := dc.client.ContainerCreate(timeoutCtx, dc.containerCreateOptions(portMap, workerID))
 	if err != nil {
 		return "", err
 	}
@@ -94,7 +102,8 @@ func (dc *DockerConnection) SpawnContainer(ctx context.Context) (string, error) 
 	return res.ID, nil
 }
 
-func (dc *DockerConnection) RestartContainer(ctx context.Context, id string) error {
+// RestartContainer restarts the given container.
+func (dc *DockerConnection) RestartContainer(ctx context.Context, containerID string) error {
 	if !dc.initialized {
 		return ErrDockerConnNotInit
 	}
@@ -107,7 +116,7 @@ func (dc *DockerConnection) RestartContainer(ctx context.Context, id string) err
 
 	_, err := dc.client.ContainerRestart(
 		timeoutCtx,
-		id,
+		containerID,
 		client.ContainerRestartOptions{Timeout: &dc.containerStopTimeout},
 	)
 	if err != nil {
@@ -116,7 +125,9 @@ func (dc *DockerConnection) RestartContainer(ctx context.Context, id string) err
 	return nil
 }
 
-func (dc *DockerConnection) KillContainer(ctx context.Context, id string) error {
+// RemoveContainer forcefully removes the given container, discarding any
+// volumes it uses.
+func (dc *DockerConnection) RemoveContainer(ctx context.Context, containerID string) error {
 	if !dc.initialized {
 		return ErrDockerConnNotInit
 	}
@@ -127,13 +138,57 @@ func (dc *DockerConnection) KillContainer(ctx context.Context, id string) error 
 	timeoutCtx, cancel := context.WithTimeout(ctx, dc.killTimeout)
 	defer cancel()
 
-	_, err := dc.client.ContainerKill(timeoutCtx, id, client.ContainerKillOptions{})
+	_, err := dc.client.ContainerRemove(
+		timeoutCtx,
+		containerID,
+		client.ContainerRemoveOptions{Force: true, RemoveVolumes: true},
+	)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
+// RemoveZombieWorkers finds and forcefully removes any leftover worker
+// containers from a previous run, identified by the worker label.
+func (dc *DockerConnection) RemoveZombieWorkers(ctx context.Context) error {
+	if !dc.initialized {
+		return ErrDockerConnNotInit
+	}
+	if dc.closed {
+		return ErrDockerConnClosed
+	}
+
+	timeoutCtx, cancel := context.WithTimeout(ctx, dc.killTimeout)
+	defer cancel()
+
+	containers, err := dc.client.ContainerList(timeoutCtx, client.ContainerListOptions{
+		All:     true,
+		Filters: client.Filters{}.Add("label", "com.github.Matian37.LobbyLab.service=game-server"),
+	})
+	if err != nil {
+		return err
+	}
+
+	for _, c := range containers.Items {
+		_, err := dc.client.ContainerRemove(
+			timeoutCtx,
+			c.ID,
+			client.ContainerRemoveOptions{
+				Force:         true,
+				RemoveVolumes: true,
+			},
+		)
+		if err != nil {
+			slog.Error("failed to kill zombie container", "id", c.ID, "error", err)
+		}
+	}
+
+	return nil
+}
+
+// GetGamePort returns the port assigned for the client to connect to the game
+// server.
 func (dc *DockerConnection) GetGamePort(ctx context.Context, containerID string) (string, error) {
 	if !dc.initialized {
 		return "", ErrDockerConnNotInit
@@ -154,6 +209,7 @@ func (dc *DockerConnection) GetGamePort(ctx context.Context, containerID string)
 	return bindings[0].HostPort, nil
 }
 
+// Close closes the Docker Engine API client.
 func (dc *DockerConnection) Close() error {
 	if !dc.initialized {
 		return ErrDockerConnNotInit
@@ -166,7 +222,7 @@ func (dc *DockerConnection) Close() error {
 	return err
 }
 
-// generates mapping of given ports to unspecified host bindings
+// Generates mapping of given ports to unspecified host bindings
 func genPortMap(ports network.PortSet) network.PortMap {
 	portBindings := network.PortMap{}
 	for port := range ports {
@@ -186,29 +242,47 @@ func (dc *DockerConnection) getPorts(ctx context.Context, containerID string) (n
 	return res.Container.NetworkSettings.Ports, nil
 }
 
-// NOTE: portMap must have unspecified host ports
-func (dc *DockerConnection) containerCreateOptions(portMap network.PortMap) client.ContainerCreateOptions {
+// containerCreateOptions creates container options for container spawning.
+// For the game-server to properly use the ports, the binding must be
+// unspecified. Note: due to container spawning nature, logs cannot be attached
+// to compose logs.
+func (dc *DockerConnection) containerCreateOptions(
+	portMap network.PortMap,
+	workerID string,
+) client.ContainerCreateOptions {
 	options := client.ContainerCreateOptions{
+		Name:  "lobbylab-game-server-" + workerID,
 		Image: dc.config.Image,
 		Config: &container.Config{
 			ExposedPorts: dc.config.ExposePorts,
 			Labels: map[string]string{
-				"com.github.multiplayer-asset.worker": "true",
+				"com.github.Matian37.LobbyLab.service": "game-server",
+			},
+			Env: []string{
+				"LOG_LEVEL=" + dc.config.GameServerLogLevel.String(),
+				"NATS_URI=" + dc.config.BrokerURI,
+				"WORKER_ID=" + workerID,
 			},
 		},
 		HostConfig: &container.HostConfig{
+			// Init set to true is required for game-server to reap abandoned child processes
+			// in case when actual game-server fails to exit gracefully
+			Init:         new(true),
 			PortBindings: portMap,
 			RestartPolicy: container.RestartPolicy{
 				Name:              container.RestartPolicyDisabled,
 				MaximumRetryCount: 0,
 			},
 		},
+		NetworkingConfig: &network.NetworkingConfig{
+			EndpointsConfig: map[string]*network.EndpointSettings{
+				dc.config.BrokerNetworkName: {},
+			},
+		},
 	}
 
 	if dc.config.TestMakeContainerDummy {
 		options.Config.Cmd = []string{"sleep", "inf"}
-		options.HostConfig.Init = new(bool)
-		*options.HostConfig.Init = true
 	}
 
 	return options
