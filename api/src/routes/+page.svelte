@@ -83,14 +83,14 @@
 
 <table>
     <thead>
-        <tr>
-            {#if rows.length > 0}
-                {#each Array(rows[0].details.players.length) as _, i}
-                    <th>Player {i + 1}</th>
-                {/each}
-                <th>Winner</th>
-            {/if}
-        </tr>
+      <tr>
+        {#if rows.length > 0}
+            {#each Array(rows[0].details.players.length) as _, i}
+                <th>Player {i + 1}</th>
+            {/each}
+            <th>Winner</th>
+        {/if}
+      </tr>
     </thead>
     <tbody>
         {#if rows.length > 0}
@@ -104,8 +104,8 @@
             {/each}
         {/if}
     </tbody>
-</table>
-<style>
+  </table>
+  <style>
     /* Wyśrodkowanie przycisków */
     button {
       display: inline-block;
@@ -178,4 +178,4 @@
       color: #4ade80;
       font-weight: 600;
     }
-</style>
+  </style>
