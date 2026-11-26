@@ -2,7 +2,7 @@ name: LobbyLab
 
 services:
   db:
-    image: postgres:18.6-alpine
+    image: postgres:18.7-alpine
     restart: unless-stopped
     environment:
       POSTGRES_DB: ${POSTGRES_DB:?}
@@ -21,7 +21,7 @@ services:
       - db-net
 
   nats:
-    image: nats:2.14-alpine
+    image: nats:2.15-alpine
     restart: unless-stopped
     command: ["-js", "-m", "8222", "-sd", "/data"]
     volumes:
